@@ -1,0 +1,30 @@
+#Deo's custom Day & Night tones for Pokemon Essentials.
+#These are created with preserving most of the tile colors in mind.
+#Credit is appreciated.
+  HourlyTones=[
+     Tone.new(-70,-70,11,68),     # Midnight
+     Tone.new(-70,-70,11,68),
+     Tone.new(-70,-70,11,68),
+     Tone.new(-70,-70,11,68),
+     Tone.new(-70,-70,11,68),
+     Tone.new(-17,   -51, -85,17),
+     Tone.new(-17,   -51, -85,17),      # 6AM
+     Tone.new(-17,   -51, -85,17),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),      # Noon
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(0,     0,     0,    0),
+     Tone.new(-30,   -30,   5,  68),      # 6PM
+     Tone.new(-30,   -30,   5,  68),
+     Tone.new(-35,   -35,   7,  68),
+     Tone.new(-35,   -35,   7,  68),
+     Tone.new(-70,-70,11,68),
+     Tone.new(-70,-70,11,68)
+
+https://i.imgur.com/KuNQ47F.png

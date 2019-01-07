@@ -1,0 +1,19 @@
+JASC-PAL
+0100
+16
+255 0 255 //transparent
+32 32 32 //black
+255 255 255 //white (permanent)
+200 200 200 //white (changeable)
+150 150 150 //accent color
+100 100 100 //body color (light)
+50 50 50 //body color (dark)
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
