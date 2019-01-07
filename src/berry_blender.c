@@ -2015,7 +2015,7 @@ static void sub_8081744(void)
 
     if (sBerryBlenderData->gameEndState == 0)
     {
-        if (gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_L_EQUALS_A && gMain.newKeys & A_BUTTON)
+        if (gMain.newKeys & A_BUTTON)
         {
             if ((gMain.heldKeysRaw & (A_BUTTON | L_BUTTON)) != (A_BUTTON | L_BUTTON))
                 A_pressed = TRUE;

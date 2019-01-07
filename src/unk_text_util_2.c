@@ -5,7 +5,6 @@
 #include "sound.h"
 
 ALIGNED(4)
-static const u8 sUnknown_08616124[] = {1, 2, 4};
 static const u16 sFont6BrailleGlyphs[] = INCBIN_U16("data/graphics/fonts/font6.fwjpnfont");
 
 static void DecompressGlyphFont6(u16);
@@ -164,15 +163,15 @@ u16 Font6Func(struct TextPrinter *textPrinter)
         case 4:
             if (textPrinter->scrollDistance)
             {
-                if (textPrinter->scrollDistance < sUnknown_08616124[gSaveBlock2Ptr->optionsTextSpeed])
+                if (textPrinter->scrollDistance < 4)
                 {
                     ScrollWindow(textPrinter->printerTemplate.windowId, 0, textPrinter->scrollDistance, textPrinter->printerTemplate.bgColor | (textPrinter->printerTemplate.bgColor << 4));
                     textPrinter->scrollDistance = 0;
                 }
                 else
                 {
-                    ScrollWindow(textPrinter->printerTemplate.windowId, 0, sUnknown_08616124[gSaveBlock2Ptr->optionsTextSpeed], textPrinter->printerTemplate.bgColor | (textPrinter->printerTemplate.bgColor << 4));
-                    textPrinter->scrollDistance -= sUnknown_08616124[gSaveBlock2Ptr->optionsTextSpeed];
+                    ScrollWindow(textPrinter->printerTemplate.windowId, 0, 4, textPrinter->printerTemplate.bgColor | (textPrinter->printerTemplate.bgColor << 4));
+                    textPrinter->scrollDistance -= 4;
                 }
                 CopyWindowToVram(textPrinter->printerTemplate.windowId, 2);
             }

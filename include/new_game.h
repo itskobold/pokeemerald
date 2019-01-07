@@ -10,5 +10,7 @@ void CopyTrainerId(u8 *dst, u8 *src);
 void NewGameInitData(void);
 void sub_808447C(void);
 void Sav2_ClearSetDefault(void);
+void SetDefaultData(void);
+void SetDefaultOptions(void);
 
 #endif // GUARD_NEW_GAME_H

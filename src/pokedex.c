@@ -3088,7 +3088,7 @@ void sub_80BEDF4(u8 taskId)
         return;
     }
     if (((gMain.newKeys & DPAD_LEFT)
-     || ((gMain.newKeys & L_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR))
+     || (gMain.newKeys & L_BUTTON))
      && sPokedexView->selectedScreen > 0)
     {
         sPokedexView->selectedScreen--;
@@ -3097,8 +3097,8 @@ void sub_80BEDF4(u8 taskId)
         return;
     }
     if (((gMain.newKeys & DPAD_RIGHT)
-     || ((gMain.newKeys & R_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR))
-     && sPokedexView->selectedScreen < 3)
+     || (gMain.newKeys & R_BUTTON))
+     && sPokedexView->selectedScreen > 0)
     {
         sPokedexView->selectedScreen++;
         sub_80BFD0C(sPokedexView->selectedScreen, 0xD);
@@ -3334,7 +3334,7 @@ void sub_80BF5CC(u8 taskId)
             return;
         }
         if ((gMain.newKeys & DPAD_LEFT)
-         || ((gMain.newKeys & L_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR))
+         || (gMain.newKeys & L_BUTTON))
         {
             BeginNormalPaletteFade(0xFFFFFFEB, 0, 0, 0x10, RGB_BLACK);
             m4aMPlayContinue(&gMPlayInfo_BGM);
@@ -3344,7 +3344,7 @@ void sub_80BF5CC(u8 taskId)
             return;
         }
         if ((gMain.newKeys & DPAD_RIGHT)
-         || ((gMain.newKeys & R_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR))
+         || (gMain.newKeys & R_BUTTON))
         {
             if (!sPokedexListItem->owned)
             {
@@ -3504,7 +3504,7 @@ void sub_80BFBB0(u8 taskId)
         PlaySE(SE_PC_OFF);
     }
     else if ((gMain.newKeys & DPAD_LEFT)
-     || ((gMain.newKeys & L_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR))
+     || (gMain.newKeys & L_BUTTON))
     {
         BeginNormalPaletteFade(0xFFFFFFEB, 0, 0, 0x10, RGB_BLACK);
         sPokedexView->unk64E = 2;

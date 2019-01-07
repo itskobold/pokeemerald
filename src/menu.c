@@ -470,18 +470,12 @@ void sub_8197948(u8 initialCursorPos)
 
 u32 GetPlayerTextSpeed(void)
 {
-    if (gTextFlags.forceMidTextSpeed)
-        return OPTIONS_TEXT_SPEED_MID;
-    return gSaveBlock2Ptr->optionsTextSpeed;
+    return 2;
 }
 
 u8 GetPlayerTextSpeedDelay(void)
 {
-    u32 speed;
-    if (gSaveBlock2Ptr->optionsTextSpeed > OPTIONS_TEXT_SPEED_FAST)
-        gSaveBlock2Ptr->optionsTextSpeed = OPTIONS_TEXT_SPEED_MID;
-    speed = GetPlayerTextSpeed();
-    return gUnknown_0860F094[speed];
+    return 1;
 }
 
 u8 sub_81979C4(u8 a1)

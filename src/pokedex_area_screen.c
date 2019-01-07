@@ -600,7 +600,7 @@ static void Task_PokedexAreaScreen_1(u8 taskId)
             gTasks[taskId].data[1] = 1;
             PlaySE(SE_PC_OFF);
         }
-        else if (gMain.newKeys & DPAD_RIGHT || (gMain.newKeys & R_BUTTON && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR))
+        else if (gMain.newKeys & DPAD_RIGHT || (gMain.newKeys & R_BUTTON))
         {
             gTasks[taskId].data[1] = 2;
             PlaySE(SE_Z_PAGE);
