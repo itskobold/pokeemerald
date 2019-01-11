@@ -1160,7 +1160,7 @@ static void atk01_accuracycheck(void)
             calc = (calc * 130) / 100; // 1.3 compound eyes boost
         if (WEATHER_HAS_EFFECT && gBattleMons[gBattlerTarget].ability == ABILITY_SAND_VEIL && gBattleWeather & WEATHER_SANDSTORM_ANY)
             calc = (calc * 80) / 100; // 1.2 sand veil loss
-        if (gBattleMons[gBattlerAttacker].ability == ABILITY_HUSTLE && IS_TYPE_PHYSICAL(type))
+        if (gBattleMons[gBattlerAttacker].ability == ABILITY_HUSTLE && gBattleMoves[move].pss == MOVE_IS_PHYSICAL)
             calc = (calc * 80) / 100; // 1.2 hustle loss
 
         if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
@@ -1932,7 +1932,7 @@ static void atk0C_datahpupdate(void)
                 if (!gSpecialStatuses[gActiveBattler].dmg && !(gHitMarker & HITMARKER_x100000))
                     gSpecialStatuses[gActiveBattler].dmg = gHpDealt;
 
-                if (IS_TYPE_PHYSICAL(moveType) && !(gHitMarker & HITMARKER_x100000) && gCurrentMove != MOVE_PAIN_SPLIT)
+                if (gBattleMoves[gCurrentMove].pss == MOVE_IS_PHYSICAL && !(gHitMarker & HITMARKER_x100000) && gCurrentMove != MOVE_PAIN_SPLIT)
                 {
                     gProtectStructs[gActiveBattler].physicalDmg = gHpDealt;
                     gSpecialStatuses[gActiveBattler].physicalDmg = gHpDealt;
@@ -1947,7 +1947,7 @@ static void atk0C_datahpupdate(void)
                         gSpecialStatuses[gActiveBattler].physicalBattlerId = gBattlerTarget;
                     }
                 }
-                else if (!IS_TYPE_PHYSICAL(moveType) && !(gHitMarker & HITMARKER_x100000))
+                else if (gBattleMoves[gCurrentMove].pss != MOVE_IS_PHYSICAL && !(gHitMarker & HITMARKER_x100000))
                 {
                     gProtectStructs[gActiveBattler].specialDmg = gHpDealt;
                     gSpecialStatuses[gActiveBattler].specialDmg = gHpDealt;
@@ -7645,13 +7645,6 @@ static void atk90_tryconversiontypechange(void) // randomly changes user's type 
     {
         moveType = gBattleMoves[gBattleMons[gBattlerAttacker].moves[moveChecked]].type;
 
-        if (moveType == TYPE_MYSTERY)
-        {
-            if (IS_BATTLER_OF_TYPE(gBattlerAttacker, TYPE_GHOST))
-                moveType = TYPE_GHOST;
-            else
-                moveType = TYPE_NORMAL;
-        }
         if (moveType != gBattleMons[gBattlerAttacker].type1
             && moveType != gBattleMons[gBattlerAttacker].type2)
         {
@@ -7672,13 +7665,6 @@ static void atk90_tryconversiontypechange(void) // randomly changes user's type 
 
             moveType = gBattleMoves[gBattleMons[gBattlerAttacker].moves[moveChecked]].type;
 
-            if (moveType == TYPE_MYSTERY)
-            {
-                if (IS_BATTLER_OF_TYPE(gBattlerAttacker, TYPE_GHOST))
-                    moveType = TYPE_GHOST;
-                else
-                    moveType = TYPE_NORMAL;
-            }
         }
         while (moveType == gBattleMons[gBattlerAttacker].type1 || moveType == gBattleMons[gBattlerAttacker].type2);
 
@@ -9121,7 +9107,7 @@ static void atkC1_hiddenpowercalc(void)
     gDynamicBasePower = (40 * powerBits) / 63 + 30;
 
     gBattleStruct->dynamicMoveType = (15 * typeBits) / 63 + 1;
-    if (gBattleStruct->dynamicMoveType >= TYPE_MYSTERY)
+    if (gBattleStruct->dynamicMoveType >= TYPE_FIRE)
         gBattleStruct->dynamicMoveType++;
     gBattleStruct->dynamicMoveType |= 0xC0;
 

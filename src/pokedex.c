@@ -1129,6 +1129,10 @@ static const struct PokedexOption gDexSearchTypeOptions[] =
     {gText_DexEmptyString, gTypeNames[TYPE_ICE]},
     {gText_DexEmptyString, gTypeNames[TYPE_DRAGON]},
     {gText_DexEmptyString, gTypeNames[TYPE_DARK]},
+	{gText_DexEmptyString, gTypeNames[TYPE_AUDIO]},
+	{gText_DexEmptyString, gTypeNames[TYPE_COSMIC]},
+	{gText_DexEmptyString, gTypeNames[TYPE_FAIRY]},
+	{gText_DexEmptyString, gTypeNames[TYPE_NULL]},
     {NULL, NULL},
 };
 
@@ -1153,6 +1157,10 @@ static const u8 gDexSearchTypeIds[] = {
     TYPE_ICE,
     TYPE_DRAGON,
     TYPE_DARK,
+	TYPE_AUDIO,
+	TYPE_COSMIC,
+	TYPE_FAIRY,
+	TYPE_NULL,
 };
 
 static const struct UnknownStruct1 gUnknown_0856EFC8[] =

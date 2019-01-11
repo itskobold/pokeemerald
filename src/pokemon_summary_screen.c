@@ -702,10 +702,6 @@ static const union AnimCmd sSpriteAnim_TypeSteel[] = {
     ANIMCMD_FRAME(TYPE_STEEL * 8, 0, FALSE, FALSE),
     ANIMCMD_END
 };
-static const union AnimCmd sSpriteAnim_TypeMystery[] = {
-    ANIMCMD_FRAME(TYPE_MYSTERY * 8, 0, FALSE, FALSE),
-    ANIMCMD_END
-};
 static const union AnimCmd sSpriteAnim_TypeFire[] = {
     ANIMCMD_FRAME(TYPE_FIRE * 8, 0, FALSE, FALSE),
     ANIMCMD_END
@@ -738,6 +734,22 @@ static const union AnimCmd sSpriteAnim_TypeDark[] = {
     ANIMCMD_FRAME(TYPE_DARK * 8, 0, FALSE, FALSE),
     ANIMCMD_END
 };
+static const union AnimCmd sSpriteAnim_TypeAudio[] = {
+    ANIMCMD_FRAME(TYPE_AUDIO * 8, 0, FALSE, FALSE),
+    ANIMCMD_END
+};
+static const union AnimCmd sSpriteAnim_TypeCosmic[] = {
+    ANIMCMD_FRAME(TYPE_COSMIC * 8, 0, FALSE, FALSE),
+    ANIMCMD_END
+};
+static const union AnimCmd sSpriteAnim_TypeFairy[] = {
+    ANIMCMD_FRAME(TYPE_FAIRY * 8, 0, FALSE, FALSE),
+    ANIMCMD_END
+};
+static const union AnimCmd sSpriteAnim_TypeNull[] = {
+    ANIMCMD_FRAME(TYPE_NULL * 8, 0, FALSE, FALSE),
+    ANIMCMD_END
+};
 static const union AnimCmd sSpriteAnim_CategoryCool[] = {
     ANIMCMD_FRAME((CONTEST_CATEGORY_COOL + NUMBER_OF_MON_TYPES) * 8, 0, FALSE, FALSE),
     ANIMCMD_END
@@ -768,7 +780,6 @@ static const union AnimCmd *const sSpriteAnimTable_MoveTypes[NUMBER_OF_MON_TYPES
     sSpriteAnim_TypeBug,
     sSpriteAnim_TypeGhost,
     sSpriteAnim_TypeSteel,
-    sSpriteAnim_TypeMystery,
     sSpriteAnim_TypeFire,
     sSpriteAnim_TypeWater,
     sSpriteAnim_TypeGrass,
@@ -777,6 +788,10 @@ static const union AnimCmd *const sSpriteAnimTable_MoveTypes[NUMBER_OF_MON_TYPES
     sSpriteAnim_TypeIce,
     sSpriteAnim_TypeDragon,
     sSpriteAnim_TypeDark,
+	sSpriteAnim_TypeAudio,
+	sSpriteAnim_TypeCosmic,
+	sSpriteAnim_TypeFairy,
+	sSpriteAnim_TypeNull,
     sSpriteAnim_CategoryCool,
     sSpriteAnim_CategoryBeauty,
     sSpriteAnim_CategoryCute,
@@ -811,7 +826,6 @@ static const u8 sMoveTypeToOamPaletteNum[NUMBER_OF_MON_TYPES + CONTEST_CATEGORIE
     [TYPE_BUG] = 15,
     [TYPE_GHOST] = 14,
     [TYPE_STEEL] = 13,
-    [TYPE_MYSTERY] = 15,
     [TYPE_FIRE] = 13,
     [TYPE_WATER] = 14,
     [TYPE_GRASS] = 15,
@@ -820,6 +834,10 @@ static const u8 sMoveTypeToOamPaletteNum[NUMBER_OF_MON_TYPES + CONTEST_CATEGORIE
     [TYPE_ICE] = 14,
     [TYPE_DRAGON] = 15,
     [TYPE_DARK] = 13,
+	[TYPE_AUDIO] = 15,
+	[TYPE_COSMIC] = 15,
+	[TYPE_FAIRY] = 15,
+	[TYPE_NULL] = 15,
     [NUMBER_OF_MON_TYPES + CONTEST_CATEGORY_COOL] = 13,
     [NUMBER_OF_MON_TYPES + CONTEST_CATEGORY_BEAUTY] = 14,
     [NUMBER_OF_MON_TYPES + CONTEST_CATEGORY_CUTE] = 14,
@@ -3720,24 +3738,17 @@ static void SetMoveTypeSpritePosAndType(u8 typeId, u8 x, u8 y, u8 spriteArrayId)
 static void sub_81C43A0(void)
 {
     struct PokeSummary *summary = &pssData->summary;
-    if (summary->isEgg)
-    {
-        SetMoveTypeSpritePosAndType(TYPE_MYSTERY, 120, 48, 3);
-        sub_81C4204(4, TRUE);
-    }
-    else
-    {
-        SetMoveTypeSpritePosAndType(gBaseStats[summary->species].type1, 0x78, 0x30, 3);
-        if (gBaseStats[summary->species].type1 != gBaseStats[summary->species].type2)
-        {
-            SetMoveTypeSpritePosAndType(gBaseStats[summary->species].type2, 0xA0, 0x30, 4);
-            sub_81C4204(4, FALSE);
-        }
-        else
-        {
-            sub_81C4204(4, TRUE);
-        }
-    }
+
+	SetMoveTypeSpritePosAndType(gBaseStats[summary->species].type1, 0x78, 0x30, 3);
+	if (gBaseStats[summary->species].type1 != gBaseStats[summary->species].type2)
+	{
+		SetMoveTypeSpritePosAndType(gBaseStats[summary->species].type2, 0xA0, 0x30, 4);
+		sub_81C4204(4, FALSE);
+	}
+	else
+	{
+		sub_81C4204(4, TRUE);
+	}
 }
 
 static void sub_81C4420(void)

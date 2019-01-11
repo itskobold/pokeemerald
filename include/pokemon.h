@@ -347,6 +347,7 @@ struct BattleMove
     u8 target;
     s8 priority;
     u8 flags;
+	u8 pss;
 };
 
 #define FLAG_MAKES_CONTACT          0x1
