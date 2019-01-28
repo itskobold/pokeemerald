@@ -125,7 +125,8 @@ SECTIONS {
         src/option_menu.o(.text);
 		src/option_menu.o(.data);
         src/pokedex.o(.text);
-        asm/trainer_card.o(.text);
+        src/trainer_card.o(.text);
+        src/frontier_pass.o(.text);
         src/pokemon_storage_system.o(.text);
         src/pokemon_icon.o(.text);
         src/script_movement.o(.text);
@@ -136,7 +137,6 @@ SECTIONS {
         src/battle_anim_80D51AC.o(.text);
         src/item.o(.text);
         src/contest.o(.text);
-        asm/contest.o(.text);
         src/shop.o(.text);
         src/fldeff_escalator.o(.text);
         src/berry.o(.text);
@@ -292,7 +292,8 @@ SECTIONS {
         src/battle_pyramid_bag.o(.text);
         asm/pokenav.o(.text);
         src/pokenav_match_call.o(.text);
-        asm/pokenav.o(.text.after.match.call);
+        asm/rom_81D1C44.o(.text);
+        src/trainer_hill.o(.text);
         src/rayquaza_scene.o(.text);
         src/walda_phrase.o(.text);
         src/contest_link_81D9DE4.o(.text);
@@ -457,7 +458,8 @@ SECTIONS {
         src/field_effect.o(.rodata);
         src/option_menu.o(.rodata);
         src/pokedex.o(.rodata);
-        data/trainer_card.o(.rodata);
+        src/trainer_card.o(.rodata);
+        src/frontier_pass.o(.rodata);
         src/pokemon_storage_system.o(.rodata);
         src/pokemon_icon.o(.rodata);
         src/fldeff_cut.o(.rodata);
@@ -596,7 +598,8 @@ SECTIONS {
         src/battle_pyramid_bag.o(.rodata);
         data/pokenav.o(.rodata);
         src/pokenav_match_call.o(.rodata);
-        data/pokenav.o(.rodata.after.match.call);
+        data/rom_81D1C44.o(.rodata);
+        src/trainer_hill.o(.rodata);
         src/rayquaza_scene.o(.rodata);
         src/walda_phrase.o(.rodata);
         src/gym_leader_rematch.o(.rodata);

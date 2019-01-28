@@ -1888,7 +1888,7 @@ static void FillTrainerParty(u16 trainerId, u8 firstMonId, u8 monCount)
     else if (trainerId == TRAINER_EREADER)
     {
         for (i = firstMonId; i < firstMonId + 3; i++)
-            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId], 0);
+            CreateBattleTowerMon(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId], 0);
         return;
     }
     else if (trainerId == TRAINER_FRONTIER_BRAIN)
@@ -1904,7 +1904,7 @@ static void FillTrainerParty(u16 trainerId, u8 firstMonId, u8 monCount)
             if (gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j].species != 0
                 && gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j].level <= level)
             {
-                sub_8068338(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j], FALSE, 0);
+                CreateBattleTowerMon2(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j], FALSE, 0);
             }
         }
         return;
@@ -2087,7 +2087,7 @@ static void FillFactoryFrontierTrainerParty(u16 trainerId, u8 firstMonId)
     else if (trainerId == TRAINER_EREADER)
     {
         for (i = firstMonId; i < firstMonId + 3; i++)
-            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId], 0);
+            CreateBattleTowerMon(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId], 0);
         return;
     }
     else if (trainerId == TRAINER_FRONTIER_BRAIN)
@@ -2290,7 +2290,7 @@ void DoSpecialTrainerBattle(void)
     case SPECIAL_BATTLE_EREADER:
         ZeroEnemyPartyMons();
         for (i = 0; i < 3; i++)
-            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i], 0);
+            CreateBattleTowerMon(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i], 0);
         gBattleTypeFlags = BATTLE_TYPE_TRAINER | BATTLE_TYPE_EREADER_TRAINER;
         gTrainerBattleOpponent_A = 0;
         CreateTask(Task_StartBattleAfterTransition, 1);
@@ -3226,7 +3226,7 @@ static void FillPartnerParty(u16 trainerId)
                 if (monData.nickname[0] == EXT_CTRL_CODE_BEGIN && monData.nickname[1] == EXT_CTRL_CODE_JPN)
                     trainerName[5] = EOS;
             }
-            sub_8068338(&gPlayerParty[3 + i], &monData, TRUE, 0);
+            CreateBattleTowerMon2(&gPlayerParty[3 + i], &monData, TRUE, 0);
             SetMonData(&gPlayerParty[3 + i], MON_DATA_OT_NAME, trainerName);
             j = IsFrontierTrainerFemale(trainerId + TRAINER_RECORD_MIXING_FRIEND);
             SetMonData(&gPlayerParty[3 + i], MON_DATA_OT_GENDER, &j);
@@ -3632,7 +3632,7 @@ static void FillTentTrainerParty_(u16 trainerId, u8 firstMonId, u8 monCount)
     }
 }
 
-u8 sub_81660B8(u8 facilityClass)
+u8 FacilityClassToGraphicsId(u8 facilityClass)
 {
     u8 trainerObjectGfxId;
     u8 i;
