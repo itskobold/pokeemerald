@@ -611,18 +611,18 @@ const struct WildPokemonInfo gMtPyre_1F_LandMonsInfo = {10, gMtPyre_1F_LandMons}
 
 const struct WildPokemon gVictoryRoad_1F_LandMons[] =
 {
-    {40, 40, SPECIES_GOLBAT},
-    {40, 40, SPECIES_HARIYAMA},
-    {40, 40, SPECIES_LAIRON},
-    {40, 40, SPECIES_LOUDRED},
-    {36, 36, SPECIES_ZUBAT},
-    {36, 36, SPECIES_MAKUHITA},
-    {38, 38, SPECIES_GOLBAT},
-    {38, 38, SPECIES_HARIYAMA},
-    {36, 36, SPECIES_ARON},
-    {36, 36, SPECIES_WHISMUR},
-    {36, 36, SPECIES_ARON},
-    {36, 36, SPECIES_WHISMUR},
+    {40, 40, SPECIES_STEELIX},
+    {40, 40, SPECIES_STEELIX},
+    {40, 40, SPECIES_STEELIX},
+    {40, 40, SPECIES_STEELIX},
+    {36, 36, SPECIES_STEELIX},
+    {36, 36, SPECIES_STEELIX},
+    {38, 38, SPECIES_STEELIX},
+    {38, 38, SPECIES_STEELIX},
+    {36, 36, SPECIES_STEELIX},
+    {36, 36, SPECIES_STEELIX},
+    {36, 36, SPECIES_STEELIX},
+    {36, 36, SPECIES_STEELIX},
 };
 
 const struct WildPokemonInfo gVictoryRoad_1F_LandMonsInfo = {10, gVictoryRoad_1F_LandMons};

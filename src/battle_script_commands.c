@@ -1595,12 +1595,12 @@ u8 TypeCalc(u16 move, u8 attacker, u8 defender)
     return flags;
 }
 
-u8 AI_TypeCalc(u16 move, u16 targetSpecies, u8 targetAbility)
+u8 AI_TypeCalc(u16 move, u8 type1, u8 type2, u16 targetAbility)
 {
     s32 i = 0;
     u8 flags = 0;
-    u8 type1 = gBaseStats[targetSpecies].type1, type2 = gBaseStats[targetSpecies].type2;
     u8 moveType;
+	u8 chance = Random() % 10;
 
     if (move == MOVE_STRUGGLE)
         return 0;
@@ -1611,7 +1611,21 @@ u8 AI_TypeCalc(u16 move, u16 targetSpecies, u8 targetAbility)
     {
         flags = MOVE_RESULT_MISSED | MOVE_RESULT_DOESNT_AFFECT_FOE;
     }
-    else
+	else if (moveType == TYPE_NULL) //if move used is null type
+	{
+		if (chance < 3) //2 in 10 chance of super effective
+			ModulateDmgByType2(20, move, &flags);
+		else if (chance < 5) //2 in 10 chance of not very effective
+			ModulateDmgByType2(5, move, &flags);
+	}
+	else if (gBattleMons[gBattlerTarget].type1 == TYPE_NULL || gBattleMons[gBattlerTarget].type2 == TYPE_NULL) //if move is not null type but mon is null type
+	{
+		if (chance < 3) //2 in 10 chance of super effective
+			ModulateDmgByType2(20, move, &flags);
+		else if (chance < 5) //2 in 10 chance of not very effective
+			ModulateDmgByType2(5, move, &flags);
+	}
+    else //nothing is null type, calculate types as normal
     {
         while (TYPE_EFFECT_ATK_TYPE(i) != TYPE_ENDTABLE)
         {
@@ -4928,9 +4942,15 @@ static void atk4D_switchindataupdate(void)
         monData[i] = gBattleBufferB[gActiveBattler][4 + i];
     }
 
-    gBattleMons[gActiveBattler].type1 = gBaseStats[gBattleMons[gActiveBattler].species].type1;
-    gBattleMons[gActiveBattler].type2 = gBaseStats[gBattleMons[gActiveBattler].species].type2;
-    gBattleMons[gActiveBattler].ability = GetAbilityBySpecies(gBattleMons[gActiveBattler].species, gBattleMons[gActiveBattler].altAbility);
+    //this code is absolutely horrible
+	//but i can't get it to work any other way & i'm too tired to figure it out. so this stays for now
+	gBattleMons[gActiveBattler].type1 = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_TYPE_1) : GetMonData(&gEnemyParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_TYPE_1);
+	gBattleMons[gActiveBattler].type2 = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_TYPE_2) : GetMonData(&gEnemyParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_TYPE_2);
+		
+	if ((GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_ABILITY) : GetMonData(&gEnemyParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_ABILITY) != 0)
+		gBattleMons[gActiveBattler].ability = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_ABILITY) : GetMonData(&gEnemyParty[gBattlerPartyIndexes[gActiveBattler]], MON_DATA_ABILITY);
+	else
+		gBattleMons[gActiveBattler].ability = GetAbilityBySpecies(gBattleMons[gActiveBattler].species, gBattleMons[gActiveBattler].altAbility, 0);
 
     // check knocked off item
     i = GetBattlerSide(gActiveBattler);
@@ -8629,10 +8649,11 @@ static void atkAE_healpartystatus(void)
         {
             u16 species = GetMonData(&party[i], MON_DATA_SPECIES2);
             u8 abilityBit = GetMonData(&party[i], MON_DATA_ALT_ABILITY);
+			u16 customAbility = GetMonData(&party[i], MON_DATA_ABILITY);
 
             if (species != SPECIES_NONE && species != SPECIES_EGG)
             {
-                u8 ability;
+                u16 ability;
 
                 if (gBattlerPartyIndexes[gBattlerAttacker] == i)
                     ability = gBattleMons[gBattlerAttacker].ability;
@@ -8641,7 +8662,7 @@ static void atkAE_healpartystatus(void)
                          && !(gAbsentBattlerFlags & gBitTable[gActiveBattler]))
                     ability = gBattleMons[gActiveBattler].ability;
                 else
-                    ability = GetAbilityBySpecies(species, abilityBit);
+                    ability = GetAbilityBySpecies(species, abilityBit, customAbility);
 
                 if (ability != ABILITY_SOUNDPROOF)
                     toHeal |= (1 << i);

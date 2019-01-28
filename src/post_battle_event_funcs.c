@@ -51,11 +51,9 @@ int GameClear(void)
         ribbonCounts[i].count = 0;
 
         if (GetMonData(mon, MON_DATA_SANITY_HAS_SPECIES)
-         && !GetMonData(mon, MON_DATA_SANITY_IS_EGG)
-         && !GetMonData(mon, MON_DATA_CHAMPION_RIBBON))
+         && !GetMonData(mon, MON_DATA_SANITY_IS_EGG))
         {
             u8 val[1] = {TRUE};
-            SetMonData(mon, MON_DATA_CHAMPION_RIBBON, val);
             ribbonCounts[i].count = GetRibbonCount(mon);
             ribbonGet = TRUE;
         }
@@ -74,11 +72,6 @@ int GameClear(void)
                 ribbonCounts[0] = ribbonCounts[i];
                 ribbonCounts[i] = prevBest;
             }
-        }
-
-        if (ribbonCounts[0].count > 4)
-        {
-            sub_80EE4DC(&gPlayerParty[ribbonCounts[0].partyIndex], MON_DATA_CHAMPION_RIBBON);
         }
     }
 

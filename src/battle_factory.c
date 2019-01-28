@@ -414,7 +414,7 @@ static void sub_81A64C4(void)
                       monLevel,
                       ivs,
                       TRUE, gSaveBlock2Ptr->frontier.field_E70[i].personality,
-                      0, 0);
+                      0, 0, 0, 0);
 
             count = 0;
             bits = gFacilityTrainerMons[monSetId].evSpread;
@@ -455,7 +455,7 @@ static void sub_81A64C4(void)
                       monLevel,
                       ivs,
                       TRUE, gSaveBlock2Ptr->frontier.field_E70[i + 3].personality,
-                      0, 0);
+                      0, 0, 0, 0);
 
             count = 0;
             bits = gFacilityTrainerMons[monSetId].evSpread;
@@ -754,7 +754,8 @@ void FillFactoryBrainParty(void)
                                              gFacilityTrainerMons[monSetId].nature,
                                              fixedIV,
                                              gFacilityTrainerMons[monSetId].evSpread,
-                                             otId);
+                                             otId,
+											 0);
 
         friendship = 0;
         for (k = 0; k < MAX_MON_MOVES; k++)

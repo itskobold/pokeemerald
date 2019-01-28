@@ -2043,7 +2043,7 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
 
                 personalityValue += nameHash << 8;
                 fixedIV = partyData[i].iv * 31 / 255;
-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
+                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0, 0, 0);
                 break;
             }
             case F_TRAINER_PARTY_CUSTOM_MOVESET:
@@ -2055,7 +2055,7 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
 
                 personalityValue += nameHash << 8;
                 fixedIV = partyData[i].iv * 31 / 255;
-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, 2, 0);
+                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, 2, 0, 0, 0);
 
                 for (j = 0; j < MAX_MON_MOVES; j++)
                 {
@@ -2073,7 +2073,7 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
 
                 personalityValue += nameHash << 8;
                 fixedIV = partyData[i].iv * 31 / 255;
-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, 2, 0);
+                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, 2, 0, 0, 0);
 
                 SetMonData(&party[i], MON_DATA_HELD_ITEM, &partyData[i].heldItem);
                 break;
@@ -2087,7 +2087,7 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
 
                 personalityValue += nameHash << 8;
                 fixedIV = partyData[i].iv * 31 / 255;
-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, 2, 0);
+                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, 2, 0, 0, 0);
 
                 SetMonData(&party[i], MON_DATA_HELD_ITEM, &partyData[i].heldItem);
 
@@ -3290,7 +3290,9 @@ void SwitchInClearSetData(void)
 
 void FaintClearSetData(void)
 {
-    s32 i;
+    s32 i, j;
+	u16 species;
+	u16 hp;
     u8 *ptr;
 
     for (i = 0; i < NUM_BATTLE_STATS; i++)
@@ -3374,8 +3376,19 @@ void FaintClearSetData(void)
 
     gBattleResources->flags->flags[gActiveBattler] = 0;
 
-    gBattleMons[gActiveBattler].type1 = gBaseStats[gBattleMons[gActiveBattler].species].type1;
-    gBattleMons[gActiveBattler].type2 = gBaseStats[gBattleMons[gActiveBattler].species].type2;
+	// gets types of mon - it will always be first in the party that isn't fainted, an egg, or no species
+    for (j = 0; j < 6; j++)
+	{
+		species = GetMonData(&gPlayerParty[j], MON_DATA_SPECIES2);
+		hp = GetMonData(&gPlayerParty[j], MON_DATA_HP);
+		
+		if (species != SPECIES_NONE && species != SPECIES_EGG && hp != 0)
+		{
+			gBattleMons[gActiveBattler].type1 = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[j], MON_DATA_TYPE_1) : GetMonData(&gEnemyParty[j], MON_DATA_TYPE_1);
+			gBattleMons[gActiveBattler].type2 = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[j], MON_DATA_TYPE_2) : GetMonData(&gEnemyParty[j], MON_DATA_TYPE_2);
+			break;
+		}
+	}
 
     ClearBattlerMoveHistory(gActiveBattler);
     ClearBattlerAbilityHistory(gActiveBattler);
@@ -3420,7 +3433,10 @@ static void BattleIntroPrepareBackgroundSlide(void)
 static void BattleIntroDrawTrainersOrMonsSprites(void)
 {
     u8 *ptr;
-    s32 i;
+	u16 species;
+	u16 hp;
+	u16 customAbility;
+    s32 i, j;
 
     if (gBattleControllerExecFlags)
         return;
@@ -3442,9 +3458,26 @@ static void BattleIntroDrawTrainersOrMonsSprites(void)
             for (i = 0; i < sizeof(struct BattlePokemon); i++)
                 ptr[i] = gBattleBufferB[gActiveBattler][4 + i];
 
-            gBattleMons[gActiveBattler].type1 = gBaseStats[gBattleMons[gActiveBattler].species].type1;
-            gBattleMons[gActiveBattler].type2 = gBaseStats[gBattleMons[gActiveBattler].species].type2;
-            gBattleMons[gActiveBattler].ability = GetAbilityBySpecies(gBattleMons[gActiveBattler].species, gBattleMons[gActiveBattler].altAbility);
+			// gets ability & types of mon - it will always be first in the party that isn't fainted, an egg, or no species
+            for (j = 0; j < 6; j++)
+			{
+				species = GetMonData(&gPlayerParty[j], MON_DATA_SPECIES2);
+				hp = GetMonData(&gPlayerParty[j], MON_DATA_HP);
+				customAbility = GetMonData(&gPlayerParty[j], MON_DATA_ABILITY);
+				
+				if (species != SPECIES_NONE && species != SPECIES_EGG && hp != 0)
+				{
+					gBattleMons[gActiveBattler].type1 = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[j], MON_DATA_TYPE_1) : GetMonData(&gEnemyParty[j], MON_DATA_TYPE_1);
+					gBattleMons[gActiveBattler].type2 = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[j], MON_DATA_TYPE_2) : GetMonData(&gEnemyParty[j], MON_DATA_TYPE_2);
+
+					if (GetMonData(((GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? &gPlayerParty[j] : &gEnemyParty[j]), MON_DATA_ABILITY) != 0)
+						gBattleMons[gActiveBattler].ability = (GetBattlerSide(gActiveBattler) == B_SIDE_PLAYER) ? GetMonData(&gPlayerParty[j], MON_DATA_ABILITY) : GetMonData(&gEnemyParty[j], MON_DATA_ABILITY);
+					else
+						gBattleMons[gActiveBattler].ability = GetAbilityBySpecies(gBattleMons[gActiveBattler].species, gBattleMons[gActiveBattler].altAbility, customAbility);
+					break;
+				}
+			}
+			
             hpOnSwitchout = &gBattleStruct->hpOnSwitchout[GetBattlerSide(gActiveBattler)];
             *hpOnSwitchout = gBattleMons[gActiveBattler].hp;
             for (i = 0; i < NUM_BATTLE_STATS; i++)

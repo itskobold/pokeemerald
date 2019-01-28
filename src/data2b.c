@@ -261,6 +261,12 @@ const union AffineAnimCmd * const gUnknown_082FF6C0[] =
 
 #include "data/pokemon_graphics/back_pic_table.h"
 #include "data/pokemon_graphics/palette_table.h"
+#include "data/pokemon_graphics/common_palette_table.h"
+#include "data/pokemon_graphics/uncommon_palette_table.h"
+#include "data/pokemon_graphics/lesser_palette_table.h"
+#include "data/pokemon_graphics/rare_palette_table.h"
+#include "data/pokemon_graphics/elite_palette_table.h"
+#include "data/pokemon_graphics/exotic_palette_table.h"
 #include "data/pokemon_graphics/shiny_palette_table.h"
 
 #include "data/trainer_graphics/front_pic_anims.h"

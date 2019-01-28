@@ -2628,8 +2628,8 @@ static void InitDomeTrainers(void)
         statSums[0] += GetMonData(&gPlayerParty[trainerId], MON_DATA_SPDEF, NULL);
         statSums[0] += GetMonData(&gPlayerParty[trainerId], MON_DATA_SPEED, NULL);
         statSums[0] += GetMonData(&gPlayerParty[trainerId], MON_DATA_MAX_HP, NULL);
-        monTypesBits |= gBitTable[gBaseStats[GetMonData(&gPlayerParty[trainerId], MON_DATA_SPECIES, NULL)].type1];
-        monTypesBits |= gBitTable[gBaseStats[GetMonData(&gPlayerParty[trainerId], MON_DATA_SPECIES, NULL)].type2];
+        monTypesBits |= gBitTable[GetMonData(&gPlayerParty[trainerId], MON_DATA_TYPE_1, NULL)];
+        monTypesBits |= gBitTable[GetMonData(&gPlayerParty[trainerId], MON_DATA_TYPE_2, NULL)];
     }
 
     for (monTypesCount = 0, j = 0; j < 32; j++)
@@ -2811,7 +2811,8 @@ static void CreateDomeMon(u8 monPartyId, u16 tournamentTrainerId, u8 tournamentM
                                          level,
                                          gFacilityTrainerMons[gSaveBlock2Ptr->frontier.domeMonIds[tournamentTrainerId][tournamentMonId]].nature,
                                          fixedIv,
-                                         gFacilityTrainerMons[gSaveBlock2Ptr->frontier.domeMonIds[tournamentTrainerId][tournamentMonId]].evSpread, otId);
+                                         gFacilityTrainerMons[gSaveBlock2Ptr->frontier.domeMonIds[tournamentTrainerId][tournamentMonId]].evSpread, otId,
+										 0);
 
     happiness = 0xFF;
     for (i = 0; i < MAX_MON_MOVES; i++)
@@ -3011,7 +3012,7 @@ static s32 sub_818FEB4(s32 *arr, bool8 arg1)
 #define TYPE_x4     80
 
 // Functionally equivalent, while loop is impossible to match.
-#ifdef NONMATCHING
+#ifndef NONMATCHING
 static s32 GetTypeEffectivenessPoints(s32 move, s32 targetSpecies, s32 arg2)
 {
     s32 defType1, defType2, defAbility, moveType;
@@ -5571,7 +5572,7 @@ static u16 GetWinningMove(s32 winnerTournamentId, s32 loserTournamentId, u8 roun
                 else
                     targetAbility = gBaseStats[targetSpecies].ability1;
 
-                var = AI_TypeCalc(moveIds[i * 4 + j], targetSpecies, targetAbility);
+                var = AI_TypeCalc(moveIds[i * 4 + j], gBaseStats[targetSpecies].type1, gBaseStats[targetSpecies].type2, targetAbility);
                 if (var & MOVE_RESULT_NOT_VERY_EFFECTIVE && var & MOVE_RESULT_SUPER_EFFECTIVE)
                     moveScores[i * 4 + j] += movePower;
                 else if (var & MOVE_RESULT_NO_EFFECT)
@@ -6296,10 +6297,13 @@ static void DecideRoundWinners(u8 roundId)
     s32 moveSlot, monId1, monId2;
     s32 tournamentId1, tournamentId2;
     s32 species;
-    s32 points1 = 0, points2 = 0;
+    s32 points1, points2;
 
     for (i = 0; i < DOME_TOURNAMENT_TRAINERS_COUNT; i++)
     {
+		points1 = 0;
+		points2 = 0;
+		
         if (gSaveBlock2Ptr->frontier.domeTrainers[i].isEliminated || gSaveBlock2Ptr->frontier.domeTrainers[i].trainerId == TRAINER_PLAYER)
             continue;
 
@@ -6322,8 +6326,6 @@ static void DecideRoundWinners(u8 roundId)
         // Decide which one of two trainers wins!
         else if (tournamentId2 != 0xFF)
         {
-            // BUG: points1 and points2 are not cleared at the beginning of the loop resulting in not fair results.
-
             // Calculate points for both trainers.
             for (monId1 = 0; monId1 < 3; monId1++)
             {

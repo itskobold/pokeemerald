@@ -559,12 +559,6 @@ static void CreateShedinja(u16 preEvoSpecies, struct Pokemon* mon)
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_HELD_ITEM, (&data));
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_MARKINGS, (&data));
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_10, (&data));
-
-        for (i = MON_DATA_COOL_RIBBON; i < MON_DATA_COOL_RIBBON + 5; i++)
-            SetMonData(&gPlayerParty[gPlayerPartyCount], i, (&data));
-        for (i = MON_DATA_CHAMPION_RIBBON; i <= MON_DATA_FATEFUL_ENCOUNTER; i++)
-            SetMonData(&gPlayerParty[gPlayerPartyCount], i, (&data));
-
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_STATUS, (&data));
         data = 0xFF;
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_MAIL, (&data));

@@ -1888,7 +1888,7 @@ static void FillTrainerParty(u16 trainerId, u8 firstMonId, u8 monCount)
     else if (trainerId == TRAINER_EREADER)
     {
         for (i = firstMonId; i < firstMonId + 3; i++)
-            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId]);
+            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId], 0);
         return;
     }
     else if (trainerId == TRAINER_FRONTIER_BRAIN)
@@ -1904,7 +1904,7 @@ static void FillTrainerParty(u16 trainerId, u8 firstMonId, u8 monCount)
             if (gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j].species != 0
                 && gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j].level <= level)
             {
-                sub_8068338(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j], FALSE);
+                sub_8068338(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.towerRecords[trainerId - TRAINER_RECORD_MIXING_FRIEND].party[j], FALSE, 0);
             }
         }
         return;
@@ -1913,7 +1913,7 @@ static void FillTrainerParty(u16 trainerId, u8 firstMonId, u8 monCount)
     {
         // Apprentice.
         for (i = firstMonId; i < firstMonId + 3; i++)
-            CreateApprenticeMon(&gEnemyParty[i], &gSaveBlock2Ptr->apprentices[trainerId - TRAINER_RECORD_MIXING_APPRENTICE], i - firstMonId);
+            CreateApprenticeMon(&gEnemyParty[i], &gSaveBlock2Ptr->apprentices[trainerId - TRAINER_RECORD_MIXING_APPRENTICE], i - firstMonId, 0);
         return;
     }
 
@@ -1969,17 +1969,29 @@ static void FillTrainerParty(u16 trainerId, u8 firstMonId, u8 monCount)
                                              gFacilityTrainerMons[monSetId].nature,
                                              fixedIV,
                                              gFacilityTrainerMons[monSetId].evSpread,
-                                             otID);
+                                             otID,
+											 0);
 
         friendship = 255;
-        // Give the chosen pokemon its specified moves.
-        for (j = 0; j < MAX_MON_MOVES; j++)
-        {
-            SetMonMoveSlot(&gEnemyParty[i + firstMonId], gFacilityTrainerMons[monSetId].moves[j], j);
-            if (gFacilityTrainerMons[monSetId].moves[j] == MOVE_FRUSTRATION)
-                friendship = 0;  // Frustration is more powerful the lower the pokemon's friendship is.
-        }
-
+       
+	    // Give mon its types
+	    GiveMonTypes(&gEnemyParty[i + firstMonId]);
+	   
+		// Give the chosen pokemon its specified moves, or random moves if on super random
+		if (gSaveBlock2Ptr->gameMode != GAME_MODE_SUPER_RANDOM)
+		{
+			for (j = 0; j < MAX_MON_MOVES; j++)
+			{
+				SetMonMoveSlot(&gEnemyParty[i + firstMonId], gFacilityTrainerMons[monSetId].moves[j], j);
+				if (gFacilityTrainerMons[monSetId].moves[j] == MOVE_FRUSTRATION)
+					friendship = 0;  // Frustration is more powerful the lower the pokemon's friendship is.
+			}
+		}
+		else
+		{
+			GiveMonInitialMoveset(&gEnemyParty[i + firstMonId]);
+		}
+		
         SetMonData(&gEnemyParty[i + firstMonId], MON_DATA_FRIENDSHIP, &friendship);
         SetMonData(&gEnemyParty[i + firstMonId], MON_DATA_HELD_ITEM, &gBattleFrontierHeldItems[gFacilityTrainerMons[monSetId].itemTableId]);
 
@@ -2010,7 +2022,7 @@ static void Unused_CreateApprenticeMons(u16 trainerId, u8 firstMonId)
 
     for (i = 0; i != 3; i++)
     {
-        CreateMonWithEVSpread(&gEnemyParty[firstMonId + i], apprentice->party[i].species, level, fixedIV, 8);
+        CreateMonWithEVSpread(&gEnemyParty[firstMonId + i], apprentice->party[i].species, level, fixedIV, 8, 0);
         friendship = 0xFF;
         for (j = 0; j < MAX_MON_MOVES; j++)
         {
@@ -2075,7 +2087,7 @@ static void FillFactoryFrontierTrainerParty(u16 trainerId, u8 firstMonId)
     else if (trainerId == TRAINER_EREADER)
     {
         for (i = firstMonId; i < firstMonId + 3; i++)
-            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId]);
+            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i - firstMonId], 0);
         return;
     }
     else if (trainerId == TRAINER_FRONTIER_BRAIN)
@@ -2099,7 +2111,8 @@ static void FillFactoryFrontierTrainerParty(u16 trainerId, u8 firstMonId)
                                              gFacilityTrainerMons[monSetId].nature,
                                              fixedIV,
                                              gFacilityTrainerMons[monSetId].evSpread,
-                                             otID);
+                                             otID,
+											 0);
 
         friendship = 0;
         for (j = 0; j < MAX_MON_MOVES; j++)
@@ -2127,7 +2140,8 @@ static void FillFactoryTentTrainerParty(u16 trainerId, u8 firstMonId)
                                              gFacilityTrainerMons[monSetId].nature,
                                              fixedIV,
                                              gFacilityTrainerMons[monSetId].evSpread,
-                                             otID);
+                                             otID,
+											 0);
 
         friendship = 0;
         for (j = 0; j < MAX_MON_MOVES; j++)
@@ -2276,7 +2290,7 @@ void DoSpecialTrainerBattle(void)
     case SPECIAL_BATTLE_EREADER:
         ZeroEnemyPartyMons();
         for (i = 0; i < 3; i++)
-            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i]);
+            sub_806819C(&gEnemyParty[i], &gSaveBlock2Ptr->frontier.ereaderTrainer.party[i], 0);
         gBattleTypeFlags = BATTLE_TYPE_TRAINER | BATTLE_TYPE_EREADER_TRAINER;
         gTrainerBattleOpponent_A = 0;
         CreateTask(Task_StartBattleAfterTransition, 1);
@@ -2983,54 +2997,7 @@ struct RibbonCounter
 
 static void AwardBattleTowerRibbons(void)
 {
-    s32 i;
-    u32 partyIndex;
-    struct RibbonCounter ribbons[3]; // BUG: 4 Pokemon can receive ribbons in a double battle mode.
-    u8 ribbonType = 0;
-    u8 lvlMode = gSaveBlock2Ptr->frontier.lvlMode;
-    u8 battleMode = VarGet(VAR_FRONTIER_BATTLE_MODE);
-    u8 monCount = GetMonCountForBattleMode(battleMode);
-
-    if (lvlMode != FRONTIER_LVL_50)
-        ribbonType = MON_DATA_VICTORY_RIBBON;
-    else
-        ribbonType = MON_DATA_WINNING_RIBBON;
-
-    gSpecialVar_Result = FALSE;
-
-    if (GetCurrentBattleTowerWinStreak(lvlMode, battleMode) > 55)
-    {
-        for (i = 0; i < monCount; i++)
-        {
-            partyIndex = gSaveBlock2Ptr->frontier.selectedPartyMons[i] - 1;
-            ribbons[i].partyIndex = partyIndex;
-            ribbons[i].count = 0;
-            if (!GetMonData(&gSaveBlock1Ptr->playerParty[partyIndex], ribbonType))
-            {
-                gSpecialVar_Result = TRUE;
-                SetMonData(&gSaveBlock1Ptr->playerParty[partyIndex], ribbonType, &gSpecialVar_Result);
-                ribbons[i].count = GetRibbonCount(&gSaveBlock1Ptr->playerParty[partyIndex]);
-            }
-        }
-    }
-
-    if (gSpecialVar_Result)
-    {
-        IncrementGameStat(GAME_STAT_RECEIVED_RIBBONS);
-        for (i = 1; i < monCount; i++)
-        {
-            if (ribbons[i].count > ribbons[0].count)
-            {
-                struct RibbonCounter prevBest = ribbons[0];
-                ribbons[0] = ribbons[i];
-                ribbons[i] = prevBest;
-            }
-        }
-        if (ribbons[0].count > 4)
-        {
-            sub_80EE4DC(&gSaveBlock1Ptr->playerParty[ribbons[0].partyIndex], ribbonType);
-        }
-    }
+    return;
 }
 
 // This is a leftover debugging function that is used to populate the E-Reader
@@ -3189,8 +3156,8 @@ static void FillPartnerParty(u16 trainerId)
                       sStevenMons[i].species,
                       sStevenMons[i].level,
                       sStevenMons[i].fixedIV,
-                      TRUE, i, // BUG: personality was stored in the 'j' variable. As a result, Steven's pokemon do not have the intended natures.
-                      TRUE, STEVEN_OTID);
+                      TRUE, j, // BUG: personality was stored in the 'j' variable. As a result, Steven's pokemon do not have the intended natures. (fixed)
+                      TRUE, STEVEN_OTID, 0, 0);
             for (j = 0; j < 6; j++)
                 SetMonData(&gPlayerParty[3 + i], MON_DATA_HP_EV + j, &sStevenMons[i].evs[j]);
             for (j = 0; j < MAX_MON_MOVES; j++)
@@ -3220,7 +3187,8 @@ static void FillPartnerParty(u16 trainerId)
                                                  gFacilityTrainerMons[monSetId].nature,
                                                  ivs,
                                                  gFacilityTrainerMons[monSetId].evSpread,
-                                                 otID);
+                                                 otID,
+												 0);
             friendship = 0xFF;
             for (j = 0; j < MAX_MON_MOVES; j++)
             {
@@ -3258,7 +3226,7 @@ static void FillPartnerParty(u16 trainerId)
                 if (monData.nickname[0] == EXT_CTRL_CODE_BEGIN && monData.nickname[1] == EXT_CTRL_CODE_JPN)
                     trainerName[5] = EOS;
             }
-            sub_8068338(&gPlayerParty[3 + i], &monData, TRUE);
+            sub_8068338(&gPlayerParty[3 + i], &monData, TRUE, 0);
             SetMonData(&gPlayerParty[3 + i], MON_DATA_OT_NAME, trainerName);
             j = IsFrontierTrainerFemale(trainerId + TRAINER_RECORD_MIXING_FRIEND);
             SetMonData(&gPlayerParty[3 + i], MON_DATA_OT_GENDER, &j);
@@ -3269,7 +3237,7 @@ static void FillPartnerParty(u16 trainerId)
         trainerId -= TRAINER_RECORD_MIXING_APPRENTICE;
         for (i = 0; i < 2; i++)
         {
-            CreateApprenticeMon(&gPlayerParty[3 + i], &gSaveBlock2Ptr->apprentices[trainerId], gSaveBlock2Ptr->frontier.field_CB4[18 + i]);
+            CreateApprenticeMon(&gPlayerParty[3 + i], &gSaveBlock2Ptr->apprentices[trainerId], gSaveBlock2Ptr->frontier.field_CB4[18 + i], 0);
             j = IsFrontierTrainerFemale(trainerId + TRAINER_RECORD_MIXING_APPRENTICE);
             SetMonData(&gPlayerParty[3 + i], MON_DATA_OT_GENDER, &j);
         }
@@ -3643,7 +3611,8 @@ static void FillTentTrainerParty_(u16 trainerId, u8 firstMonId, u8 monCount)
                                              gFacilityTrainerMons[monSetId].nature,
                                              fixedIV,
                                              gFacilityTrainerMons[monSetId].evSpread,
-                                             otID);
+                                             otID,
+											 0);
 
         friendship = 255;
         // Give the chosen pokemon its specified moves.

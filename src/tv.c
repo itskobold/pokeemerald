@@ -2391,48 +2391,11 @@ void sub_80EE4DC(struct Pokemon *pokemon, u8 ribbonMonDataIdx)
 
 u8 GetRibbonCount(struct Pokemon *pokemon)
 {
-    u8 nRibbons;
-
-    nRibbons = 0;
-    nRibbons += GetMonData(pokemon, MON_DATA_COOL_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_BEAUTY_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_CUTE_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_SMART_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_TOUGH_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_CHAMPION_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_WINNING_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_VICTORY_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_ARTIST_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_EFFORT_RIBBON);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_1);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_2);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_3);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_4);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_5);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_6);
-    nRibbons += GetMonData(pokemon, MON_DATA_GIFT_RIBBON_7);
-    return nRibbons;
+    return 0;
 }
 
 u8 TV_MonDataIdxToRibbon(u8 monDataIdx)
 {
-    if (monDataIdx == MON_DATA_CHAMPION_RIBBON) return  0;
-    if (monDataIdx == MON_DATA_COOL_RIBBON)     return  1;
-    if (monDataIdx == MON_DATA_BEAUTY_RIBBON)   return  5;
-    if (monDataIdx == MON_DATA_CUTE_RIBBON)     return  9;
-    if (monDataIdx == MON_DATA_SMART_RIBBON)    return 13;
-    if (monDataIdx == MON_DATA_TOUGH_RIBBON)    return 17;
-    if (monDataIdx == MON_DATA_WINNING_RIBBON)  return 21;
-    if (monDataIdx == MON_DATA_VICTORY_RIBBON)  return 22;
-    if (monDataIdx == MON_DATA_ARTIST_RIBBON)   return 23;
-    if (monDataIdx == MON_DATA_EFFORT_RIBBON)   return 24;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_1)   return 25;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_2)   return 26;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_3)   return 27;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_4)   return 28;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_5)   return 29;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_6)   return 30;
-    if (monDataIdx == MON_DATA_GIFT_RIBBON_7)   return 31;
     return 0;
 }
 

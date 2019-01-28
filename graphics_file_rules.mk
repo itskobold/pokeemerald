@@ -47,6 +47,42 @@ $(MONPALDIR)/castform_palette.gbapal: $(MONPALDIR)/castform_normal_form_palette.
 									  $(MONPALDIR)/castform_rainy_form_palette.gbapal \
 									  $(MONPALDIR)/castform_snowy_form_palette.gbapal
 	@cat $^ >$@
+	
+$(MONPALDIR)/castform_common_palette.gbapal: $(MONPALDIR)/castform_normal_form_common_palette.gbapal \
+									  $(MONPALDIR)/castform_sunny_form_common_palette.gbapal \
+									  $(MONPALDIR)/castform_rainy_form_common_palette.gbapal \
+									  $(MONPALDIR)/castform_snowy_form_common_palette.gbapal
+	@cat $^ >$@
+	
+$(MONPALDIR)/castform_uncommon_palette.gbapal: $(MONPALDIR)/castform_normal_form_uncommon_palette.gbapal \
+									  $(MONPALDIR)/castform_sunny_form_uncommon_palette.gbapal \
+									  $(MONPALDIR)/castform_rainy_form_uncommon_palette.gbapal \
+									  $(MONPALDIR)/castform_snowy_form_uncommon_palette.gbapal
+	@cat $^ >$@
+	
+$(MONPALDIR)/castform_lesser_palette.gbapal: $(MONPALDIR)/castform_normal_form_lesser_palette.gbapal \
+									  $(MONPALDIR)/castform_sunny_form_lesser_palette.gbapal \
+									  $(MONPALDIR)/castform_rainy_form_lesser_palette.gbapal \
+									  $(MONPALDIR)/castform_snowy_form_lesser_palette.gbapal
+	@cat $^ >$@
+	
+$(MONPALDIR)/castform_rare_palette.gbapal: $(MONPALDIR)/castform_normal_form_rare_palette.gbapal \
+									  $(MONPALDIR)/castform_sunny_form_rare_palette.gbapal \
+									  $(MONPALDIR)/castform_rainy_form_rare_palette.gbapal \
+									  $(MONPALDIR)/castform_snowy_form_rare_palette.gbapal
+	@cat $^ >$@
+
+$(MONPALDIR)/castform_elite_palette.gbapal: $(MONPALDIR)/castform_normal_form_elite_palette.gbapal \
+									  $(MONPALDIR)/castform_sunny_form_elite_palette.gbapal \
+									  $(MONPALDIR)/castform_rainy_form_elite_palette.gbapal \
+									  $(MONPALDIR)/castform_snowy_form_elite_palette.gbapal
+	@cat $^ >$@
+	
+$(MONPALDIR)/castform_exotic_palette.gbapal: $(MONPALDIR)/castform_normal_form_exotic_palette.gbapal \
+									  $(MONPALDIR)/castform_sunny_form_exotic_palette.gbapal \
+									  $(MONPALDIR)/castform_rainy_form_exotic_palette.gbapal \
+									  $(MONPALDIR)/castform_snowy_form_exotic_palette.gbapal
+	@cat $^ >$@
 
 $(MONPALDIR)/castform_shiny_palette.gbapal: $(MONPALDIR)/castform_normal_form_shiny_palette.gbapal \
 											$(MONPALDIR)/castform_sunny_form_shiny_palette.gbapal \

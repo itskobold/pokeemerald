@@ -4605,7 +4605,11 @@ static void CursorCb_Trade1(u8 taskId)
     u16 species2 = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_SPECIES2);
     u16 species = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_SPECIES);
     u8 obedience = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_OBEDIENCE);
-    u32 stringId = sub_807A7E0(*(struct UnkLinkRfuStruct_02022B14Substruct *)sub_800F7DC(), gUnknown_02022C38, species2, gUnknown_02022C3C, gUnknown_02022C3E, species, obedience);
+	u8 type1 = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_TYPE_1);
+	u8 type2 = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_TYPE_2);
+    u32 stringId;
+
+	stringId = sub_807A7E0(*(struct UnkLinkRfuStruct_02022B14Substruct *)sub_800F7DC(), gUnknown_02022C38, species2, gUnknown_02022C3C, gUnknown_02022C3E, species, obedience, type1, type2);
 
     if (stringId != 0)
     {

@@ -283,23 +283,7 @@ void sub_80F8B94(void)
 
 u8 GiveMonArtistRibbon(void)
 {
-    u8 hasArtistRibbon;
-
-    hasArtistRibbon = GetMonData(&gPlayerParty[gContestMonPartyIndex], MON_DATA_ARTIST_RIBBON);
-    if (!hasArtistRibbon && gContestFinalStandings[gContestPlayerMonIndex] == 0 && gSpecialVar_ContestRank == 3
-     && gUnknown_02039F08[gContestPlayerMonIndex] >= 800)
-    {
-        hasArtistRibbon = 1;
-        SetMonData(&gPlayerParty[gContestMonPartyIndex], MON_DATA_ARTIST_RIBBON, &hasArtistRibbon);
-        if (GetRibbonCount(&gPlayerParty[gContestMonPartyIndex]) > 4)
-            sub_80EE4DC(&gPlayerParty[gContestMonPartyIndex], MON_DATA_ARTIST_RIBBON);
-
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }
 
 u8 sub_80F8D24(void)
@@ -550,7 +534,7 @@ u8 ScriptGiveMon(u16 species, u8 level, u16 item, u32 unused1, u32 unused2, u8 u
     u8 heldItem[2];
     struct Pokemon mon;
 
-    CreateMon(&mon, species, level, 32, 0, 0, 0, 0);
+    CreateMon(&mon, species, level, 32, 0, 0, 0, 0, 0, 0);
     heldItem[0] = item;
     heldItem[1] = item >> 8;
     SetMonData(&mon, MON_DATA_HELD_ITEM, heldItem);
@@ -623,7 +607,7 @@ void CreateScriptedWildMon(u16 species, u8 level, u16 item)
     u8 heldItem[2];
 
     ZeroEnemyPartyMons();
-    CreateMon(&gEnemyParty[0], species, level, 0x20, 0, 0, 0, 0);
+    CreateMon(&gEnemyParty[0], species, level, 0x20, 0, 0, 0, 0, 0, 0);
     if (item)
     {
         heldItem[0] = item;

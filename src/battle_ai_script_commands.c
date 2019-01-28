@@ -1336,7 +1336,20 @@ static void BattleAICmd_get_considered_move_effect(void)
 
 static void BattleAICmd_get_ability(void)
 {
+	struct Pokemon *party;
+    struct Pokemon *partyPtr;
     u8 battlerId;
+	u16 customAbility;
+	
+	switch (gAIScriptPtr[1])
+    {
+    case 1:
+        party = partyPtr = gEnemyParty;
+        break;
+    default:
+        party = partyPtr = gPlayerParty;
+        break;
+    }
 
     if (gAIScriptPtr[1] == AI_USER)
         battlerId = sBattler_AI;
@@ -1361,26 +1374,35 @@ static void BattleAICmd_get_ability(void)
             gAIScriptPtr += 2;
             return;
         }
-
-        if (gBaseStats[gBattleMons[battlerId].species].ability1 != ABILITY_NONE)
-        {
-            if (gBaseStats[gBattleMons[battlerId].species].ability2 != ABILITY_NONE)
-            {
-                // AI has no knowledge of opponent, so it guesses which ability.
-                if (Random() & 1)
-                    AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability1;
-                else
-                    AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability2;
-            }
-            else
-            {
-                AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability1; // It's definitely ability 1.
-            }
-        }
-        else
-        {
-            AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability2; // AI can't actually reach this part since no pokemon has ability 2 and no ability 1.
-        }
+		
+		// AI knows custom abilities through telepathy and godly intellect
+		customAbility = GetMonData(&party[battlerId], MON_DATA_ABILITY);
+		
+		// just use custom ability if it exists. not exactly fair but meh
+		if (customAbility != 0)
+			AI_THINKING_STRUCT->funcResult = customAbility;
+		else
+		{
+			if (gBaseStats[gBattleMons[battlerId].species].ability1 != ABILITY_NONE)
+			{
+				if (gBaseStats[gBattleMons[battlerId].species].ability2 != ABILITY_NONE)
+				{
+					// AI has no knowledge of opponent, so it guesses which ability.
+					if (Random() & 1)
+						AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability1;
+					else
+						AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability2;
+				}
+				else
+				{
+					AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability1; // It's definitely ability 1.
+				}
+			}
+			else
+			{
+				AI_THINKING_STRUCT->funcResult = gBaseStats[gBattleMons[battlerId].species].ability2; // AI can't actually reach this part since no pokemon has ability 2 and no ability 1.
+			}
+		}
     }
     else
     {
@@ -1393,8 +1415,23 @@ static void BattleAICmd_get_ability(void)
 
 static void BattleAICmd_check_ability(void)
 {
+	struct Pokemon *party;
+    struct Pokemon *partyPtr;
     u32 battlerId = BattleAI_GetWantedBattler(gAIScriptPtr[1]);
     u32 ability = gAIScriptPtr[2];
+	u16 customAbility;
+	
+	switch (gAIScriptPtr[1])
+    {
+    case 1:
+        party = partyPtr = gEnemyParty;
+        break;
+    default:
+        party = partyPtr = gPlayerParty;
+        break;
+    }
+	
+	customAbility = GetMonData(&party[battlerId], MON_DATA_ABILITY);
 
     if (gAIScriptPtr[1] == AI_TARGET || gAIScriptPtr[1] == AI_TARGET_PARTNER)
     {
@@ -1403,6 +1440,9 @@ static void BattleAICmd_check_ability(void)
             ability = BATTLE_HISTORY->abilities[battlerId];
             AI_THINKING_STRUCT->funcResult = ability;
         }
+		//godly intellect etc
+		else if (customAbility != 0)
+			ability = customAbility;
         // Abilities that prevent fleeing.
         else if (gBattleMons[battlerId].ability == ABILITY_SHADOW_TAG
         || gBattleMons[battlerId].ability == ABILITY_MAGNET_PULL

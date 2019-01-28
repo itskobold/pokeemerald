@@ -71,28 +71,22 @@
 #define MON_DATA_MAIL              64
 #define MON_DATA_SPECIES2          65
 #define MON_DATA_IVS               66
-#define MON_DATA_CHAMPION_RIBBON   67
-#define MON_DATA_WINNING_RIBBON    68
-#define MON_DATA_VICTORY_RIBBON    69
-#define MON_DATA_ARTIST_RIBBON     70
-#define MON_DATA_EFFORT_RIBBON     71
-#define MON_DATA_GIFT_RIBBON_1     72
-#define MON_DATA_GIFT_RIBBON_2     73
-#define MON_DATA_GIFT_RIBBON_3     74
-#define MON_DATA_GIFT_RIBBON_4     75
-#define MON_DATA_GIFT_RIBBON_5     76
-#define MON_DATA_GIFT_RIBBON_6     77
-#define MON_DATA_GIFT_RIBBON_7     78
-#define MON_DATA_FATEFUL_ENCOUNTER 79
-#define MON_DATA_OBEDIENCE         80
-#define MON_DATA_KNOWN_MOVES       81
-#define MON_DATA_RIBBON_COUNT      82
-#define MON_DATA_RIBBONS           83
-#define MON_DATA_ATK2              84
-#define MON_DATA_DEF2              85
-#define MON_DATA_SPEED2            86
-#define MON_DATA_SPATK2            87
-#define MON_DATA_SPDEF2            88
+#define MON_DATA_TYPE_1            67
+#define MON_DATA_TYPE_2            68
+#define MON_DATA_HIDDEN_TYPE       69
+#define MON_DATA_ABILITY           70
+#define MON_DATA_NATURE    		   71
+#define MON_DATA_FATEFUL_ENCOUNTER 72
+#define MON_DATA_OBEDIENCE         73
+#define MON_DATA_KNOWN_MOVES       74
+#define MON_DATA_RIBBON_COUNT      75
+#define MON_DATA_RIBBONS           76
+#define MON_DATA_ATK2              77
+#define MON_DATA_DEF2              78
+#define MON_DATA_SPEED2            79
+#define MON_DATA_SPATK2            80
+#define MON_DATA_SPDEF2            81
+#define MON_DATA_RARITY			   82
 
 #define MAX_LEVEL 100
 
@@ -134,6 +128,26 @@
 #define MAX_TOTAL_EVS 510
 #define UNOWN_FORM_COUNT 28
 
+#define NUM_ABILITIES 78 //don't think this exists already. remove & replace if it does
+#define NUM_BANNED_RANDOM_ABILITIES 3 //number of abilities in random ability banlist
+#define NUM_BANNED_RANDOM_MOVES 6 //number of moves in random move banlist
+#define NUM_BANNED_RANDOM_MONS 47 //number of Pokemon in random mon banlist
+#define NUM_MONS_WITH_BRANCHING_EVOS 8 //number of pokemon with evolution lines that branch out (like eevee, gloom, poliwhirl etc)
+
+enum
+{
+	COSMETIC_RARITY_NONE,
+	COSMETIC_RARITY_TYPICAL,
+	COSMETIC_RARITY_COMMON,
+	COSMETIC_RARITY_UNCOMMON,
+	COSMETIC_RARITY_LESSER,
+	COSMETIC_RARITY_RARE,
+	COSMETIC_RARITY_ELITE,
+	COSMETIC_RARITY_EXOTIC,
+	COSMETIC_RARITY_MYTHICAL,
+	COSMETIC_RARITY_GOLD
+};
+
 struct PokemonSubstruct0
 {
     u16 species;
@@ -157,12 +171,11 @@ struct PokemonSubstruct2
     u8 speedEV;
     u8 spAttackEV;
     u8 spDefenseEV;
-    u8 cool;
-    u8 beauty;
-    u8 cute;
-    u8 smart;
-    u8 tough;
-    u8 sheen;
+    u8 type1;
+    u8 type2;
+    u8 hiddenType;
+	u8 nature;
+    u16 ability;
 };
 
 struct PokemonSubstruct3
@@ -172,7 +185,7 @@ struct PokemonSubstruct3
 
  /* 0x02 */ u16 metLevel:7;
  /* 0x02 */ u16 metGame:4;
- /* 0x03 */ u16 pokeball:4;
+ /* 0x03 */ u16 filler4b:4;
  /* 0x03 */ u16 otGender:1;
 
  /* 0x04 */ u32 hpIV:5;
@@ -184,23 +197,9 @@ struct PokemonSubstruct3
  /* 0x07 */ u32 isEgg:1;
  /* 0x07 */ u32 altAbility:1;
 
- /* 0x08 */ u32 coolRibbon:3;
- /* 0x08 */ u32 beautyRibbon:3;
- /* 0x08 */ u32 cuteRibbon:3;
- /* 0x09 */ u32 smartRibbon:3;
- /* 0x09 */ u32 toughRibbon:3;
- /* 0x09 */ u32 championRibbon:1;
- /* 0x0A */ u32 winningRibbon:1;
- /* 0x0A */ u32 victoryRibbon:1;
- /* 0x0A */ u32 artistRibbon:1;
- /* 0x0A */ u32 effortRibbon:1;
- /* 0x0A */ u32 giftRibbon1:1;
- /* 0x0A */ u32 giftRibbon2:1;
- /* 0x0A */ u32 giftRibbon3:1;
- /* 0x0A */ u32 giftRibbon4:1;
- /* 0x0B */ u32 giftRibbon5:1;
- /* 0x0B */ u32 giftRibbon6:1;
- /* 0x0B */ u32 giftRibbon7:1;
+ /* 0x08 */ u32 pokeball:6;
+ /* 0x08 */ u32 rarity:4;
+ /* 0x0A */ u32 filler17b:17;
  /* 0x0B */ u32 fatefulEncounter:4;
  /* 0x0B */ u32 obedient:1;
 };
@@ -283,10 +282,9 @@ struct BattlePokemon
     /*0x17*/ u32 isEgg:1;
     /*0x17*/ u32 altAbility:1;
     /*0x18*/ s8 statStages[NUM_BATTLE_STATS];
-    /*0x20*/ u8 ability;
+    /*0x20*/ u16 ability;
     /*0x21*/ u8 type1;
     /*0x22*/ u8 type2;
-    /*0x23*/ u8 unknown;
     /*0x24*/ u8 pp[4];
     /*0x28*/ u16 hp;
     /*0x2A*/ u8 level;
@@ -393,26 +391,64 @@ enum
     BODY_COLOR_PINK
 };
 
-#define EVO_FRIENDSHIP       0x0001 // Pokémon levels up with friendship ≥ 220
-#define EVO_FRIENDSHIP_DAY   0x0002 // Pokémon levels up during the day with friendship ≥ 220
-#define EVO_FRIENDSHIP_NIGHT 0x0003 // Pokémon levels up at night with friendship ≥ 220
-#define EVO_LEVEL            0x0004 // Pokémon reaches the specified level
-#define EVO_TRADE            0x0005 // Pokémon is traded
-#define EVO_TRADE_ITEM       0x0006 // Pokémon is traded while it's holding the specified item
-#define EVO_ITEM             0x0007 // specified item is used on Pokémon
-#define EVO_LEVEL_ATK_GT_DEF 0x0008 // Pokémon reaches the specified level with attack > defense
-#define EVO_LEVEL_ATK_EQ_DEF 0x0009 // Pokémon reaches the specified level with attack = defense
-#define EVO_LEVEL_ATK_LT_DEF 0x000a // Pokémon reaches the specified level with attack < defense
-#define EVO_LEVEL_SILCOON    0x000b // Pokémon reaches the specified level with a Silcoon personality value
-#define EVO_LEVEL_CASCOON    0x000c // Pokémon reaches the specified level with a Cascoon personality value
-#define EVO_LEVEL_NINJASK    0x000d // Pokémon reaches the specified level (special value for Ninjask)
-#define EVO_LEVEL_SHEDINJA   0x000e // Pokémon reaches the specified level (special value for Shedinja)
-#define EVO_BEAUTY           0x000f // Pokémon levels up with beauty ≥ specified value
+#define EVO_LEVEL_FRIENDSHIP       	0x0001 // Pokémon levels up with friendship at a certain value
+#define EVO_LEVEL_MALE       		0x0002 // Pokémon reaches a certain level and is male
+#define EVO_LEVEL_FEMALE     		0x0003 // Pokémon reaches a certain level and is female
+#define EVO_LEVEL            		0x0004 // Pokémon reaches the specified level
+#define EVO_LEVEL_MOVE        		0x0005 // Pokémon reaches a certain level knowing a move
+#define EVO_MAP	      	 			0x0006 // Pokémon levels up in a map
+#define EVO_ITEM             		0x0007 // specified item is used on Pokémon
+#define EVO_LEVEL_ATK_GT_DEF 		0x0008 // Pokémon reaches the specified level with attack > defense
+#define EVO_LEVEL_ATK_EQ_DEF 		0x0009 // Pokémon reaches the specified level with attack = defense
+#define EVO_LEVEL_ATK_LT_DEF 		0x000a // Pokémon reaches the specified level with attack < defense
+#define EVO_LEVEL_SILCOON    		0x000b // Pokémon reaches the specified level with a Silcoon personality value
+#define EVO_LEVEL_CASCOON    		0x000c // Pokémon reaches the specified level with a Cascoon personality value
+#define EVO_LEVEL_NINJASK    		0x000d // Pokémon reaches the specified level (special value for Ninjask)
+#define EVO_LEVEL_SHEDINJA   		0x000e // Pokémon reaches the specified level (special value for Shedinja)
+#define EVO_LEVEL_DAY_ONLY   		0x000f // Pokémon reaches a certain level during the day. Use when mon can evolve in twilight as well
+#define EVO_LEVEL_NIGHT_ONLY 		0x0010 // Pokémon reaches a certain level at night. Use when mon can evolve in twilight as well
+#define EVO_LEVEL_DAY   	   		0x0011 // Pokémon reaches a certain level during dawn/day
+#define EVO_LEVEL_NIGHT 	   		0x0012 // Pokémon reaches a certain level at dusk/night
+#define EVO_LEVEL_TWILIGHT   		0x0013 // Pokémon reaches a certain level at dawn/dusk
+#define EVO_LEVEL_SPATK_GT_SPDEF 	0x0014 // Pokémon reaches the specified level with special attack > special defense
+#define EVO_LEVEL_SPATK_EQ_SPDEF 	0x0015 // Pokémon reaches the specified level with special attack = special defense
+#define EVO_LEVEL_SPATK_LT_SPDEF 	0x0016 // Pokémon reaches the specified level with special attack < special defense
+#define EVO_LEVEL_SPRING			0x0017 // Pokémon reaches a certain level in Spring
+#define EVO_LEVEL_SUMMER			0x0018 // Pokémon reaches a certain level in Summer
+#define EVO_LEVEL_FALL				0x0019 // Pokémon reaches a certain level in Fall
+#define EVO_LEVEL_WINTER			0x001a // Pokémon reaches a certain level in Winter
+#define EVO_LEVEL_HELD_ITEM			0x001b // Pokémon reaches a certain level holding an item
+#define EVO_LEVEL_HP_EV				0x001c // Pokémon reaches a certain level with a certain EV value
+#define EVO_LEVEL_ATK_EV			0x001d // Pokémon reaches a certain level with a certain EV value
+#define EVO_LEVEL_DEF_EV			0x001e // Pokémon reaches a certain level with a certain EV value
+#define EVO_LEVEL_SPEED_EV			0x001f // Pokémon reaches a certain level with a certain EV value
+#define EVO_LEVEL_SPATK_EV			0x0020 // Pokémon reaches a certain level with a certain EV value
+#define EVO_LEVEL_SPDEF_EV			0x0021 // Pokémon reaches a certain level with a certain EV value
+
+#define NUM_LEVEL_BASED_EVOS 31
+
+#define RARITY_GOLD			0
+#define RARITY_MYTHICAL		4
+#define RARITY_EXOTIC		16
+#define RARITY_ELITE		64
+#define RARITY_RARE			256
+#define RARITY_LESSER		1024
+#define RARITY_UNCOMMON		4096
+#define RARITY_COMMON		16384
+#define RARITY_TYPICAL		(0xFFFF - RARITY_MYTHICAL - RARITY_EXOTIC - RARITY_ELITE - RARITY_RARE - RARITY_LESSER - RARITY_UNCOMMON - RARITY_COMMON)
+
+#define NUM_ABILITIES 78 //don't think this exists already. remove & replace if it does
+#define NUM_BANNED_RANDOM_ABILITIES 3 //number of abilities in random ability banlist
+#define NUM_BANNED_RANDOM_MOVES 6 //number of moves in random move banlist
+#define NUM_BANNED_RANDOM_MONS 47 //number of Pokemon in random mon banlist
+#define NUM_MAX_POSSIBLE_EVOLUTIONS 5 //this should really be in evolution.h but moving it causes problems so eh
+#define NUM_MONS_WITH_BRANCHING_EVOS 8 //number of pokemon with evolution lines that branch out (like eevee, gloom, poliwhirl etc)
 
 struct Evolution
 {
     u16 method;
     u16 param;
+	u16 param2;
     u16 targetSpecies;
 };
 
@@ -444,20 +480,21 @@ void ZeroBoxMonData(struct BoxPokemon *boxMon);
 void ZeroMonData(struct Pokemon *mon);
 void ZeroPlayerPartyMons(void);
 void ZeroEnemyPartyMons(void);
-void CreateMon(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId);
-void CreateBoxMon(struct BoxPokemon *boxMon, u16 species, u8 level, u8 fixedIV, u8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId);
-void CreateMonWithNature(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 nature);
-void CreateMonWithGenderNatureLetter(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 gender, u8 nature, u8 unownLetter);
-void CreateMaleMon(struct Pokemon *mon, u16 species, u8 level);
-void CreateMonWithIVsPersonality(struct Pokemon *mon, u16 species, u8 level, u32 ivs, u32 personality);
-void CreateMonWithIVsOTID(struct Pokemon *mon, u16 species, u8 level, u8 *ivs, u32 otId);
-void CreateMonWithEVSpread(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 evSpread);
-void sub_806819C(struct Pokemon *mon, struct BattleTowerPokemon *src);
-void sub_8068338(struct Pokemon *mon, struct BattleTowerPokemon *src, bool8 lvl50);
-void CreateApprenticeMon(struct Pokemon *mon, const struct Apprentice *src, u8 monId);
-void CreateMonWithEVSpreadNatureOTID(struct Pokemon *mon, u16 species, u8 level, u8 nature, u8 fixedIV, u8 evSpread, u32 otId);
+void CreateMon(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId, u8 rarity, bool8 shinyCharm);
+void CreateBoxMon(struct BoxPokemon *boxMon, u16 species, u8 level, u8 fixedIV, u8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId, bool8 shinyCharm);
+void CreateMonWithNature(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 nature, bool8 shinyCharm);
+void CreateMonWithGenderNatureLetter(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 gender, u8 nature, u8 unownLetter, u8 rarity);
+void CreateMonWithRarity(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u16 rarity, u32 OtId); //untested
+void CreateMaleMon(struct Pokemon *mon, u16 species, u8 level, u8 rarity);
+void CreateMonWithIVsPersonality(struct Pokemon *mon, u16 species, u8 level, u32 ivs, u32 personality, u8 rarity);
+void CreateMonWithIVsOTID(struct Pokemon *mon, u16 species, u8 level, u8 *ivs, u32 otId, u8 rarity);
+void CreateMonWithEVSpread(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 evSpread, u8 rarity);
+void sub_806819C(struct Pokemon *mon, struct BattleTowerPokemon *src, u8 rarity);
+void sub_8068338(struct Pokemon *mon, struct BattleTowerPokemon *src, bool8 lvl50, u8 rarity);
+void CreateApprenticeMon(struct Pokemon *mon, const struct Apprentice *src, u8 monId, u8 rarity);
+void CreateMonWithEVSpreadNatureOTID(struct Pokemon *mon, u16 species, u8 level, u8 nature, u8 fixedIV, u8 evSpread, u32 otId, u8 rarity);
 void sub_80686FC(struct Pokemon *mon, struct BattleTowerPokemon *dest);
-void CreateObedientMon(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId);
+void CreateObedientMon(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId, u8 rarity);
 bool8 sub_80688F8(u8 caseId, u8 battlerId);
 void SetDeoxysStats(void);
 u16 sub_8068B48(void);
@@ -478,6 +515,23 @@ u16 MonTryLearningNewMove(struct Pokemon *mon, bool8 firstMove);
 void DeleteFirstMoveAndGiveMoveToMon(struct Pokemon *mon, u16 move);
 void DeleteFirstMoveAndGiveMoveToBoxMon(struct BoxPokemon *boxMon, u16 move);
 s32 CalculateBaseDamage(struct BattlePokemon *attacker, struct BattlePokemon *defender, u32 move, u16 sideStatus, u16 powerOverride, u8 typeOverride, u8 bankAtk, u8 bankDef);
+
+u16 CalculateBaseStatTotal(u16 species);
+u16 CalculateEvioliteBonus(u16 species);
+bool8 IsRandomAbilityBanned(u16 ability);
+void SetRandomAbilityForMon(struct Pokemon *mon);
+void SetRandomAbility(struct BoxPokemon *boxMon);
+void GenerateRandomNature(struct BoxPokemon *boxMon);
+void GiveMonTypes(struct Pokemon *mon);
+void GiveBoxMonTypes(struct BoxPokemon *boxMon);
+void GenerateSuperRandomMovesetForMon(struct Pokemon *mon, s32 level, bool8 hatched);
+void GenerateSuperRandomMovesetForBoxMon(struct BoxPokemon *boxMon, s32 level, bool8 hatched);
+u16 GenerateSuperRandomMove(u8 moveType1, u8 moveType2);
+bool8 IsRandomMoveBanned(u16 move);
+bool8 IsRandomMonBanned(u16 species);
+u8 GetSuperRandomMovesetSize(s32 level, bool8 hatched);
+u16 GetRarity(struct Pokemon *mon);
+u16 GetRarityOtIdPersonality(u32 otId, u32 personality);
 
 u8 CountAliveMonsInBattle(u8 caseId);
 #define BATTLE_ALIVE_EXCEPT_ACTIVE  0
@@ -508,8 +562,8 @@ u8 CalculatePlayerPartyCount(void);
 u8 CalculateEnemyPartyCount(void);
 u8 GetMonsStateToDoubles(void);
 u8 GetMonsStateToDoubles_2(void);
-u8 GetAbilityBySpecies(u16 species, bool8 altAbility);
-u8 GetMonAbility(struct Pokemon *mon);
+u16 GetAbilityBySpecies(u16 species, bool8 altAbility, u16 customAbility);
+u16 GetMonAbility(struct Pokemon *mon);
 void CreateSecretBaseEnemyParty(struct SecretBaseRecord *secretBaseRecord);
 u8 GetSecretBaseTrainerPicIndex(void);
 u8 GetSecretBaseTrainerClass(void);

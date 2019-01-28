@@ -85,7 +85,10 @@ static EWRAM_DATA struct UnkSummaryStruct
         u8 ppBonuses; // 0x34
         u8 sanity; // 0x35
         u8 OTName[8]; // 0x36
-        u8 unk3E[9]; // 0x3E
+		u8 type1; // 0x3E
+		u8 type2; // 0x3F
+		u16 ability; // 0x40
+        u8 unk40[5]; // 0x42
         u32 OTID; // 0x48
     } summary;
     u16 bgTilemapBuffers[4][2][0x400];
@@ -1324,6 +1327,9 @@ static bool8 ExtractMonDataToSummaryStruct(struct Pokemon *a)
         sum->altAbility = GetMonData(a, MON_DATA_ALT_ABILITY);
         sum->item = GetMonData(a, MON_DATA_HELD_ITEM);
         sum->pid = GetMonData(a, MON_DATA_PERSONALITY);
+		sum->type1 = GetMonData(a, MON_DATA_TYPE_1);
+		sum->type2 = GetMonData(a, MON_DATA_TYPE_2);
+		sum->ability = GetMonData(a, MON_DATA_ABILITY);
         sum->sanity = GetMonData(a, MON_DATA_SANITY_IS_BAD_EGG);
 
         if (sum->sanity)
@@ -2533,12 +2539,9 @@ static void sub_81C2228(struct Pokemon *mon)
     schedule_bg_copy_tilemap_to_vram(3);
 }
 
-static void sub_81C228C(bool8 isMonShiny)
+static void sub_81C228C(void)
 {
-    if (!isMonShiny)
-        sub_8199C30(3, 1, 4, 8, 8, 0);
-    else
-        sub_8199C30(3, 1, 4, 8, 8, 5);
+    sub_8199C30(3, 1, 4, 8, 8, 5);
     schedule_bg_copy_tilemap_to_vram(3);
 }
 
@@ -2680,25 +2683,15 @@ static void sub_81C2628(void)
         StringCopy(gStringVar1, &gText_UnkCtrlF908Clear01[0]);
         ConvertIntToDecimalStringN(gStringVar2, dexNum, 2, 3);
         StringAppend(gStringVar1, gStringVar2);
-        if (!IsMonShiny(mon))
-        {
-            SummaryScreen_PrintTextOnWindow(17, gStringVar1, 0, 1, 0, 1);
-            sub_81C228C(FALSE);
-        }
-        else
-        {
-            SummaryScreen_PrintTextOnWindow(17, gStringVar1, 0, 1, 0, 7);
-            sub_81C228C(TRUE);
-        }
+		SummaryScreen_PrintTextOnWindow(17, gStringVar1, 0, 1, 0, 1);
+		sub_81C228C();
+        
         PutWindowTilemap(17);
     }
     else
     {
         ClearWindowTilemap(17);
-        if (!IsMonShiny(mon))
-            sub_81C228C(FALSE);
-        else
-            sub_81C228C(TRUE);
+        sub_81C228C();
     }
     StringCopy(gStringVar1, &gText_LevelSymbol[0]);
     ConvertIntToDecimalStringN(gStringVar2, summary->level, 0, 3);
@@ -3023,13 +3016,13 @@ static void PrintMonOTID(void)
 
 static void PrintMonAbilityName(void)
 {
-    u8 ability = GetAbilityBySpecies(pssData->summary.species, pssData->summary.altAbility);
+    u16 ability = GetAbilityBySpecies(pssData->summary.species, pssData->summary.altAbility, pssData->summary.ability);
     SummaryScreen_PrintTextOnWindow(AddWindowFromTemplateList(gUnknown_0861CCCC, 2), gAbilityNames[ability], 0, 1, 0, 1);
 }
 
 static void PrintMonAbilityDescription(void)
 {
-    u8 ability = GetAbilityBySpecies(pssData->summary.species, pssData->summary.altAbility);
+    u16 ability = GetAbilityBySpecies(pssData->summary.species, pssData->summary.altAbility, pssData->summary.ability);
     SummaryScreen_PrintTextOnWindow(AddWindowFromTemplateList(gUnknown_0861CCCC, 2), gAbilityDescriptionPointers[ability], 0, 17, 0, 0);
 }
 
@@ -3738,11 +3731,11 @@ static void SetMoveTypeSpritePosAndType(u8 typeId, u8 x, u8 y, u8 spriteArrayId)
 static void sub_81C43A0(void)
 {
     struct PokeSummary *summary = &pssData->summary;
-
-	SetMoveTypeSpritePosAndType(gBaseStats[summary->species].type1, 0x78, 0x30, 3);
-	if (gBaseStats[summary->species].type1 != gBaseStats[summary->species].type2)
+	
+	SetMoveTypeSpritePosAndType(summary->type1, 0x78, 0x30, 3);
+	if (summary->type1 != summary->type2)
 	{
-		SetMoveTypeSpritePosAndType(gBaseStats[summary->species].type2, 0xA0, 0x30, 4);
+		SetMoveTypeSpritePosAndType(summary->type2, 0xA0, 0x30, 4);
 		sub_81C4204(4, FALSE);
 	}
 	else

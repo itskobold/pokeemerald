@@ -26,6 +26,7 @@
 #include "alloc.h"
 #include "overworld.h"
 #include "event_scripts.h"
+#include "wild_encounter.h"
 #include "constants/battle_frontier.h"
 #include "constants/event_objects.h"
 #include "constants/event_object_movement_constants.h"
@@ -1310,23 +1311,24 @@ void GenerateBattlePyramidWildMon(void)
     s32 i;
     const struct PyramidWildMon *wildMons;
     u32 id;
-    u32 lvl = gSaveBlock2Ptr->frontier.lvlMode;
-    u16 round = (gSaveBlock2Ptr->frontier.pyramidWinStreaks[lvl] / 7) % TOTAL_ROUNDS;
+	u32 frontierLvl = gSaveBlock2Ptr->frontier.lvlMode;
+    u32 lvl;
+    u16 round = (gSaveBlock2Ptr->frontier.pyramidWinStreaks[frontierLvl] / 7) % TOTAL_ROUNDS;
+	u16 randomSpecies;
 
     if (round >= TOTAL_ROUNDS)
         round = TOTAL_ROUNDS - 1;
 
-    if (lvl != FRONTIER_LVL_50)
+    if (frontierLvl != FRONTIER_LVL_50)
         wildMons = sOpenLevelWildMonPointers[round];
     else
         wildMons = sLevel50WildMonPointers[round];
 
     id = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL) - 1;
-    SetMonData(&gEnemyParty[0], MON_DATA_SPECIES, &wildMons[id].species);
-    GetSpeciesName(name, wildMons[id].species);
-    SetMonData(&gEnemyParty[0], MON_DATA_NICKNAME, &name);
-    if (lvl != FRONTIER_LVL_50)
+	
+	if (frontierLvl != FRONTIER_LVL_50)
     {
+		lvl = frontierLvl;
         lvl = SetFacilityPtrsGetLevel();
         lvl -= wildMons[id].lvl;
         lvl = lvl - 5 + (Random() % 11);
@@ -1335,35 +1337,58 @@ void GenerateBattlePyramidWildMon(void)
     {
         lvl = wildMons[id].lvl - 5 + ((Random() % 11));
     }
-    SetMonData(&gEnemyParty[0],
+	
+	randomSpecies = GenerateRandomSpecies(lvl);
+	
+	if (gSaveBlock2Ptr->gameMode < GAME_MODE_RANDOM) // normal battle pyramid
+	{
+		SetMonData(&gEnemyParty[0], MON_DATA_SPECIES, &wildMons[id].species);
+		SetMonData(&gEnemyParty[0],
                MON_DATA_EXP,
                &gExperienceTables[gBaseStats[wildMons[id].species].growthRate][lvl]);
 
-    switch (wildMons[id].abilityBit)
-    {
-    case 0:
-    case 1:
-        SetMonData(&gEnemyParty[0], MON_DATA_ALT_ABILITY, &wildMons[id].abilityBit);
-        break;
-    case 2:
-    default:
-        if (gBaseStats[wildMons[id].species].ability2)
-        {
-            i = GetMonData(&gEnemyParty[0], MON_DATA_PERSONALITY, NULL) % 2;
-            SetMonData(&gEnemyParty[0], MON_DATA_ALT_ABILITY, &i);
-        }
-        else
-        {
-            i = 0;
-            SetMonData(&gEnemyParty[0], MON_DATA_ALT_ABILITY, &i);
-        }
-        break;
-    }
+		switch (wildMons[id].abilityBit)
+		{
+		case 0:
+		case 1:
+			SetMonData(&gEnemyParty[0], MON_DATA_ALT_ABILITY, &wildMons[id].abilityBit);
+			break;
+		case 2:
+		default:
+			if (gBaseStats[wildMons[id].species].ability2)
+			{
+				i = GetMonData(&gEnemyParty[0], MON_DATA_PERSONALITY, NULL) % 2;
+				SetMonData(&gEnemyParty[0], MON_DATA_ALT_ABILITY, &i);
+			}
+			else
+			{
+				i = 0;
+				SetMonData(&gEnemyParty[0], MON_DATA_ALT_ABILITY, &i);
+			}
+			break;
+		}
 
-    for (i = 0; i < MAX_MON_MOVES; i++)
-        SetMonMoveSlot(&gEnemyParty[0], wildMons[id].moves[i], i);
+		for (i = 0; i < MAX_MON_MOVES; i++)
+			SetMonMoveSlot(&gEnemyParty[0], wildMons[id].moves[i], i);
+		
+		GetSpeciesName(name, wildMons[id].species);
+	}
+	else // random or super random game modes
+	{
+		SetMonData(&gEnemyParty[0], MON_DATA_SPECIES, &randomSpecies);
+		SetMonData(&gEnemyParty[0],
+               MON_DATA_EXP,
+               &gExperienceTables[gBaseStats[randomSpecies].growthRate][lvl]);
+		SetRandomAbilityForMon(&gEnemyParty[0]);
+		GiveMonTypes(&gEnemyParty[0]);
+		GenerateSuperRandomMovesetForMon(&gEnemyParty[0], lvl, 0);
+		
+		GetSpeciesName(name, randomSpecies);
+	}
+	
+	SetMonData(&gEnemyParty[0], MON_DATA_NICKNAME, &name);
 
-    if (gSaveBlock2Ptr->frontier.pyramidWinStreaks[lvl] >= 140) // BUG: Reading outside the array as lvl was used for mon level instead of frontier lvl mode.
+    if (gSaveBlock2Ptr->frontier.pyramidWinStreaks[frontierLvl] >= 140) // BUG: Reading outside the array as lvl was used for mon level instead of frontier lvl mode. (FIXED)
     {
         id = (Random() % 17) + 15;
         for (i = 0; i < NUM_STATS; i++)

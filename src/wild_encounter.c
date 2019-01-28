@@ -22,10 +22,24 @@
 #include "battle_pyramid.h"
 #include "constants/items.h"
 #include "constants/maps.h"
+#include "daycare.h"
 
 extern const u8 EventScript_RepelWoreOff[];
 
 #define NUM_FEEBAS_SPOTS    6
+
+const u8 gLevelBasedEvoList[NUM_LEVEL_BASED_EVOS] = {EVO_LEVEL_FRIENDSHIP, EVO_LEVEL_MALE, EVO_LEVEL_FEMALE, EVO_LEVEL, EVO_LEVEL_MOVE, EVO_LEVEL_ATK_GT_DEF, EVO_LEVEL_ATK_EQ_DEF, EVO_LEVEL_ATK_LT_DEF, EVO_LEVEL_SILCOON, EVO_LEVEL_CASCOON, EVO_LEVEL_NINJASK, EVO_LEVEL_SHEDINJA, EVO_LEVEL_DAY_ONLY, EVO_LEVEL_NIGHT_ONLY, EVO_LEVEL_DAY, EVO_LEVEL_NIGHT, EVO_LEVEL_TWILIGHT, EVO_LEVEL_SPATK_GT_SPDEF, EVO_LEVEL_SPATK_EQ_SPDEF, EVO_LEVEL_SPATK_LT_SPDEF, EVO_LEVEL_SPRING, EVO_LEVEL_SUMMER, EVO_LEVEL_FALL, EVO_LEVEL_WINTER, EVO_LEVEL_HELD_ITEM, EVO_LEVEL_HP_EV, EVO_LEVEL_ATK_EV, EVO_LEVEL_DEF_EV, EVO_LEVEL_SPEED_EV, EVO_LEVEL_SPATK_EV, EVO_LEVEL_SPDEF_EV};
+const u16 gBranchingEvoMons[NUM_MONS_WITH_BRANCHING_EVOS][2] =
+{
+	{SPECIES_GLOOM, 2},
+	{SPECIES_POLIWHIRL, 2},
+	{SPECIES_SLOWPOKE, 2},
+	{SPECIES_EEVEE, 5},
+	{SPECIES_TYROGUE, 3},
+	{SPECIES_WURMPLE, 2},
+	{SPECIES_NINCADA, 2},
+	{SPECIES_CLAMPERL, 2},
+};
 
 // this file's functions
 static u16 FeebasRandom(void);
@@ -33,7 +47,7 @@ static void FeebasSeedRng(u16 seed);
 static bool8 IsWildLevelAllowedByRepel(u8 level);
 static void ApplyFluteEncounterRateMod(u32 *encRate);
 static void ApplyCleanseTagEncounterRateMod(u32 *encRate);
-static bool8 TryGetAbilityInfluencedWildMonIndex(const struct WildPokemon *wildMon, u8 type, u8 ability, u8 *monIndex);
+static bool8 TryGetAbilityInfluencedWildMonIndex(const struct WildPokemon *wildMon, u8 type, u16 ability, u8 *monIndex);
 static bool8 IsAbilityAllowingEncounter(u8 level);
 
 // EWRAM vars
@@ -335,6 +349,85 @@ static u8 PickWildMonNature(void)
     return Random() % 25;
 }
 
+u16 GenerateRandomSpecies(u8 level) //level is used to calculate evolution stages etc. has no effect on the level of the mon generated
+{
+	u16 species;
+	
+	do //generates an unbanned species
+	{
+		species = Random() % NUM_SPECIES;
+	}
+	while (IsRandomMonBanned(species));
+	species = CalculateRandomMonEvolutionStage(species, level);
+	return species;
+}
+
+u16 CalculateRandomMonEvolutionStage(u16 species, u8 level)
+//gets the mon's species and calculates a suitable evolution stage
+//so if a lv80 bulbasaur is generated it will be turned into a venusaur
+//likewise, if a lv3 venusaur is generated it will be turned into a bulbasaur
+{
+	int monEvoNumber;
+	u8 data;
+	
+	species = GetEggSpecies(species); //species now contains first stage
+	data = GetRandomEvoBranch(species);
+	monEvoNumber = Random() % data; //picks a random evolution chain to follow
+	
+	while (gEvolutionTable[species][monEvoNumber].targetSpecies != SPECIES_NONE) //loop until mon can no longer evolve
+	{
+		if (IsLevelBasedEvolution(gEvolutionTable[species][monEvoNumber].method) == TRUE) //if mon evolves by level (including special evolutions like ninjask/shedninja)
+		{
+			if (level >= gEvolutionTable[species][monEvoNumber].param) //if level is equal or higher than specified for its pre-evo to evolve
+			{
+				species = gEvolutionTable[species][monEvoNumber].targetSpecies; //make species targetSpecies
+			}
+			else //level too low for mon to evolve
+			{
+				break;
+			}
+		}
+		else //mon evolves via item etc
+		{
+			if (level >= 45) //if level is equal to or higher than 45
+			{
+				species = gEvolutionTable[species][monEvoNumber].targetSpecies; //make species targetSpecies
+			}
+			else //if under level 45 just return species
+			{
+				return species;
+			}
+		}
+		data = GetRandomEvoBranch(species); //recalculate monEvoNumber to account for branching evo lines
+		monEvoNumber = Random() % data;
+	}
+	return species;
+}
+
+u8 GetRandomEvoBranch(u16 species)
+{
+	int i;
+	
+	for (i = 0; i < NUM_MONS_WITH_BRANCHING_EVOS; i++)
+	{
+        if (gBranchingEvoMons[i][0] == species)
+            return gBranchingEvoMons[i][1];
+    }
+    return 0;
+}
+
+bool8 IsLevelBasedEvolution(u8 method)
+{
+    int i;
+	
+    for (i = 0; i < NUM_LEVEL_BASED_EVOS; i++)
+	{
+        if (gLevelBasedEvoList[i] == method)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static void CreateWildMon(u16 species, u8 level)
 {
     bool32 checkCuteCharm;
@@ -342,6 +435,9 @@ static void CreateWildMon(u16 species, u8 level)
     ZeroEnemyPartyMons();
     checkCuteCharm = TRUE;
 
+	if (gSaveBlock2Ptr->gameMode >= GAME_MODE_RANDOM)
+		species = GenerateRandomSpecies(level);
+	
     switch (gBaseStats[species].genderRatio)
     {
     case MON_MALE:
@@ -360,17 +456,19 @@ static void CreateWildMon(u16 species, u8 level)
         u32 leadingMonPersonality = GetMonData(&gPlayerParty[0], MON_DATA_PERSONALITY);
         u8 gender = GetGenderFromSpeciesAndPersonality(leadingMonSpecies, leadingMonPersonality);
 
-        // misses mon is genderless check, although no genderless mon can have cute charm as ability
+        // misses mon is genderless check, although no genderless mon can have cute charm as ability (fixed)
         if (gender == MON_FEMALE)
             gender = MON_MALE;
-        else
+        else if (gender == MON_MALE)
             gender = MON_FEMALE;
+		else
+            gender = MON_GENDERLESS;
 
-        CreateMonWithGenderNatureLetter(&gEnemyParty[0], species, level, 32, gender, PickWildMonNature(), 0);
+        CreateMonWithGenderNatureLetter(&gEnemyParty[0], species, level, 32, gender, PickWildMonNature(), 0, 0);
         return;
     }
 
-    CreateMonWithNature(&gEnemyParty[0], species, level, 32, PickWildMonNature());
+    CreateMonWithNature(&gEnemyParty[0], species, level, 32, PickWildMonNature(), 0);
 }
 
 enum
@@ -895,7 +993,7 @@ static bool8 TryGetRandomWildMonIndexByType(const struct WildPokemon *wildMon, u
     return TRUE;
 }
 
-static bool8 TryGetAbilityInfluencedWildMonIndex(const struct WildPokemon *wildMon, u8 type, u8 ability, u8 *monIndex)
+static bool8 TryGetAbilityInfluencedWildMonIndex(const struct WildPokemon *wildMon, u8 type, u16 ability, u8 *monIndex)
 {
     if (GetMonData(&gPlayerParty[0], MON_DATA_SANITY_IS_EGG))
         return FALSE;

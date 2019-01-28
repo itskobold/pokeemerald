@@ -809,7 +809,7 @@ static void HealMon(struct Pokemon *mon)
 
 static bool8 DoesAbilityPreventStatus(struct Pokemon *mon, u32 status)
 {
-    u8 ability = GetMonAbility(mon);
+    u16 ability = GetMonData(mon, MON_DATA_ABILITY);
     bool8 ret = FALSE;
 
     switch (status)
@@ -838,28 +838,30 @@ static bool8 DoesAbilityPreventStatus(struct Pokemon *mon, u32 status)
     return ret;
 }
 
-static bool8 DoesTypePreventStatus(u16 species, u32 status)
+static bool8 DoesTypePreventStatus(struct Pokemon *mon, u32 status)
 {
+	u8 type1 = GetMonData(mon, MON_DATA_TYPE_1);
+	u8 type2 = GetMonData(mon, MON_DATA_TYPE_2);
     bool8 ret = FALSE;
 
     switch (status)
     {
     case STATUS1_TOXIC_POISON:
-        if (gBaseStats[species].type1 == TYPE_STEEL || gBaseStats[species].type1 == TYPE_POISON
-            || gBaseStats[species].type2 == TYPE_STEEL || gBaseStats[species].type2 == TYPE_POISON)
+        if (type1 == TYPE_STEEL || type1 == TYPE_POISON
+            || type2 == TYPE_STEEL || type2 == TYPE_POISON)
             ret = TRUE;
         break;
     case STATUS1_FREEZE:
-        if (gBaseStats[species].type1 == TYPE_ICE || gBaseStats[species].type2 == TYPE_ICE)
+        if (type1 == TYPE_ICE || type2 == TYPE_ICE)
             ret = TRUE;
         break;
     case STATUS1_PARALYSIS:
-        if (gBaseStats[species].type1 == TYPE_GROUND || gBaseStats[species].type1 == TYPE_ELECTRIC
-            || gBaseStats[species].type2 == TYPE_GROUND || gBaseStats[species].type2 == TYPE_ELECTRIC)
+        if (type1 == TYPE_GROUND || type1 == TYPE_ELECTRIC
+            || type2 == TYPE_GROUND || type2 == TYPE_ELECTRIC)
             ret = TRUE;
         break;
     case STATUS1_BURN:
-        if (gBaseStats[species].type1 == TYPE_FIRE || gBaseStats[species].type2 == TYPE_FIRE)
+        if (type1 == TYPE_FIRE || type2 == TYPE_FIRE)
             ret = TRUE;
         break;
     case STATUS1_SLEEP:
@@ -926,8 +928,7 @@ static bool8 TryInflictRandomStatus(void)
                     && GetMonData(mon, MON_DATA_HP) != 0)
                 {
                     j++;
-                    species = GetMonData(mon, MON_DATA_SPECIES);
-                    if (!DoesTypePreventStatus(species, sStatusFlags))
+                    if (!DoesTypePreventStatus(mon, sStatusFlags))
                     {
                         statusChosen = TRUE;
                         break;
@@ -968,8 +969,7 @@ static bool8 TryInflictRandomStatus(void)
             && GetMonData(mon, MON_DATA_HP) != 0)
         {
             j++;
-            species = GetMonData(mon, MON_DATA_SPECIES);
-            if (!DoesAbilityPreventStatus(mon, sStatusFlags) && !DoesTypePreventStatus(species, sStatusFlags))
+            if (!DoesAbilityPreventStatus(mon, sStatusFlags) && !DoesTypePreventStatus(mon, sStatusFlags))
                 SetMonData(mon, MON_DATA_STATUS, &sStatusFlags);
         }
         if (j == count)
