@@ -50,7 +50,7 @@ Route113_MapBGEvents: @ 8529DF4
 	bg_secret_base_event 49, 8, 3, SECRET_BASE_RED_CAVE1_3
 	bg_hidden_item_event 66, 3, 3, ITEM_ETHER, FLAG_HIDDEN_ITEM_ROUTE_113_ETHER
 	bg_hidden_item_event 22, 5, 3, ITEM_TM32, FLAG_HIDDEN_ITEM_ROUTE_113_TM_32
-	bg_hidden_item_event 73, 3, 3, ITEM_NUGGET, FLAG_HIDDEN_ITEM_ROUTE_113_NUGGET
+	bg_hidden_item_event 73, 3, 3, ITEM_GOLD_NUGGET, FLAG_HIDDEN_ITEM_ROUTE_113_NUGGET
 
 Route113_MapEvents:: @ 8529E54
 	map_events Route113_EventObjects, Route113_MapWarps, Route113_MapCoordEvents, Route113_MapBGEvents

@@ -1,6 +1,7 @@
 #include "global.h"
 #include "battle.h"
 #include "battle_controllers.h"
+#include "item.h"
 #include "pokemon.h"
 #include "random.h"
 #include "util.h"
@@ -794,21 +795,21 @@ u8 GetMostSuitableMonToSwitchInto(void)
     return bestMonId;
 }
 
-// TODO: use PokemonItemEffect struct instead of u8 once it's documented.
-static u8 GetAI_ItemType(u8 itemId, const u8 *itemEffect) // NOTE: should take u16 as item Id argument
+// This will need expanding eventually
+static u8 GetAI_ItemType(u16 itemId, u8 medicineGroup)
 {
     if (itemId == ITEM_FULL_RESTORE)
         return AI_ITEM_FULL_RESTORE;
-    else if (itemEffect[4] & 4)
-        return AI_ITEM_HEAL_HP;
-    else if (itemEffect[3] & 0x3F)
-        return AI_ITEM_CURE_CONDITION;
-    else if (itemEffect[0] & 0x3F || itemEffect[1] != 0 || itemEffect[2] != 0)
-        return AI_ITEM_X_STAT;
-    else if (itemEffect[3] & 0x80)
+	if (itemId == ITEM_GUARD_SPEC)
         return AI_ITEM_GUARD_SPECS;
-    else
-        return AI_ITEM_NOT_RECOGNIZABLE;
+    if (medicineGroup == MEDICINE_GROUP_HP_RESTORE)
+        return AI_ITEM_HEAL_HP;
+    if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE)
+        return AI_ITEM_CURE_CONDITION;
+    if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+        return AI_ITEM_X_STAT;
+
+    return AI_ITEM_NOT_RECOGNIZABLE;
 }
 
 static bool8 ShouldUseItem(void)
@@ -839,24 +840,20 @@ static bool8 ShouldUseItem(void)
     for (i = 0; i < 4; i++)
     {
         u16 item;
-        const u8 *itemEffects;
-        u8 paramOffset;
+        u8 medicineGroup;
+        u16 healAmt;
         u8 battlerSide;
 
         if (i != 0 && validMons > (gBattleResources->battleHistory->itemsNo - i) + 1)
             continue;
         item = gBattleResources->battleHistory->trainerItems[i];
+		medicineGroup = ItemId_GetMedicineGroup(item);
         if (item == ITEM_NONE)
             continue;
-        if (gItemEffectTable[item - 13] == NULL)
+        if (medicineGroup == 0)
             continue;
 
-        if (item == ITEM_ENIGMA_BERRY)
-            itemEffects = gSaveBlock1Ptr->enigmaBerry.itemEffect;
-        else
-            itemEffects = gItemEffectTable[item - 13];
-
-        *(gBattleStruct->AI_itemType + gActiveBattler / 2) = GetAI_ItemType(item, itemEffects);
+		*(gBattleStruct->AI_itemType + gActiveBattler / 2) = GetAI_ItemType(item, medicineGroup);
 
         switch (*(gBattleStruct->AI_itemType + gActiveBattler / 2))
         {
@@ -868,63 +865,61 @@ static bool8 ShouldUseItem(void)
             shouldUse = TRUE;
             break;
         case AI_ITEM_HEAL_HP:
-            paramOffset = GetItemEffectParamOffset(item, 4, 4);
-            if (paramOffset == 0)
-                break;
+            healAmt = GetItemHealAmount(item, gBattleMons[gActiveBattler].maxHP);
             if (gBattleMons[gActiveBattler].hp == 0)
                 break;
-            if (gBattleMons[gActiveBattler].hp < gBattleMons[gActiveBattler].maxHP / 4 || gBattleMons[gActiveBattler].maxHP - gBattleMons[gActiveBattler].hp > itemEffects[paramOffset])
+            if (gBattleMons[gActiveBattler].hp < gBattleMons[gActiveBattler].maxHP / 4 || gBattleMons[gActiveBattler].maxHP - gBattleMons[gActiveBattler].hp > healAmt)
                 shouldUse = TRUE;
             break;
         case AI_ITEM_CURE_CONDITION:
             *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) = 0;
-            if (itemEffects[3] & 0x20 && gBattleMons[gActiveBattler].status1 & STATUS1_SLEEP)
+            if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE && gBattleMons[gActiveBattler].status1 & STATUS1_SLEEP)
             {
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x20;
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x20;
                 shouldUse = TRUE;
             }
-            if (itemEffects[3] & 0x10 && (gBattleMons[gActiveBattler].status1 & STATUS1_POISON || gBattleMons[gActiveBattler].status1 & STATUS1_TOXIC_POISON))
+            if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE && (gBattleMons[gActiveBattler].status1 & STATUS1_POISON || gBattleMons[gActiveBattler].status1 & STATUS1_TOXIC_POISON))
             {
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x10;
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x10;
                 shouldUse = TRUE;
             }
-            if (itemEffects[3] & 0x8 && gBattleMons[gActiveBattler].status1 & STATUS1_BURN)
+            if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE && gBattleMons[gActiveBattler].status1 & STATUS1_BURN)
             {
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x8;
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x8;
                 shouldUse = TRUE;
             }
-            if (itemEffects[3] & 0x4 && gBattleMons[gActiveBattler].status1 & STATUS1_FREEZE)
+            if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE && gBattleMons[gActiveBattler].status1 & STATUS1_FREEZE)
             {
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x4;
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x4;
                 shouldUse = TRUE;
             }
-            if (itemEffects[3] & 0x2 && gBattleMons[gActiveBattler].status1 & STATUS1_PARALYSIS)
+            if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE && gBattleMons[gActiveBattler].status1 & STATUS1_PARALYSIS)
             {
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x2;
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x2;
                 shouldUse = TRUE;
             }
-            if (itemEffects[3] & 0x1 && gBattleMons[gActiveBattler].status2 & STATUS2_CONFUSION)
+            if (medicineGroup == MEDICINE_GROUP_STATUS_RESTORE && (gBattleMons[gActiveBattler].status2 & STATUS2_CURABLE || gStatuses3[gActiveBattler] & STATUS3_CURABLE))
             {
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x1;
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x1;
                 shouldUse = TRUE;
             }
             break;
         case AI_ITEM_X_STAT:
-            *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) = 0;
+           *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) = 0;
             if (gDisableStructs[gActiveBattler].isFirstTurn == 0)
                 break;
-            if (itemEffects[0] & 0xF)
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x1;
-            if (itemEffects[1] & 0xF0)
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x2;
-            if (itemEffects[1] & 0xF)
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x4;
-            if (itemEffects[2] & 0xF)
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x8;
-            if (itemEffects[2] & 0xF0)
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x20;
-            if (itemEffects[0] & 0x30)
-                *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x80;
+            if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x1;
+            if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x2;
+            if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x4;
+            if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x8;
+            if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x20;
+            if (medicineGroup == MEDICINE_GROUP_BATTLE_ITEM)
+               *(gBattleStruct->AI_itemFlags + gActiveBattler / 2) |= 0x80;
             shouldUse = TRUE;
             break;
         case AI_ITEM_GUARD_SPECS:

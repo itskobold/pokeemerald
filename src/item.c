@@ -98,7 +98,7 @@ void CopyItemNameHandlePlural(u16 itemId, u8 *dst, u32 quantity)
     }
     else
     {
-        if (itemId >= ITEM_CHERI_BERRY && itemId <= ITEM_ENIGMA_BERRY)
+        if (itemId >= ITEM_CHERI_BERRY && itemId <= ITEM_BERRY_PULP)
             GetBerryCountString(dst, gBerries[itemId - ITEM_CHERI_BERRY].name, quantity);
         else
             StringCopy(dst, ItemId_GetName(itemId));
@@ -1104,4 +1104,9 @@ ItemUseFunc ItemId_GetBattleFunc(u16 itemId)
 u8 ItemId_GetSecondaryId(u16 itemId)
 {
     return gItems[SanitizeItemId(itemId)].secondaryId;
+}
+
+u8 ItemId_GetMedicineGroup(u16 itemId)
+{
+    return gItems[SanitizeItemId(itemId)].medicineGroup;
 }

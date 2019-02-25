@@ -271,9 +271,7 @@ u8 sub_812210C(void)
 
 bool8 sub_8122148(u16 itemId)
 {
-    if (itemId != ITEM_ENIGMA_BERRY)
-        return TRUE;
-    else if (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(TRADE_CENTER) && gSaveBlock1Ptr->location.mapNum == MAP_NUM(TRADE_CENTER))
+    if (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(TRADE_CENTER) && gSaveBlock1Ptr->location.mapNum == MAP_NUM(TRADE_CENTER))
         return FALSE;
     else if (InUnionRoom() != TRUE)
         return TRUE;

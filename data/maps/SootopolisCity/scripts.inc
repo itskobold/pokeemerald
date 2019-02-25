@@ -770,7 +770,7 @@ SootopolisCity_EventScript_1E5F79:: @ 81E5F79
 	end
 
 SootopolisCity_EventScript_1E5F9A:: @ 81E5F9A
-	giveitem_std ITEM_IAPAPA_BERRY
+	giveitem_std ITEM_ORAN_BERRY
 	compare VAR_RESULT, 0
 	goto_if_eq SootopolisCity_EventScript_272054
 	msgbox SootopolisCity_Text_2A7CB7, MSGBOX_DEFAULT

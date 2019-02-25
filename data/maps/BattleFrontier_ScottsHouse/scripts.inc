@@ -32,7 +32,7 @@ BattleFrontier_ScottsHouse_EventScript_263704:: @ 8263704
 	goto_if_unset FLAG_SYS_PIKE_SILVER, BattleFrontier_ScottsHouse_EventScript_2636EC
 	goto_if_unset FLAG_SYS_PYRAMID_SILVER, BattleFrontier_ScottsHouse_EventScript_2636EC
 	msgbox BattleFrontier_ScottsHouse_Text_2640BC, MSGBOX_DEFAULT
-	giveitem_std ITEM_LANSAT_BERRY
+	giveitem_std ITEM_ORAN_BERRY
 	compare VAR_RESULT, 0
 	goto_if_eq BattleFrontier_ScottsHouse_EventScript_2637D0
 	setflag FLAG_COLLECTED_ALL_SILVER_SYMBOLS

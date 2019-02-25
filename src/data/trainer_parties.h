@@ -1453,7 +1453,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Cindy1[] = {
     .iv = 0,
     .lvl = 7,
     .species = SPECIES_ZIGZAGOON,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1462,14 +1462,14 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Daphne[] = {
     .iv = 100,
     .lvl = 39,
     .species = SPECIES_LUVDISC,
-    .heldItem = ITEM_NUGGET,
+    .heldItem = ITEM_GOLD_NUGGET,
     .moves = MOVE_ATTRACT, MOVE_SWEET_KISS, MOVE_FLAIL, MOVE_WATER_PULSE
     },
     {
     .iv = 100,
     .lvl = 39,
     .species = SPECIES_LUVDISC,
-    .heldItem = ITEM_NUGGET,
+    .heldItem = ITEM_GOLD_NUGGET,
     .moves = MOVE_ATTRACT, MOVE_SAFEGUARD, MOVE_TAKE_DOWN, MOVE_WATER_PULSE
     }
 };
@@ -1497,7 +1497,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Cindy2[] = {
     .iv = 0,
     .lvl = 11,
     .species = SPECIES_ZIGZAGOON,
-    .heldItem = ITEM_NUGGET,
+    .heldItem = ITEM_GOLD_NUGGET,
     .moves = MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_NONE, MOVE_NONE
     }
 };
@@ -1507,7 +1507,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Brianna[] = {
     .iv = 150,
     .lvl = 40,
     .species = SPECIES_SEAKING,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1516,7 +1516,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Naomi[] = {
     .iv = 100,
     .lvl = 45,
     .species = SPECIES_ROSELIA,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1525,7 +1525,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Cindy3[] = {
     .iv = 10,
     .lvl = 27,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1534,7 +1534,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Cindy4[] = {
     .iv = 20,
     .lvl = 30,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1543,7 +1543,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Cindy5[] = {
     .iv = 30,
     .lvl = 33,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1552,7 +1552,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Cindy6[] = {
     .iv = 40,
     .lvl = 36,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET,
+    .heldItem = ITEM_GOLD_NUGGET,
     .moves = MOVE_FURY_SWIPES, MOVE_MUD_SPORT, MOVE_ODOR_SLEUTH, MOVE_SAND_ATTACK
     }
 };
@@ -1711,7 +1711,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Winston1[] = {
     .iv = 0,
     .lvl = 7,
     .species = SPECIES_ZIGZAGOON,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1733,7 +1733,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Garret[] = {
     .iv = 0,
     .lvl = 45,
     .species = SPECIES_AZUMARILL,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1742,7 +1742,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Winston2[] = {
     .iv = 0,
     .lvl = 27,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1751,7 +1751,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Winston3[] = {
     .iv = 0,
     .lvl = 30,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1760,7 +1760,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Winston4[] = {
     .iv = 0,
     .lvl = 33,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -1769,7 +1769,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Winston5[] = {
     .iv = 0,
     .lvl = 36,
     .species = SPECIES_LINOONE,
-    .heldItem = ITEM_NUGGET,
+    .heldItem = ITEM_GOLD_NUGGET,
     .moves = MOVE_FURY_SWIPES, MOVE_MUD_SPORT, MOVE_ODOR_SLEUTH, MOVE_SAND_ATTACK
     }
 };
@@ -3469,7 +3469,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery1[] = {
     .iv = 250,
     .lvl = 29,
     .species = SPECIES_TORKOAL,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_BODY_SLAM, MOVE_ATTRACT
     }
 };
@@ -9408,7 +9408,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Dawson[] = {
     .iv = 0,
     .lvl = 8,
     .species = SPECIES_ZIGZAGOON,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     },
     {
     .iv = 0,
@@ -9429,7 +9429,7 @@ const struct TrainerMonItemDefaultMoves gTrainerParty_Sarah[] = {
     .iv = 0,
     .lvl = 8,
     .species = SPECIES_ZIGZAGOON,
-    .heldItem = ITEM_NUGGET
+    .heldItem = ITEM_GOLD_NUGGET
     }
 };
 
@@ -10752,7 +10752,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery2[] = {
     .iv = 255,
     .lvl = 38,
     .species = SPECIES_MAGCARGO,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_ATTRACT, MOVE_LIGHT_SCREEN, MOVE_ROCK_SLIDE
     },
     {
@@ -10766,14 +10766,14 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery2[] = {
     .iv = 255,
     .lvl = 38,
     .species = SPECIES_CAMERUPT,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EARTHQUAKE, MOVE_ATTRACT
     },
     {
     .iv = 255,
     .lvl = 40,
     .species = SPECIES_TORKOAL,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EXPLOSION, MOVE_ATTRACT
     }
 };
@@ -10790,7 +10790,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery3[] = {
     .iv = 255,
     .lvl = 43,
     .species = SPECIES_MAGCARGO,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_ATTRACT, MOVE_LIGHT_SCREEN, MOVE_ROCK_SLIDE
     },
     {
@@ -10804,14 +10804,14 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery3[] = {
     .iv = 255,
     .lvl = 43,
     .species = SPECIES_CAMERUPT,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EARTHQUAKE, MOVE_ATTRACT
     },
     {
     .iv = 255,
     .lvl = 45,
     .species = SPECIES_TORKOAL,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EXPLOSION, MOVE_ATTRACT
     }
 };
@@ -10835,7 +10835,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery4[] = {
     .iv = 255,
     .lvl = 48,
     .species = SPECIES_MAGCARGO,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_ATTRACT, MOVE_LIGHT_SCREEN, MOVE_ROCK_SLIDE
     },
     {
@@ -10849,14 +10849,14 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery4[] = {
     .iv = 255,
     .lvl = 48,
     .species = SPECIES_CAMERUPT,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EARTHQUAKE, MOVE_ATTRACT
     },
     {
     .iv = 255,
     .lvl = 50,
     .species = SPECIES_TORKOAL,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EXPLOSION, MOVE_ATTRACT
     }
 };
@@ -10873,7 +10873,7 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery5[] = {
     .iv = 255,
     .lvl = 53,
     .species = SPECIES_MAGCARGO,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_ATTRACT, MOVE_LIGHT_SCREEN, MOVE_ROCK_SLIDE
     },
     {
@@ -10894,14 +10894,14 @@ const struct TrainerMonItemCustomMoves gTrainerParty_Flannery5[] = {
     .iv = 255,
     .lvl = 53,
     .species = SPECIES_CAMERUPT,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EARTHQUAKE, MOVE_ATTRACT
     },
     {
     .iv = 255,
     .lvl = 55,
     .species = SPECIES_TORKOAL,
-    .heldItem = ITEM_WHITE_HERB,
+    .heldItem = ITEM_BITTER_HERB,
     .moves = MOVE_OVERHEAT, MOVE_SUNNY_DAY, MOVE_EXPLOSION, MOVE_ATTRACT
     }
 };

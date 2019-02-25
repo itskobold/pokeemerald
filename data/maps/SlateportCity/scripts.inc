@@ -724,7 +724,7 @@ SlateportCity_EventScript_1DD36E:: @ 81DD36E
 	faceplayer
 	goto_if_set FLAG_RECEIVED_POWDER_JAR, SlateportCity_EventScript_1DD39A
 	msgbox SlateportCity_Text_1DEBCE, MSGBOX_DEFAULT
-	giveitem_std ITEM_POWDER_JAR
+	giveitem_std ITEM_POTION
 	setflag FLAG_RECEIVED_POWDER_JAR
 	msgbox SlateportCity_Text_1DED27, MSGBOX_DEFAULT
 	release
@@ -768,7 +768,7 @@ SlateportCity_EventScript_1DD3CA:: @ 81DD3CA
 	end
 
 SlateportCity_EventScript_1DD46E:: @ 81DD46E
-	bufferitemname 0, ITEM_ENERGY_POWDER
+	bufferitemname 0, ITEM_ENERGY_PULP
 	setvar VAR_0x8008, 30
 	setvar VAR_0x8009, 50
 	goto SlateportCity_EventScript_1DD557
@@ -782,7 +782,7 @@ SlateportCity_EventScript_1DD482:: @ 81DD482
 	end
 
 SlateportCity_EventScript_1DD496:: @ 81DD496
-	bufferitemname 0, ITEM_HEAL_POWDER
+	bufferitemname 0, ITEM_HEALING_DUST
 	setvar VAR_0x8008, 32
 	setvar VAR_0x8009, 50
 	goto SlateportCity_EventScript_1DD557

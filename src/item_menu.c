@@ -1402,7 +1402,7 @@ void sub_81AC644(u8 unused)
             gUnknown_0203CE54->unk828 = 4;
             break;
         case 8:
-            if (!ItemId_GetImportance(gSpecialVar_ItemId) && gSpecialVar_ItemId != ITEM_ENIGMA_BERRY)
+            if (!ItemId_GetImportance(gSpecialVar_ItemId))
             {
                 gUnknown_0203CE54->unk820 = gUnknown_0861404B;
                 gUnknown_0203CE54->unk828 = 2;
@@ -1414,7 +1414,7 @@ void sub_81AC644(u8 unused)
             }
             break;
         case 6:
-            if (!ItemId_GetImportance(gSpecialVar_ItemId) && gSpecialVar_ItemId != ITEM_ENIGMA_BERRY)
+            if (!ItemId_GetImportance(gSpecialVar_ItemId))
             {
                 gUnknown_0203CE54->unk820 = gUnknown_0861404D;
                 gUnknown_0203CE54->unk828 = 2;
@@ -1426,7 +1426,7 @@ void sub_81AC644(u8 unused)
             }
             break;
         case 7:
-            if (!ItemId_GetImportance(gSpecialVar_ItemId) && gSpecialVar_ItemId != ITEM_ENIGMA_BERRY)
+            if (!ItemId_GetImportance(gSpecialVar_ItemId))
             {
                 gUnknown_0203CE54->unk820 = gUnknown_0861404F;
                 gUnknown_0203CE54->unk828 = 2;
@@ -1459,12 +1459,11 @@ void sub_81AC644(u8 unused)
             {
                 switch (gUnknown_0203CE58.pocket)
                 {
+					case BALLS_POCKET:
                     case ITEMS_POCKET:
                         gUnknown_0203CE54->unk820 = &gUnknown_0203CE54->unk824;
                         gUnknown_0203CE54->unk828 = 4;
                         memcpy(&gUnknown_0203CE54->unk824, &gUnknown_0861402C, 4);
-                        if (ItemIsMail(gSpecialVar_ItemId) == TRUE)
-                            gUnknown_0203CE54->unk824 = 6;
                         break;
                     case KEYITEMS_POCKET:
                         gUnknown_0203CE54->unk820 = &gUnknown_0203CE54->unk824;
@@ -1477,10 +1476,6 @@ void sub_81AC644(u8 unused)
                             if (TestPlayerAvatarFlags(6))
                                 gUnknown_0203CE54->unk824 = 7;
                         }
-                        break;
-                    case BALLS_POCKET:
-                        gUnknown_0203CE54->unk820 = gUnknown_08614034;
-                        gUnknown_0203CE54->unk828 = 4;
                         break;
                     case TMHM_POCKET:
                         gUnknown_0203CE54->unk820 = gUnknown_08614038;

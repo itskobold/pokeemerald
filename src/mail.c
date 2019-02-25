@@ -244,57 +244,7 @@ static const struct MailLayout sUnknown_0859F458[] = {
 
 void ReadMail(struct MailStruct *mail, void (*callback)(void), bool8 flag)
 {
-    u16 buffer[2];
-    u16 species;
-
-    sMailRead = calloc(1, sizeof(*sMailRead));
-    sMailRead->language = LANGUAGE_ENGLISH;
-    sMailRead->playerIsSender = TRUE;
-    sMailRead->parserSingle = CopyEasyChatWord;
-    sMailRead->parserMultiple = ConvertEasyChatWordsToString;
-    if (IS_ITEM_MAIL(mail->itemId))
-    {
-        sMailRead->mailType = mail->itemId - ITEM_ORANGE_MAIL;
-    }
-    else
-    {
-        sMailRead->mailType = 0;
-        flag = FALSE;
-    }
-    switch (sMailRead->playerIsSender)
-    {
-        case FALSE:
-        default:
-            sMailRead->layout = &sUnknown_0859F3B4[sMailRead->mailType];
-            break;
-        case TRUE:
-            sMailRead->layout = &sUnknown_0859F458[sMailRead->mailType];
-            break;
-    }
-    species = MailSpeciesToSpecies(mail->species, buffer);
-    if (species >= SPECIES_BULBASAUR && species < NUM_SPECIES)
-    {
-        switch (sMailRead->mailType)
-        {
-            default:
-                sMailRead->animsActive = 0;
-                break;
-            case ITEM_BEAD_MAIL - ITEM_ORANGE_MAIL:
-                sMailRead->animsActive = 1;
-                break;
-            case ITEM_DREAM_MAIL - ITEM_ORANGE_MAIL:
-                sMailRead->animsActive = 2;
-                break;
-        }
-    }
-    else
-    {
-        sMailRead->animsActive = 0;
-    }
-    sMailRead->mail = mail;
-    sMailRead->callback = callback;
-    sMailRead->flag = flag;
-    SetMainCallback2(CB2_InitMailRead);
+    return;
 }
 
 static bool8 MailReadBuildGraphics(void)

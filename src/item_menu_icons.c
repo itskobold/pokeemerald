@@ -576,11 +576,6 @@ static void sub_80D5070(u8 berryId)
 {
     struct CompressedSpritePalette pal;
 
-    if (berryId == ITEM_TO_BERRY(ITEM_ENIGMA_BERRY) - 1 && IsEnigmaBerryValid())
-    {
-        // unknown empty if statement
-    }
-
     pal.data = gBerryPicTable[berryId].pal;
     pal.tag = 0x7544;
     LoadCompressedSpritePalette(&pal);

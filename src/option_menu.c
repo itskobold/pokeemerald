@@ -199,7 +199,7 @@ static const struct WindowTemplate sOptionMenuWinTemplates[] =
 
 static const struct WindowTemplate sYesNoWindowTemplate =
 {
-    .bg = 0,
+    .bg = 2,
     .tilemapLeft = 24,
     .tilemapTop = 11,
     .width = 5,

@@ -24,7 +24,7 @@ Route109_SeashoreHouse_EventScript_269428:: @ 8269428
 
 Route109_SeashoreHouse_EventScript_269432:: @ 8269432
 	msgbox Route109_SeashoreHouse_Text_269685, MSGBOX_DEFAULT
-	giveitem_std ITEM_SODA_POP, 6
+	giveitem_std ITEM_LEMONADE, 6
 	compare VAR_RESULT, 0
 	goto_if_eq Route109_SeashoreHouse_EventScript_269456
 	setflag FLAG_RECEIVED_6_SODA_POP
@@ -52,14 +52,14 @@ Route109_SeashoreHouse_EventScript_269484:: @ 8269484
 	checkmoney 0x12c, 0
 	compare VAR_RESULT, 0
 	goto_if_eq Route109_SeashoreHouse_EventScript_2694C8
-	checkitemspace ITEM_SODA_POP, 1
+	checkitemspace ITEM_LEMONADE, 1
 	compare VAR_RESULT, 0
 	goto_if_eq Route109_SeashoreHouse_EventScript_2694D5
 	msgbox Route109_SeashoreHouse_Text_2697C8, MSGBOX_DEFAULT
 	takemoney 0x12c, 0
 	updatemoneybox 0, 0
 	nop
-	giveitem_std ITEM_SODA_POP
+	giveitem_std ITEM_LEMONADE
 	hidemoneybox
 	nop
 	nop

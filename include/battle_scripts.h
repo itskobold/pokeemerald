@@ -222,5 +222,16 @@ extern const u8 BattleScript_RunByUsingItem[];
 extern const u8 BattleScript_ActionWatchesCarefully[];
 extern const u8 BattleScript_ActionGetNear[];
 extern const u8 BattleScript_ActionThrowPokeblock[];
+extern const u8 BattleScript_TotemWardStatRaiseEnd2[];
+extern const u8 BattleScript_BerryCureChosenStatusEnd2[]; //berry cure any status end2
+extern const u8 BattleScript_BerryMoveFirstEnd[]; //custap berry
+extern const u8 BattleScript_BerryInflictDmgEnd[]; //jaboca/rowap berry
+extern const u8 BattleScript_BerryHalfSuperEffectiveDmgEnd[]; //durin berry
+extern const u8 BattleScript_BerryCureChosenStatusRet[]; //berry cure any status return
+extern const u8 BattleScript_BerryMoveFirstRet[]; //custap berry
+extern const u8 BattleScript_BerryHalfSuperEffectiveDmgRet[]; //durin berry
+extern const u8 BattleScript_BerryInflictDmgRet[]; //jaboca/rowap berry
+extern const u8 BattleScript_GrandWardUse[];
+extern const u8 BattleScript_GrandTotemUse[];
 
 #endif // GUARD_BATTLE_SCRIPTS_H

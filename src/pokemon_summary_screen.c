@@ -3261,11 +3261,7 @@ static void PrintHeldItemName(void)
     const u8 *text;
     int offset;
 
-    if (pssData->summary.item == ITEM_ENIGMA_BERRY && IsMultiBattle() == TRUE && (pssData->curMonIndex == 1 || pssData->curMonIndex == 4 || pssData->curMonIndex == 5))
-    {
-        text = ItemId_GetName(ITEM_ENIGMA_BERRY);
-    }
-    else if (pssData->summary.item == ITEM_NONE)
+    if (pssData->summary.item == ITEM_NONE)
     {
         text = gText_None;
     }

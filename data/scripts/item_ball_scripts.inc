@@ -75,7 +75,7 @@ Route111_EventScript_290DC2:: @ 8290DC2
 	end
 
 Route112_EventScript_290DCF:: @ 8290DCF
-	giveitem_std ITEM_NUGGET, 1, 1
+	giveitem_std ITEM_GOLD_NUGGET, 1, 1
 	end
 
 Route113_EventScript_290DDC:: @ 8290DDC
@@ -99,7 +99,7 @@ Route114_EventScript_290E10:: @ 8290E10
 	end
 
 Route114_EventScript_290E1D:: @ 8290E1D
-	giveitem_std ITEM_ENERGY_POWDER, 1, 1
+	giveitem_std ITEM_ENERGY_PULP, 1, 1
 	end
 
 Route115_EventScript_290E2A:: @ 8290E2A
@@ -119,7 +119,7 @@ Route115_EventScript_290E51:: @ 8290E51
 	end
 
 Route115_EventScript_290E5E:: @ 8290E5E
-	giveitem_std ITEM_HEAL_POWDER, 1, 1
+	giveitem_std ITEM_HEALING_DUST, 1, 1
 	end
 
 Route115_EventScript_290E6B:: @ 8290E6B
@@ -127,7 +127,7 @@ Route115_EventScript_290E6B:: @ 8290E6B
 	end
 
 Route116_EventScript_290E78:: @ 8290E78
-	giveitem_std ITEM_X_SPECIAL, 1, 1
+	giveitem_std ITEM_X_SP_ATK, 1, 1
 	end
 
 Route116_EventScript_290E85:: @ 8290E85
@@ -191,7 +191,7 @@ Route119_EventScript_290F3B:: @ 8290F3B
 	end
 
 Route120_EventScript_290F48:: @ 8290F48
-	giveitem_std ITEM_NUGGET, 1, 1
+	giveitem_std ITEM_GOLD_NUGGET, 1, 1
 	end
 
 Route120_EventScript_290F55:: @ 8290F55
@@ -419,7 +419,7 @@ NewMauville_Inside_EventScript_291220:: @ 8291220
 	end
 
 AbandonedShip_Rooms_1F_EventScript_29122D:: @ 829122D
-	giveitem_std ITEM_HARBOR_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 AbandonedShip_Rooms_B1F_EventScript_29123A:: @ 829123A
@@ -475,7 +475,7 @@ SafariZone_Southwest_EventScript_2912D6:: @ 82912D6
 	end
 
 SafariZone_Northeast_EventScript_2912E3:: @ 82912E3
-	giveitem_std ITEM_NUGGET, 1, 1
+	giveitem_std ITEM_GOLD_NUGGET, 1, 1
 	end
 
 SafariZone_Southeast_EventScript_2912F0:: @ 82912F0
@@ -491,11 +491,11 @@ MtPyre_3F_EventScript_29130A:: @ 829130A
 	end
 
 MtPyre_4F_EventScript_291317:: @ 8291317
-	giveitem_std ITEM_SEA_INCENSE, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 MtPyre_5F_EventScript_291324:: @ 8291324
-	giveitem_std ITEM_LAX_INCENSE, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 MtPyre_6F_EventScript_291331:: @ 8291331
@@ -515,7 +515,7 @@ AquaHideout_B1F_EventScript_291358:: @ 8291358
 	end
 
 AquaHideout_B1F_EventScript_291365:: @ 8291365
-	giveitem_std ITEM_NUGGET, 1, 1
+	giveitem_std ITEM_GOLD_NUGGET, 1, 1
 	end
 
 AquaHideout_B1F_EventScript_291372:: @ 8291372
@@ -531,7 +531,7 @@ AquaHideout_B2F_EventScript_29138C:: @ 829138C
 	end
 
 Route119_EventScript_291399:: @ 8291399
-	giveitem_std ITEM_NUGGET, 1, 1
+	giveitem_std ITEM_GOLD_NUGGET, 1, 1
 	end
 
 Route119_EventScript_2913A6:: @ 82913A6
@@ -567,39 +567,39 @@ SeafloorCavern_Room9_EventScript_291401:: @ 8291401
 	end
 
 Route110_TrickHousePuzzle1_EventScript_29140E:: @ 829140E
-	giveitem_std ITEM_ORANGE_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle2_EventScript_29141B:: @ 829141B
-	giveitem_std ITEM_HARBOR_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle2_EventScript_291428:: @ 8291428
-	giveitem_std ITEM_WAVE_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle3_EventScript_291435:: @ 8291435
-	giveitem_std ITEM_SHADOW_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle3_EventScript_291442:: @ 8291442
-	giveitem_std ITEM_WOOD_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle4_EventScript_29144F:: @ 829144F
-	giveitem_std ITEM_MECH_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle6_EventScript_29145C:: @ 829145C
-	giveitem_std ITEM_GLITTER_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle7_EventScript_291469:: @ 8291469
-	giveitem_std ITEM_TROPIC_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 Route110_TrickHousePuzzle8_EventScript_291476:: @ 8291476
-	giveitem_std ITEM_BEAD_MAIL, 1, 1
+	giveitem_std ITEM_POTION, 1, 1
 	end
 
 VictoryRoad_1F_EventScript_291483:: @ 8291483
@@ -643,7 +643,7 @@ MagmaHideout_2F_2R_EventScript_2914F8:: @ 82914F8
 	end
 
 MagmaHideout_3F_1R_EventScript_291505:: @ 8291505
-	giveitem_std ITEM_NUGGET, 1, 1
+	giveitem_std ITEM_GOLD_NUGGET, 1, 1
 	end
 
 MagmaHideout_3F_2R_EventScript_291512:: @ 8291512

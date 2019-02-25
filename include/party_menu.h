@@ -70,6 +70,7 @@ void sub_81B5D4C(u8 *a, u8 *b, u8 c);
 void sub_81B617C(void);
 void ItemUseCB_Medicine(u8 taskId, TaskFunc task);
 void sub_81B67C8(u8 taskId, TaskFunc task);
+void dp05_pokeball(u8 taskId, TaskFunc task);
 void dp05_ether(u8 taskId, TaskFunc task);
 void dp05_pp_up(u8 taskId, TaskFunc task);
 u16 ItemIdToBattleMoveId(u16 item);
@@ -109,5 +110,6 @@ void sub_81B9770(void);
 void sub_81B9718(void);
 void sub_81B96D0(void);
 void sub_81B968C(void);
+void sub_81B754C(u8 slot, struct Pokemon *mon);
 
 #endif // GUARD_PARTY_MENU_H

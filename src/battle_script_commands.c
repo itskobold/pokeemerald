@@ -209,7 +209,7 @@ static void atk7F_setseeded(void);
 static void atk80_manipulatedamage(void);
 static void atk81_trysetrest(void);
 static void atk82_jumpifnotfirstturn(void);
-static void atk83_nop(void);
+static void atk83_jabocarowapdmg(void);
 static void atk84_jumpifcantmakeasleep(void);
 static void atk85_stockpile(void);
 static void atk86_stockpiletobasedamage(void);
@@ -461,7 +461,7 @@ void (* const gBattleScriptingCommandsTable[])(void) =
     atk80_manipulatedamage,
     atk81_trysetrest,
     atk82_jumpifnotfirstturn,
-    atk83_nop,
+    atk83_jabocarowapdmg,
     atk84_jumpifcantmakeasleep,
     atk85_stockpile,
     atk86_stockpiletobasedamage,
@@ -846,11 +846,11 @@ static const u16 sPickupItems[] =
 static const u16 sRarePickupItems[] =
 {
     ITEM_HYPER_POTION,
-    ITEM_NUGGET,
+    ITEM_GOLD_NUGGET,
     ITEM_KINGS_ROCK,
     ITEM_FULL_RESTORE,
     ITEM_ETHER,
-    ITEM_WHITE_HERB,
+    ITEM_BITTER_HERB,
     ITEM_TM44_REST,
     ITEM_ELIXIR,
     ITEM_TM01_FOCUS_PUNCH,
@@ -1163,16 +1163,8 @@ static void atk01_accuracycheck(void)
         if (gBattleMons[gBattlerAttacker].ability == ABILITY_HUSTLE && gBattleMoves[move].pss == MOVE_IS_PHYSICAL)
             calc = (calc * 80) / 100; // 1.2 hustle loss
 
-        if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
-        {
-            holdEffect = gEnigmaBerries[gBattlerTarget].holdEffect;
-            param = gEnigmaBerries[gBattlerTarget].holdEffectParam;
-        }
-        else
-        {
-            holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
-            param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
-        }
+		holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
+		param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
 
         gPotentialItemEffectBattler = gBattlerTarget;
 
@@ -1262,10 +1254,7 @@ static void atk04_critcalc(void)
 
     item = gBattleMons[gBattlerAttacker].item;
 
-    if (item == ITEM_ENIGMA_BERRY)
-        holdEffect = gEnigmaBerries[gBattlerAttacker].holdEffect;
-    else
-        holdEffect = ItemId_GetHoldEffect(item);
+    holdEffect = ItemId_GetHoldEffect(item);
 
     gPotentialItemEffectBattler = gBattlerAttacker;
 
@@ -1274,9 +1263,7 @@ static void atk04_critcalc(void)
                 + (gBattleMoves[gCurrentMove].effect == EFFECT_SKY_ATTACK)
                 + (gBattleMoves[gCurrentMove].effect == EFFECT_BLAZE_KICK)
                 + (gBattleMoves[gCurrentMove].effect == EFFECT_POISON_TAIL)
-                + (holdEffect == HOLD_EFFECT_SCOPE_LENS)
-                + 2 * (holdEffect == HOLD_EFFECT_LUCKY_PUNCH && gBattleMons[gBattlerAttacker].species == SPECIES_CHANSEY)
-                + 2 * (holdEffect == HOLD_EFFECT_STICK && gBattleMons[gBattlerAttacker].species == SPECIES_FARFETCHD);
+                + (holdEffect == HOLD_EFFECT_SCOPE_LENS);
 
     if (critChance > 4)
         critChance = 4;
@@ -1679,16 +1666,8 @@ static void atk07_adjustnormaldamage(void)
 
     ApplyRandomDmgMultiplier();
 
-    if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
-    {
-        holdEffect = gEnigmaBerries[gBattlerTarget].holdEffect;
-        param = gEnigmaBerries[gBattlerTarget].holdEffectParam;
-    }
-    else
-    {
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
-        param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
-    }
+	holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
+	param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
 
     gPotentialItemEffectBattler = gBattlerTarget;
 
@@ -1728,16 +1707,8 @@ static void atk08_adjustnormaldamage2(void) // The same as 0x7 except it doesn't
 
     ApplyRandomDmgMultiplier();
 
-    if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
-    {
-        holdEffect = gEnigmaBerries[gBattlerTarget].holdEffect;
-        param = gEnigmaBerries[gBattlerTarget].holdEffectParam;
-    }
-    else
-    {
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
-        param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
-    }
+	holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
+	param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
 
     gPotentialItemEffectBattler = gBattlerTarget;
 
@@ -2776,10 +2747,7 @@ void SetMoveEffect(bool8 primary, u8 certain)
                         gLastUsedAbility = gBattleMons[gBattlerTarget].ability;
                         RecordAbilityBattle(gBattlerTarget, gLastUsedAbility);
                     }
-                    else if (gBattleMons[gBattlerAttacker].item != 0
-                        || gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY
-                        || IS_ITEM_MAIL(gBattleMons[gBattlerTarget].item)
-                        || gBattleMons[gBattlerTarget].item == 0)
+                    else if (gBattleMons[gBattlerAttacker].item != 0 || gBattleMons[gBattlerTarget].item == 0)
                     {
                         gBattlescriptCurrInstr++;
                     }
@@ -3297,10 +3265,7 @@ static void atk23_getexp(void)
 
                 item = GetMonData(&gPlayerParty[i], MON_DATA_HELD_ITEM);
 
-                if (item == ITEM_ENIGMA_BERRY)
-                    holdEffect = gSaveBlock1Ptr->enigmaBerry.holdEffect;
-                else
-                    holdEffect = ItemId_GetHoldEffect(item);
+                holdEffect = ItemId_GetHoldEffect(item);
 
                 if (holdEffect == HOLD_EFFECT_EXP_SHARE)
                     viaExpShare++;
@@ -3336,10 +3301,7 @@ static void atk23_getexp(void)
         {
             item = GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_HELD_ITEM);
 
-            if (item == ITEM_ENIGMA_BERRY)
-                holdEffect = gSaveBlock1Ptr->enigmaBerry.holdEffect;
-            else
-                holdEffect = ItemId_GetHoldEffect(item);
+            holdEffect = ItemId_GetHoldEffect(item);
 
             if (holdEffect != HOLD_EFFECT_EXP_SHARE && !(gBattleStruct->sentInPokes & 1))
             {
@@ -4538,10 +4500,7 @@ static void atk49_moveend(void)
     arg1 = gBattlescriptCurrInstr[1];
     arg2 = gBattlescriptCurrInstr[2];
 
-    if (gBattleMons[gBattlerAttacker].item == ITEM_ENIGMA_BERRY)
-        holdEffectAtk = gEnigmaBerries[gBattlerAttacker].holdEffect;
-    else
-        holdEffectAtk = ItemId_GetHoldEffect(gBattleMons[gBattlerAttacker].item);
+    holdEffectAtk = ItemId_GetHoldEffect(gBattleMons[gBattlerAttacker].item);
 
     choicedMoveAtk = &gBattleStruct->choicedMove[gBattlerAttacker];
     GET_MOVE_TYPE(gCurrentMove, moveType);
@@ -4602,7 +4561,7 @@ static void atk49_moveend(void)
             gBattleScripting.atk49_state++;
             break;
         case ATK49_CHOICE_MOVE: // update choice band move
-            if (!(gHitMarker & HITMARKER_OBEYS) || holdEffectAtk != HOLD_EFFECT_CHOICE_BAND
+            if (!(gHitMarker & HITMARKER_OBEYS) || holdEffectAtk != HOLD_EFFECT_CHOICE_ITEM
                 || gChosenMove == MOVE_STRUGGLE || (*choicedMoveAtk != 0 && *choicedMoveAtk != 0xFFFF))
                     goto LOOP;
             if (gChosenMove == MOVE_BATON_PASS && !(gMoveResultFlags & MOVE_RESULT_FAILED))
@@ -6177,17 +6136,8 @@ static void atk69_adjustsetdamage(void) // The same as 0x7, except there's no ra
 {
     u8 holdEffect, param;
 
-    if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
-    {
-        holdEffect = gEnigmaBerries[gBattlerTarget].holdEffect;
-        param = gEnigmaBerries[gBattlerTarget].holdEffectParam;
-    }
-    else
-    {
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
-        param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
-    }
-
+	holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
+	param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
     gPotentialItemEffectBattler = gBattlerTarget;
 
     if (holdEffect == HOLD_EFFECT_FOCUS_BAND && (Random() % 100) < param)
@@ -7094,9 +7044,12 @@ static void atk82_jumpifnotfirstturn(void)
         gBattlescriptCurrInstr = failJump;
 }
 
-static void atk83_nop(void)
+static void atk83_jabocarowapdmg(void)
 {
-    gBattlescriptCurrInstr++;
+    gBattleMoveDamage = gBattleMons[gBattlerTarget].maxHP / 8;
+	if (gBattleMoveDamage == 0)
+		gBattleMoveDamage = 1;
+	gBattlescriptCurrInstr++;
 }
 
 bool8 UproarWakeUpCheck(u8 battlerId)
@@ -7739,16 +7692,8 @@ static void atk93_tryKO(void)
 {
     u8 holdEffect, param;
 
-    if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
-    {
-       holdEffect = gEnigmaBerries[gBattlerTarget].holdEffect;
-       param = gEnigmaBerries[gBattlerTarget].holdEffectParam;
-    }
-    else
-    {
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
-        param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
-    }
+	holdEffect = ItemId_GetHoldEffect(gBattleMons[gBattlerTarget].item);
+	param = ItemId_GetHoldEffectParam(gBattleMons[gBattlerTarget].item);
 
     gPotentialItemEffectBattler = gBattlerTarget;
 
@@ -9178,6 +9123,9 @@ static void atkC3_trysetfutureattack(void)
 static void atkC4_trydobeatup(void)
 {
     struct Pokemon *party;
+	u16 enemySpecies = gBattleMons[gBattlerTarget].species;
+	u16 attack = gBaseStats[GetMonData(&party[gBattleCommunication[0]], MON_DATA_SPECIES)].baseAttack; //party mon base attack stats
+	u16 defense = gBaseStats[gBattleMons[gBattlerTarget].species].baseDefense; //target mon defense
 
     if (GetBattlerSide(gBattlerAttacker) == B_SIDE_PLAYER)
         party = gPlayerParty;
@@ -9204,11 +9152,21 @@ static void atkC4_trydobeatup(void)
             PREPARE_MON_NICK_WITH_PREFIX_BUFFER(gBattleTextBuff1, gBattlerAttacker, gBattleCommunication[0])
 
             gBattlescriptCurrInstr += 9;
+			
+			if (GetMonData(&party[gBattleCommunication[0]], MON_DATA_HELD_ITEM) == ITEM_RED_SCARF) //mod attack if party mon is holding red scarf
+				attack = ModifyStatByScarf(ITEM_RED_SCARF, attack, 1);
+			else if (gBattleMons[gBattlerTarget].item == ITEM_EVIOLITE && gEvolutionTable[GetMonData(&party[gBattleCommunication[0]], MON_DATA_SPECIES)][0].targetSpecies != SPECIES_NONE) //mod attack if party mon is holding eviolite & can evolve
+				attack += CalculateEvioliteBonus(enemySpecies);
+			
+			if (gBattleMons[gBattlerTarget].item == ITEM_BLUE_SCARF) //mod defense if target is holding blue scarf
+				defense = ModifyStatByScarf(ITEM_BLUE_SCARF, defense, 2);
+			else if (gBattleMons[gBattlerTarget].item == ITEM_EVIOLITE && gEvolutionTable[enemySpecies][0].targetSpecies != SPECIES_NONE) //mod defense if target is holding eviolite & can evolve
+				defense += CalculateEvioliteBonus(enemySpecies);
 
-            gBattleMoveDamage = gBaseStats[GetMonData(&party[gBattleCommunication[0]], MON_DATA_SPECIES)].baseAttack;
+            gBattleMoveDamage = attack;
             gBattleMoveDamage *= gBattleMoves[gCurrentMove].power;
             gBattleMoveDamage *= (GetMonData(&party[gBattleCommunication[0]], MON_DATA_LEVEL) * 2 / 5 + 2);
-            gBattleMoveDamage /= gBaseStats[gBattleMons[gBattlerTarget].species].baseDefense;
+            gBattleMoveDamage /= defense;
             gBattleMoveDamage = (gBattleMoveDamage / 50) + 2;
             if (gProtectStructs[gBattlerAttacker].helpingHand)
                 gBattleMoveDamage = gBattleMoveDamage * 15 / 10;
@@ -9426,12 +9384,7 @@ static void atkD2_tryswapitems(void) // trick
             gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
         }
         // can't swap if two pokemon don't have an item
-        // or if either of them is an enigma berry or a mail
-        else if ((gBattleMons[gBattlerAttacker].item == 0 && gBattleMons[gBattlerTarget].item == 0)
-                 || gBattleMons[gBattlerAttacker].item == ITEM_ENIGMA_BERRY
-                 || gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY
-                 || IS_ITEM_MAIL(gBattleMons[gBattlerAttacker].item)
-                 || IS_ITEM_MAIL(gBattleMons[gBattlerTarget].item))
+        else if (gBattleMons[gBattlerAttacker].item == 0 && gBattleMons[gBattlerTarget].item == 0)
         {
             gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
         }

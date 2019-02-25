@@ -119,7 +119,7 @@ LilycoveCity_Harbor_EventScript_21E194:: @ 821E194
 LilycoveCity_Harbor_EventScript_21E1C6:: @ 821E1C6
 	setvar VAR_TEMP_D, 0
 	goto_if_unset FLAG_ENABLE_SHIP_BIRTH_ISLAND, LilycoveCity_Harbor_EventScript_27374E
-	checkitem ITEM_AURORA_TICKET, 1
+	checkitem ITEM_POTION, 1
 	compare VAR_RESULT, 0
 	goto_if_eq LilycoveCity_Harbor_EventScript_27374E
 	setvar VAR_TEMP_D, 1
@@ -130,7 +130,7 @@ LilycoveCity_Harbor_EventScript_21E1C6:: @ 821E1C6
 LilycoveCity_Harbor_EventScript_21E1F8:: @ 821E1F8
 	setvar VAR_TEMP_C, 0
 	goto_if_unset FLAG_ENABLE_SHIP_FARAWAY_ISLAND, LilycoveCity_Harbor_EventScript_27374E
-	checkitem ITEM_OLD_SEA_MAP, 1
+	checkitem ITEM_POTION, 1
 	compare VAR_RESULT, 0
 	goto_if_eq LilycoveCity_Harbor_EventScript_27374E
 	setvar VAR_TEMP_C, 1
@@ -141,7 +141,7 @@ LilycoveCity_Harbor_EventScript_21E1F8:: @ 821E1F8
 LilycoveCity_Harbor_EventScript_21E22A:: @ 821E22A
 	setvar VAR_TEMP_9, 0
 	goto_if_unset FLAG_ENABLE_SHIP_NAVEL_ROCK, LilycoveCity_Harbor_EventScript_27374E
-	checkitem ITEM_MYSTIC_TICKET, 1
+	checkitem ITEM_POTION, 1
 	compare VAR_RESULT, 0
 	goto_if_eq LilycoveCity_Harbor_EventScript_27374E
 	setvar VAR_TEMP_9, 1

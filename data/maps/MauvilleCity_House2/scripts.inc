@@ -6,7 +6,7 @@ MauvilleCity_House2_EventScript_210C5D:: @ 8210C5D
 	faceplayer
 	goto_if_set FLAG_RECEIVED_COIN_CASE, MauvilleCity_House2_EventScript_210CDA
 	msgbox MauvilleCity_House2_Text_210CEE, MSGBOX_DEFAULT
-	checkitem ITEM_HARBOR_MAIL, 1
+	checkitem ITEM_POTION, 1
 	compare VAR_RESULT, 1
 	goto_if_eq MauvilleCity_House2_EventScript_210C82
 	release
@@ -27,7 +27,7 @@ MauvilleCity_House2_EventScript_210C82:: @ 8210C82
 
 MauvilleCity_House2_EventScript_210CB8:: @ 8210CB8
 	msgbox MauvilleCity_House2_Text_210DB3, MSGBOX_DEFAULT
-	takeitem ITEM_HARBOR_MAIL, 1
+	takeitem ITEM_POTION, 1
 	giveitem_std ITEM_COIN_CASE
 	setflag FLAG_RECEIVED_COIN_CASE
 	goto MauvilleCity_House2_EventScript_210CDA

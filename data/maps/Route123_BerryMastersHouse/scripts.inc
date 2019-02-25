@@ -86,7 +86,7 @@ Route123_BerryMastersHouse_EventScript_26F94C:: @ 826F94C
 Route123_BerryMastersHouse_EventScript_26F97A:: @ 826F97A
 	goto_if_set FLAG_RECEIVED_SPELON_BERRY, Route123_BerryMastersHouse_EventScript_26F94C
 	msgbox Route123_BerryMastersHouse_Text_2A7583, MSGBOX_DEFAULT
-	giveitem_std ITEM_SPELON_BERRY
+	giveitem_std ITEM_ORAN_BERRY
 	compare VAR_RESULT, 0
 	goto_if_eq Route123_BerryMastersHouse_EventScript_272054
 	setflag FLAG_RECEIVED_SPELON_BERRY

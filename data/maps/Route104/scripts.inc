@@ -286,7 +286,7 @@ Route104_EventScript_1ECFCD:: @ 81ECFCD
 	faceplayer
 	goto_if_set FLAG_RECEIVED_WHITE_HERB, Route104_EventScript_1ECFFC
 	msgbox Route104_Text_1ED96A, MSGBOX_DEFAULT
-	giveitem_std ITEM_WHITE_HERB
+	giveitem_std ITEM_PERSIM_BERRY
 	compare VAR_RESULT, 0
 	goto_if_eq Route104_EventScript_272054
 	setflag FLAG_RECEIVED_WHITE_HERB

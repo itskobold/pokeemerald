@@ -1113,7 +1113,7 @@ OldaleTown_PokemonCenter_2F_EventScript_2776A4:: @ 82776A4
 	end
 
 OldaleTown_PokemonCenter_2F_EventScript_2776E3:: @ 82776E3
-	checkitem ITEM_POWDER_JAR, 1
+	checkitem ITEM_POTION, 1
 	compare VAR_RESULT, 0
 	goto_if_eq OldaleTown_PokemonCenter_2F_EventScript_27778B
 	goto_if_set FLAG_VISITED_MAUVILLE_CITY, OldaleTown_PokemonCenter_2F_EventScript_27773E

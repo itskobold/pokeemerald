@@ -595,11 +595,7 @@ static bool8 CheckPartyMonHasHeldItem(u16 item)
 
 bool8 sub_80F9370(void)
 {
-    bool8 hasItem = CheckPartyMonHasHeldItem(ITEM_ENIGMA_BERRY);
-    if (hasItem == TRUE)
-        GetBerryNameByBerryType(ItemIdToBerryType(ITEM_ENIGMA_BERRY), gStringVar1);
-
-    return hasItem;
+    return FALSE;
 }
 
 void CreateScriptedWildMon(u16 species, u8 level, u16 item)

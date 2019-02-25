@@ -122,10 +122,7 @@ static const struct YesNoFuncTable gUnknown_085920E8 =
 void SetUpItemUseCallback(u8 taskId)
 {
     u8 type;
-    if (gSpecialVar_ItemId == ITEM_ENIGMA_BERRY)
-        type = gTasks[taskId].data[4] - 1;
-    else
-        type = ItemId_GetType(gSpecialVar_ItemId) - 1;
+    type = ItemId_GetType(gSpecialVar_ItemId) - 1;
     if (!InBattlePyramid())
     {
         gUnknown_0203CE54->mainCallback2 = gUnknown_085920D8[type];
@@ -766,6 +763,12 @@ void ItemUseOutOfBattle_PPUp(u8 taskId)
 void ItemUseOutOfBattle_RareCandy(u8 taskId)
 {
     gUnknown_03006328 = dp05_rare_candy;
+    SetUpItemUseCallback(taskId);
+}
+
+void ItemUseOutOfBattle_PokeBall(u8 taskId)
+{
+	gUnknown_03006328 = dp05_pokeball;
     SetUpItemUseCallback(taskId);
 }
 

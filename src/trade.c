@@ -1105,7 +1105,7 @@ static const struct InGameTrade gIngameTrades[] = {
         FALSE, 73996,
         5, 5, 30, 5, 5,
         0x6F,
-        ITEM_WOOD_MAIL, 0,
+        ITEM_CHESTO_BERRY, 0,
         _("ROMAN"), MALE, 10,
         SPECIES_VOLBEAT
     }, {
@@ -1115,7 +1115,7 @@ static const struct InGameTrade gIngameTrades[] = {
         FALSE, 46285,
         5, 5, 5, 5, 30,
         0x7F,
-        ITEM_WAVE_MAIL, 1,
+        ITEM_CHESTO_BERRY, 1,
         _("SKYLAR"), MALE, 10,
         SPECIES_BAGON
     }, {
@@ -1125,7 +1125,7 @@ static const struct InGameTrade gIngameTrades[] = {
         FALSE, 91481,
         5, 5, 5, 30, 5,
         0x8B,
-        ITEM_RETRO_MAIL, 2,
+        ITEM_CHESTO_BERRY, 2,
         _("ISIS"), FEMALE, 10,
         SPECIES_SKITTY
     }

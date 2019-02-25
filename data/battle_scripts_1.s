@@ -4442,6 +4442,66 @@ BattleScript_BerryConfuseHealEnd2::
 	removeitem BS_ATTACKER
 	end2
 
+BattleScript_GrandTotemUse::
+	playanimation BS_ATTACKER, B_ANIM_ITEM_EFFECT, NULL
+	playanimation 2, B_ANIM_STATS_CHANGE, sB_ANIM_ARG1
+	printstring STRINGID_GRANDTOTEM
+	waitmessage 64
+	end2
+	
+BattleScript_GrandWardUse::
+	playanimation BS_ATTACKER, B_ANIM_ITEM_EFFECT, NULL
+	playanimation 2, B_ANIM_STATS_CHANGE, sB_ANIM_ARG1
+	printstring STRINGID_GRANDWARD
+	waitmessage 64
+	end2
+	
+BattleScript_TotemWardStatRaiseEnd2::
+	playanimation BS_ATTACKER, B_ANIM_ITEM_EFFECT, NULL
+	statbuffchange MOVE_EFFECT_AFFECTS_USER | 0x1, BattleScript_TotemWardStatRaiseCont
+
+BattleScript_TotemWardStatRaiseCont:
+	setbyte cMULTISTRING_CHOOSER, 0x4
+	call BattleScript_StatUp
+	end2
+	
+BattleScript_BerryMoveFirstEnd::
+	call BattleScript_BerryMoveFirstRet
+	end2
+
+BattleScript_BerryMoveFirstRet::
+	playanimation 10, B_ANIM_ITEM_EFFECT, NULL
+	printstring STRINGID_MOVEFIRST
+	waitmessage 64
+	removeitem BS_SCRIPTING
+	return
+	
+BattleScript_BerryHalfSuperEffectiveDmgEnd::
+	call BattleScript_BerryHalfSuperEffectiveDmgRet
+	end2
+
+BattleScript_BerryHalfSuperEffectiveDmgRet::
+	playanimation 10, B_ANIM_ITEM_EFFECT, NULL
+	printstring STRINGID_HALFSUPEREFFECTIVEDMG
+	waitmessage 64
+	removeitem BS_SCRIPTING
+	return
+	
+BattleScript_BerryInflictDmgEnd::
+	call BattleScript_BerryInflictDmgRet
+	end2
+
+BattleScript_BerryInflictDmgRet::
+	playanimation 10, B_ANIM_ITEM_EFFECT, NULL
+	jabocarowapdmg
+	printstring STRINGID_BERRYINFLICTEDDMG
+	waitmessage 64
+	healthbarupdate BS_TARGET
+	datahpupdate BS_TARGET
+	tryfaintmon BS_TARGET, FALSE, NULL
+	removeitem BS_SCRIPTING
+	return
+	
 BattleScript_BerryStatRaiseEnd2::
 	playanimation BS_ATTACKER, B_ANIM_ITEM_EFFECT, NULL
 	statbuffchange MOVE_EFFECT_AFFECTS_USER | 0x1, BattleScript_82DB85B

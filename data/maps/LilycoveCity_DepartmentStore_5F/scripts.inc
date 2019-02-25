@@ -61,7 +61,7 @@ LilycoveCity_DepartmentStore_5F_Pokemart_21FFF4: @ 821FFF4
 	.2byte ITEM_BIG_PEARL
 	.2byte ITEM_STARDUST
 	.2byte ITEM_STAR_PIECE
-	.2byte ITEM_NUGGET
+	.2byte ITEM_GOLD_NUGGET
 	.2byte ITEM_NONE
 	release
 	end

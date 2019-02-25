@@ -1140,7 +1140,7 @@ static const struct TrHillTag sDataTagNormal =
                         [3] =
                         {
                             .species = SPECIES_TROPIUS,
-                            .heldItem = ITEM_WHITE_HERB,
+                            .heldItem = ITEM_BITTER_HERB,
                             .moves = {MOVE_SUNNY_DAY, MOVE_SOLAR_BEAM, MOVE_SWEET_SCENT, MOVE_AERIAL_ACE},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1162,7 +1162,7 @@ static const struct TrHillTag sDataTagNormal =
                         [4] =
                         {
                             .species = SPECIES_BELLOSSOM,
-                            .heldItem = ITEM_MENTAL_HERB,
+                            .heldItem = ITEM_PERSIM_BERRY,
                             .moves = {MOVE_SWEET_SCENT, MOVE_PETAL_DANCE, MOVE_STUN_SPORE, MOVE_SLUDGE_BOMB},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1383,7 +1383,7 @@ static const struct TrHillTag sDataTagVariety =
                         [0] =
                         {
                             .species = SPECIES_WIGGLYTUFF,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_ROLLOUT, MOVE_DEFENSE_CURL, MOVE_SING, MOVE_DREAM_EATER},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1404,7 +1404,7 @@ static const struct TrHillTag sDataTagVariety =
                         [1] =
                         {
                             .species = SPECIES_SABLEYE,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_ASTONISH, MOVE_FAINT_ATTACK, MOVE_DETECT, MOVE_CONFUSE_RAY},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1425,7 +1425,7 @@ static const struct TrHillTag sDataTagVariety =
                         [2] =
                         {
                             .species = SPECIES_GRUMPIG,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_PSYBEAM, MOVE_MAGIC_COAT, MOVE_BOUNCE, MOVE_FUTURE_SIGHT},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1446,7 +1446,7 @@ static const struct TrHillTag sDataTagVariety =
                         [3] =
                         {
                             .species = SPECIES_CORSOLA,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_BUBBLE_BEAM, MOVE_ROCK_BLAST, MOVE_REFLECT, MOVE_LIGHT_SCREEN},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1467,7 +1467,7 @@ static const struct TrHillTag sDataTagVariety =
                         [4] =
                         {
                             .species = SPECIES_CLAMPERL,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_WHIRLPOOL, MOVE_IRON_DEFENSE, MOVE_ENDURE, MOVE_CONFUSE_RAY},
                             .level = 0,
                             .ppBonuses = 0,
@@ -1488,7 +1488,7 @@ static const struct TrHillTag sDataTagVariety =
                         [5] =
                         {
                             .species = SPECIES_STARMIE,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_DIVE, MOVE_ICY_WIND, MOVE_SWIFT, MOVE_SKILL_SWAP},
                             .level = 0,
                             .ppBonuses = 0,
@@ -2066,7 +2066,7 @@ static const struct TrHillTag sDataTagVariety =
                         [3] =
                         {
                             .species = SPECIES_BALTOY,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_EXPLOSION, MOVE_SELF_DESTRUCT, MOVE_NONE, MOVE_NONE},
                             .level = 0,
                             .ppBonuses = 0,
@@ -2088,7 +2088,7 @@ static const struct TrHillTag sDataTagVariety =
                         [4] =
                         {
                             .species = SPECIES_PINECO,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_EXPLOSION, MOVE_SELF_DESTRUCT, MOVE_NONE, MOVE_NONE},
                             .level = 0,
                             .ppBonuses = 0,
@@ -2110,7 +2110,7 @@ static const struct TrHillTag sDataTagVariety =
                         [5] =
                         {
                             .species = SPECIES_VOLTORB,
-                            .heldItem = ITEM_SILK_SCARF,
+                            .heldItem = ITEM_SILK_RIBBON,
                             .moves = {MOVE_EXPLOSION, MOVE_SELF_DESTRUCT, MOVE_NONE, MOVE_NONE},
                             .level = 0,
                             .ppBonuses = 0,
@@ -2629,7 +2629,7 @@ static const struct TrHillTag sDataTagUnique =
                         [1] =
                         {
                             .species = SPECIES_GOLDUCK,
-                            .heldItem = ITEM_LAX_INCENSE,
+                            .heldItem = ITEM_BRIGHT_POWDER,
                             .moves = {MOVE_SURF, MOVE_PSYBEAM, MOVE_BRICK_BREAK, MOVE_RAIN_DANCE},
                             .level = 0,
                             .ppBonuses = 0,
@@ -2971,7 +2971,7 @@ static const struct TrHillTag sDataTagUnique =
                         [3] =
                         {
                             .species = SPECIES_CUBONE,
-                            .heldItem = ITEM_THICK_CLUB,
+                            .heldItem = ITEM_MORPH_GEM,
                             .moves = {MOVE_BONEMERANG, MOVE_NONE, MOVE_NONE, MOVE_NONE},
                             .level = 0,
                             .ppBonuses = 0,
@@ -4205,7 +4205,7 @@ static const struct TrHillTag sDataTagExpert =
                         [4] =
                         {
                             .species = SPECIES_NINETALES,
-                            .heldItem = ITEM_WHITE_HERB,
+                            .heldItem = ITEM_BITTER_HERB,
                             .moves = {MOVE_OVERHEAT, MOVE_CONFUSE_RAY, MOVE_WILL_O_WISP, MOVE_ATTRACT},
                             .level = 0,
                             .ppBonuses = 0,
@@ -4664,7 +4664,7 @@ static const struct TrHillTag sDataTagExpert =
                         [4] =
                         {
                             .species = SPECIES_NINETALES,
-                            .heldItem = ITEM_WHITE_HERB,
+                            .heldItem = ITEM_BITTER_HERB,
                             .moves = {MOVE_IMPRISON, MOVE_PROTECT, MOVE_OVERHEAT, MOVE_CONFUSE_RAY},
                             .level = 0,
                             .ppBonuses = 0,

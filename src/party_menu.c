@@ -133,6 +133,7 @@ EWRAM_DATA u8 gSelectedOrderFromParty[4] = {0};
 static EWRAM_DATA u16 gUnknown_0203CEFC = 0;
 static EWRAM_DATA u16 gUnknown_0203CEFE = 0; // unused
 EWRAM_DATA u8 gUnknown_0203CF00[3] = {0};
+static EWRAM_DATA u16 gEtherPPUpMoveList[MAX_MON_MOVES - 1] = {0};
 
 extern void (*gUnknown_03006328)(u8, TaskFunc);
 
@@ -295,8 +296,11 @@ static void c2_815ABFC(void);
 static void sub_81B672C(u8);
 static u16 sub_81B691C(struct Pokemon*, u8);
 static void option_menu_get_string(u8, u8*);
+static void pokeball_get_input(u8);
+static void ball_swap_no_effect(u8);
+static void do_ball_swap(u8);
 static void sub_81B6BB4(u8);
-static void ether_effect_related_2(u8);
+static void ether_effect_related_2(u8, u8);
 static void ether_effect_related(u8);
 static void sub_81B6EB4(u8);
 static void sub_81B6FF4(u8);
@@ -315,7 +319,7 @@ static void sub_81B7294(u8);
 static void sub_81B72C8(u8);
 static void sub_81B73E4(u8);
 static void sub_81B79A0(struct Pokemon*, s16*);
-static void sub_81B754C(u8, struct Pokemon*);
+static void RedrawPokemonInfoInMenuNoTextChange(u8 slot, struct Pokemon *mon);
 static void sub_81B75D4(u8);
 static void sub_81B767C(u8);
 static void sub_81B7634(u8);
@@ -803,6 +807,28 @@ static const struct WindowTemplate gUnknown_08615930 =
 	.baseBlock = 0x299,
 };
 
+static const struct WindowTemplate gBallSwapWindow =
+{
+	.bg = 2,
+	.tilemapLeft = 1,
+	.tilemapTop = 17,
+	.width = 28,
+	.height = 2,
+	.paletteNum = 15,
+	.baseBlock = 0x299,
+};
+
+static const struct WindowTemplate gBallSwapYesNo =
+{
+	.bg = 2,
+	.tilemapLeft = 21,
+	.tilemapTop = 9,
+	.width = 5,
+	.height = 4,
+	.paletteNum = 14,
+	.baseBlock = 0x2E9,
+};
+
 static const struct WindowTemplate gUnknown_08615938 =
 {
 	.bg = 2,
@@ -856,6 +882,39 @@ static const struct WindowTemplate gUnknown_08615958 =
 	.height = 6,
 	.paletteNum = 14,
 	.baseBlock = 0x39D,
+};
+
+static const struct WindowTemplate gEther1Move =
+{
+	.bg = 2,
+	.tilemapLeft = 19,
+	.tilemapTop = 17,
+	.width = 10,
+	.height = 2,
+	.paletteNum = 14,
+	.baseBlock = 0x2E9,
+};
+
+static const struct WindowTemplate gEther2Moves =
+{
+	.bg = 2,
+	.tilemapLeft = 19,
+	.tilemapTop = 15,
+	.width = 10,
+	.height = 4,
+	.paletteNum = 14,
+	.baseBlock = 0x2E9,
+};
+
+static const struct WindowTemplate gEther3Moves =
+{
+	.bg = 2,
+	.tilemapLeft = 19,
+	.tilemapTop = 13,
+	.width = 10,
+	.height = 6,
+	.paletteNum = 14,
+	.baseBlock = 0x2E9,
 };
 
 static const struct WindowTemplate gUnknown_08615960 =
@@ -973,6 +1032,7 @@ static const u8 *const gUnknown_08615AF4[] =
     gUnknown_085E9F42,
     gUnknown_085E9FF9,
     gUnknown_085EA073,
+	gText_BallSwapConfirm,
 };
 
 static const u8 *const gUnknown_08615B60[] =
@@ -2834,6 +2894,8 @@ static void sub_81B1DB8(struct Pokemon *mon, u16 item)
     itemBytes[0] = item;
     itemBytes[1] = item >> 8;
     SetMonData(mon, MON_DATA_HELD_ITEM, itemBytes);
+	CalculateMonStats(mon);
+	RedrawPokemonInfoInMenuNoTextChange(gUnknown_0203CEC8.unk9, mon);
 }
 
 static u8 sub_81B1E00(struct Pokemon* mon)
@@ -2847,6 +2909,8 @@ static u8 sub_81B1E00(struct Pokemon* mon)
 
     item = ITEM_NONE;
     SetMonData(mon, MON_DATA_HELD_ITEM, &item);
+	CalculateMonStats(mon);
+	RedrawPokemonInfoInMenuNoTextChange(gUnknown_0203CEC8.unk9, mon);
     return 2;
 }
 
@@ -3529,6 +3593,9 @@ void display_pokemon_menu_message(u32 stringID)
         case 26:
             *windowPtr = AddWindow(&gUnknown_08615948);
             break;
+		case 27: //ball swap
+			*windowPtr = AddWindow(&gBallSwapWindow);
+            break;
         default:
             *windowPtr = AddWindow(&gUnknown_08615920);
             break;
@@ -3566,7 +3633,7 @@ static bool8 sub_81B314C(void)
     return FALSE;
 }
 
-static u8 sub_81B31B0(u8 a)
+static u8 sub_81B31B0(u8 a, u8 etherMoveCount)
 {
     struct WindowTemplate window;
     u8 cursorDimension;
@@ -3584,14 +3651,30 @@ static u8 sub_81B31B0(u8 a)
     case 2:
         window = gUnknown_08615958;
         break;
-    default:
+    case 3:
         window = gUnknown_08615960;
+        break;
+	case 4: //ether
+		switch (etherMoveCount - 1)
+		{
+			case 0: // 1 move
+				window = gEther1Move;
+				break;
+			case 1: // 2 moves
+				window = gEther2Moves;
+				break;
+			case 2: // 3 moves
+				window = gEther3Moves;
+				break;
+			default: // 4 moves
+				window = gUnknown_08615960;
+		}
         break;
     }
 
     gUnknown_0203CEC4->unkC[0] = AddWindow(&window);
     SetWindowBorderStyle(gUnknown_0203CEC4->unkC[0], FALSE, 0x4F, 13);
-    if (a == 3)
+    if (a >= 3)
         return gUnknown_0203CEC4->unkC[0];
     cursorDimension = GetMenuCursorDimensionByFont(1, 0);
     fontAttribute = GetFontAttribute(1, 2);
@@ -3740,7 +3823,7 @@ static bool8 sub_81B3608(u8 taskId)
     if (gUnknown_0203CEC8.unk8_0 != 12)
     {
         sub_81B33B4(gPlayerParty, gUnknown_0203CEC8.unk9, sub_81B353C(mon));
-        sub_81B31B0(0);
+        sub_81B31B0(0, 0);
         display_pokemon_menu_message(21);
     }
     else
@@ -3749,7 +3832,7 @@ static bool8 sub_81B3608(u8 taskId)
         if (item != ITEM_NONE)
         {
             sub_81B33B4(gPlayerParty, gUnknown_0203CEC8.unk9, sub_81B353C(mon));
-            sub_81B31B0(1);
+            sub_81B31B0(1, 0);
             CopyItemName(item, gStringVar2);
             display_pokemon_menu_message(26);
         }
@@ -4080,7 +4163,7 @@ static void CursorCb_Item(u8 taskId)
     sub_81B302C(&gUnknown_0203CEC4->unkC[0]);
     sub_81B302C(&gUnknown_0203CEC4->unkC[1]);
     sub_81B33B4(gPlayerParty, gUnknown_0203CEC8.unk9, 8);
-    sub_81B31B0(1);
+    sub_81B31B0(1, 0);
     display_pokemon_menu_message(24);
     gTasks[taskId].data[0] = 0xFF;
     gTasks[taskId].func = HandleMenuInput;
@@ -4217,6 +4300,8 @@ static void sub_81B4578(void)
     {
         TakeMailFromMon(mon);
         SetMonData(mon, MON_DATA_HELD_ITEM, &gUnknown_0203CEFC);
+		CalculateMonStats(mon);
+		sub_81B754C(gUnknown_0203CEC8.unk9, mon);
         RemoveBagItem(gUnknown_0203CEFC, 1);
         AddBagItem(item, 1);
         InitPartyMenu(gUnknown_0203CEC8.unk8_0, 0xFF, gUnknown_0203CEC8.unkB, 1, 0, sub_81B36FC, gUnknown_0203CEC8.exitCallback);
@@ -4346,6 +4431,8 @@ static void sub_81B4988(u8 taskId)
         u16 item = ITEM_NONE;
 
         SetMonData(mon, MON_DATA_HELD_ITEM, &item);
+		CalculateMonStats(mon);
+		sub_81B754C(gUnknown_0203CEC8.unk9, mon);
         sub_81B5C94(mon, &gUnknown_0203CEDC[gUnknown_0203CEC8.unk9]);
         DisplayPartyPokemonOtherText(12, &gUnknown_0203CEDC[gUnknown_0203CEC8.unk9], 1);
         gTasks[taskId].func = sub_81B1C1C;
@@ -4358,7 +4445,7 @@ static void CursorCb_Mail(u8 taskId)
     sub_81B302C(&gUnknown_0203CEC4->unkC[0]);
     sub_81B302C(&gUnknown_0203CEC4->unkC[1]);
     sub_81B33B4(gPlayerParty, gUnknown_0203CEC8.unk9, 9);
-    sub_81B31B0(2);
+    sub_81B31B0(2, 0);
     display_pokemon_menu_message(25);
     gTasks[taskId].data[0] = 0xFF;
     gTasks[taskId].func = HandleMenuInput;
@@ -4473,12 +4560,12 @@ static void CursorCb_Cancel2(u8 taskId)
     sub_81B33B4(gPlayerParty, gUnknown_0203CEC8.unk9, sub_81B353C(mon));
     if (gUnknown_0203CEC8.unk8_0 != 12)
     {
-        sub_81B31B0(0);
+        sub_81B31B0(0, 0);
         display_pokemon_menu_message(21);
     }
     else
     {
-        sub_81B31B0(1);
+        sub_81B31B0(1, 0);
         CopyItemName(GetMonData(mon, MON_DATA_HELD_ITEM), gStringVar2);
         display_pokemon_menu_message(26);
     }
@@ -5259,17 +5346,16 @@ static void sub_81B6280(u8 taskId)
     }
 }
 
-static bool8 IsHPRecoveryItem(u16 item)
+static u8 IsHPRecoveryItem(u16 item)
 {
-    const u8 *effect;
+    u8 medicineGroup = ItemId_GetMedicineGroup(item);
 
-    if (item == ITEM_ENIGMA_BERRY)
-        effect = gSaveBlock1Ptr->enigmaBerry.itemEffect;
-    else
-        effect = gItemEffectTable[item - ITEM_POTION];
-    if ((effect[4] & 4) != 0)
+	if (item == ITEM_FULL_RESTORE)
+		return 2;
+    if (medicineGroup == MEDICINE_GROUP_HP_RESTORE)
         return TRUE;
-    return FALSE;
+    else
+        return FALSE;
 }
 
 static void GetMedicineItemEffectMessage(u16 item)
@@ -5291,10 +5377,10 @@ static void GetMedicineItemEffectMessage(u16 item)
     case 7:
         StringExpandPlaceholders(gStringVar4, gText_PkmnCuredOfParalysis);
         break;
-    case 8:
+    case 8: //unused
         StringExpandPlaceholders(gStringVar4, gText_PkmnSnappedOutOfConfusion);
         break;
-    case 9:
+    case 9: //unused
         StringExpandPlaceholders(gStringVar4, gText_PkmnGotOverInfatuation);
         break;
     case 11:
@@ -5331,6 +5417,48 @@ static void GetMedicineItemEffectMessage(u16 item)
     case 21:
         StringExpandPlaceholders(gStringVar4, gText_PPWasRestored);
         break;
+	case 23: //Roll types
+		StringExpandPlaceholders(gStringVar4, gText_TypesRandomized);
+        break;
+	case 24: //Roll ability
+		StringExpandPlaceholders(gStringVar4, gText_AbilityRandomized);
+        break;
+	case 25: //Roll nature
+		StringExpandPlaceholders(gStringVar4, gText_NatureRandomized);
+        break;
+	case 26: //Vital Tonic
+		StringCopy(gStringVar2, gText_HP3);
+		StringExpandPlaceholders(gStringVar4, gText_Var2IVRaised);
+        break;
+	case 27: //Strong Tonic
+		StringCopy(gStringVar2, gText_Attack3);
+		StringExpandPlaceholders(gStringVar4, gText_Var2IVRaised);
+        break;
+	case 28: //Guard Tonic
+		StringCopy(gStringVar2, gText_Defense3);
+		StringExpandPlaceholders(gStringVar4, gText_Var2IVRaised);
+        break;
+	case 29: //Rapid Tonic
+		StringCopy(gStringVar2, gText_Speed2);
+		StringExpandPlaceholders(gStringVar4, gText_Var2IVRaised);
+        break;
+	case 30: //Mental Tonic
+		StringCopy(gStringVar2, gText_SpAtk3);
+		StringExpandPlaceholders(gStringVar4, gText_Var2IVRaised);
+        break;
+	case 31: //Shield Tonic
+		StringCopy(gStringVar2, gText_SpDef3);
+		StringExpandPlaceholders(gStringVar4, gText_Var2IVRaised);
+        break;
+	case 32: //Ability Capsule
+		StringExpandPlaceholders(gStringVar4, gText_AbilitySwapped);
+        break;
+	case 33: //Hidden Type berries
+		StringExpandPlaceholders(gStringVar4, gText_HiddenTypeChanged);
+        break;
+	case 34: //Pokeballs
+		StringExpandPlaceholders(gStringVar4, gText_MonWasMoved);
+        break;
     default:
         StringExpandPlaceholders(gStringVar4, gText_WontHaveEffect);
         break;
@@ -5342,13 +5470,6 @@ static bool8 UsingHPEVItemOnShedinja(struct Pokemon *mon, u16 item)
     if (GetItemEffectType(item) == 13 && GetMonData(mon, MON_DATA_SPECIES) == SPECIES_SHEDINJA)
         return FALSE;
     return TRUE;
-}
-
-static bool8 IsBlueYellowRedFlute(u16 item)
-{
-    if (item == ITEM_BLUE_FLUTE || item == ITEM_RED_FLUTE || item == ITEM_YELLOW_FLUTE)
-        return TRUE;
-    return FALSE;
 }
 
 static bool8 ExecuteTableBasedItemEffect__(u8 partyMonIndex, u16 item, u8 monMoveIndex)
@@ -5369,7 +5490,7 @@ void ItemUseCB_Medicine(u8 taskId, TaskFunc task)
     if (UsingHPEVItemOnShedinja(mon, item))
     {
         canHeal = IsHPRecoveryItem(item);
-        if (canHeal == TRUE)
+        if (canHeal != FALSE)
         {
             hp = GetMonData(mon, MON_DATA_HP);
             if (hp == GetMonData(mon, MON_DATA_MAX_HP))
@@ -5391,20 +5512,15 @@ void ItemUseCB_Medicine(u8 taskId, TaskFunc task)
         goto iTriedHonestlyIDid;
     }
     gUnknown_0203CEE8 = 1;
-    if (IsBlueYellowRedFlute(item) == FALSE)
-    {
-        PlaySE(SE_KAIFUKU);
-        if (gUnknown_0203CEC8.unkB != 14)
-            RemoveBagItem(item, 1);
-    }
-    else
-    {
-        PlaySE(SE_BIDORO);
-    }
+
+	PlaySE(SE_KAIFUKU);
+	if (gUnknown_0203CEC8.unkB != 14)
+		RemoveBagItem(item, 1);
+
     party_menu_get_status_condition_and_update_object(mon, &gUnknown_0203CEDC[gUnknown_0203CEC8.unk9]);
     if (gSprites[gUnknown_0203CEDC[gUnknown_0203CEC8.unk9].unkC].invisible)
         DisplayPartyPokemonLevelCheck(mon, &gUnknown_0203CEDC[gUnknown_0203CEC8.unk9], 1);
-    if (canHeal == TRUE)
+    if (canHeal != FALSE)
     {
         if (hp == 0)
             sub_81B0FCC(gUnknown_0203CEC8.unk9, 1);
@@ -5532,23 +5648,100 @@ static void option_menu_get_string(u8 effectType, u8 *dest)
     }
 }
 
-static void sub_81B6A10(u8 slot)
+// make PP up window
+static bool8 sub_81B6A10(u8 slot)
 {
     u8 i;
     u8 moveCount = 0;
     u8 fontId = 1;
-    u8 windowId = sub_81B31B0(3);
-    u16 move;
-
+    u8 windowId;
+	u16 move;
+	u8 pp;
+    u8 ppBonus;
+	
+	for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+		move = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
+		pp = GetMonData(&gPlayerParty[slot], MON_DATA_PP1 + i);
+        ppBonus = (GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL) & gUnknown_08329D22[i]) >> (i * 2);
+		if (ppBonus < 3 && pp > 4 && move != MOVE_NONE)
+			moveCount++;
+	}
+	
+	if (!moveCount)
+		return TRUE;
+	else
+		windowId = sub_81B31B0(4, moveCount);
+	
+	moveCount = 0;
     for (i = 0; i < MAX_MON_MOVES; i++)
     {
         move = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
-        AddTextPrinterParameterized(windowId, fontId, gMoveNames[move], 8, (i * 16) + 1, 0xFF, NULL);
-        if (move != MOVE_NONE)
-            moveCount++;
+		pp = GetMonData(&gPlayerParty[slot], MON_DATA_PP1 + i);
+		ppBonus = (GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL) & gUnknown_08329D22[i]) >> (i * 2);
+		if (ppBonus < 3 && pp > 4 && move != MOVE_NONE)
+		{
+			AddTextPrinterParameterized(windowId, fontId, gMoveNames[move], 8, (moveCount * 16) + 1, 0xFF, NULL);
+			if (move != MOVE_NONE)
+			{
+				gEtherPPUpMoveList[moveCount] = move;
+				moveCount++;
+			}
+		}
     }
-    InitMenuInUpperLeftCornerPlaySoundWhenAPressed(windowId, moveCount, 0);
+	
+	InitMenuInUpperLeftCornerPlaySoundWhenAPressed(windowId, moveCount, 0);
     schedule_bg_copy_tilemap_to_vram(2);
+	return FALSE;
+}
+
+// only prints moves with less than max PP
+// returns TRUE if all moves have max PP
+// messy and lazy but if it works i don't care :^)
+static bool8 ether_make_window(u8 slot)
+{
+    u8 i;
+    u8 moveCount = 0;
+    u8 fontId = 1;
+    u8 windowId;
+    u16 move;
+	u8 pp;
+
+	for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        move = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
+		pp = GetMonData(&gPlayerParty[slot], MON_DATA_PP1 + i);
+		if (pp < CalculatePPWithBonus(move, GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL), i))
+		{
+			if (move != MOVE_NONE)
+				moveCount++;
+		}
+	}
+	
+	if (!moveCount)
+		return TRUE;
+	else
+		windowId = sub_81B31B0(4, moveCount);
+	
+	moveCount = 0;
+    for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        move = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
+		pp = GetMonData(&gPlayerParty[slot], MON_DATA_PP1 + i);
+		if (pp < CalculatePPWithBonus(move, GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL), i))
+		{
+			AddTextPrinterParameterized(windowId, fontId, gMoveNames[move], 8, (moveCount * 16) + 1, 0xFF, NULL);
+			if (move != MOVE_NONE)
+			{
+				gEtherPPUpMoveList[moveCount] = move;
+				moveCount++;
+			}
+		}
+    }
+	
+	InitMenuInUpperLeftCornerPlaySoundWhenAPressed(windowId, moveCount, 0);
+    schedule_bg_copy_tilemap_to_vram(2);
+	return FALSE;
 }
 
 static void ether_effect_related_3(u8 taskId)
@@ -5565,38 +5758,58 @@ static void ether_effect_related_3(u8 taskId)
         else
         {
             sub_81B302C(&gUnknown_0203CEC4->unkC[1]);
-            ether_effect_related_2(taskId);
+            ether_effect_related_2(taskId, gUnknown_0203CEC8.unk9);
         }
     }
 }
 
 void dp05_ether(u8 taskId, TaskFunc task)
 {
-    const u8 *effect;
+    u8 medicineGroup;
     u16 item = gSpecialVar_ItemId;
+	bool8 maxPP;
 
-    if (item == ITEM_ENIGMA_BERRY)
-        effect = gSaveBlock1Ptr->enigmaBerry.itemEffect;
-    else
-        effect = gItemEffectTable[item - ITEM_POTION];
-    if ((effect[4] & 0x10) == 0)
+	medicineGroup = ItemId_GetMedicineGroup(item);
+    if (medicineGroup != MEDICINE_GROUP_PP_RESTORE)
     {
         gUnknown_0203CEC8.unkE = 0;
         ether_effect_related(taskId);
     }
-    else
+    else if (item == ITEM_ETHER || item == ITEM_MAX_ETHER)
     {
         PlaySE(SE_SELECT);
         display_pokemon_menu_message(22);
-        sub_81B6A10(gUnknown_0203CEC8.unk9);
-        gTasks[taskId].func = ether_effect_related_3;
+        maxPP = ether_make_window(gUnknown_0203CEC8.unk9);
+		if (!maxPP)
+			gTasks[taskId].func = ether_effect_related_3;
+		else //no effect if all moves have max PP
+			gTasks[taskId].func = ether_effect_related;
     }
+	else //elixirs
+	{
+		PlaySE(SE_SELECT);
+        gTasks[taskId].func = ether_effect_related;
+	}
 }
 
-static void ether_effect_related_2(u8 taskId)
+static void ether_effect_related_2(u8 taskId, u8 slot)
 {
+	u16 move, checkedMove;
+	int i;
+	
     sub_81B302C(&gUnknown_0203CEC4->unkC[0]);
-    gUnknown_0203CEC8.unkE = Menu_GetCursorPos();
+	move = gEtherPPUpMoveList[Menu_GetCursorPos()];
+	
+	for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        checkedMove = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
+		if (checkedMove == move)
+		{
+			gUnknown_0203CEC8.unkE = i;
+			break;
+		}
+	}
+	
     ether_effect_related(taskId);
 }
 
@@ -5639,12 +5852,98 @@ static void ether_effect_related(u8 taskId)
     }
 }
 
+static void pokeball_process_input(u8 taskId)
+{
+	switch (Menu_ProcessInputNoWrapClearOnChoose())
+    {
+        case 0:     //YES
+            sub_81B302C(&gUnknown_0203CEC4->unkC[1]);
+            pokeball_get_input(taskId);
+            break;
+        case 1:    //B button
+        case -1:     //NO
+            PlaySE(SE_SELECT);
+            sub_81B6BB4(taskId);
+            break;
+    }
+}
+
+static void pokeball_get_input(u8 taskId)
+{
+    sub_81B302C(&gUnknown_0203CEC4->unkC[0]);
+    gUnknown_0203CEC8.unkE = Menu_GetCursorPos();
+    do_ball_swap(taskId);
+}
+
+void dp05_pokeball(u8 taskId, TaskFunc task)
+{
+    u16 item = gSpecialVar_ItemId;
+	struct Struct203CEC8 *ptr = &gUnknown_0203CEC8;
+	struct Pokemon *mon;
+	
+	mon = &gPlayerParty[ptr->unk9];
+
+	PlaySE(SE_SELECT);
+	if (GetMonData(mon, MON_DATA_POKEBALL, 0) == item) // is in the same type of ball already
+		ball_swap_no_effect(taskId);
+	else
+	{
+		GetMonData(mon, MON_DATA_NICKNAME, gStringVar1);
+		StringCopy(gStringVar2, ItemId_GetName(item));
+		display_pokemon_menu_message(27);
+		SetWindowBorderStyle(0, FALSE, 0x250, 0x0d);
+		PutWindowTilemap(3);
+		schedule_bg_copy_tilemap_to_vram(3);
+		CreateYesNoMenu(&gBallSwapYesNo, 0x4F, 13, 0);
+		gTasks[taskId].func = pokeball_process_input;
+	}
+}
+
+static void ball_swap_no_effect(u8 taskId)
+{
+	gUnknown_0203CEE8 = 0;
+	PlaySE(SE_SELECT);
+	sub_81B1B5C(gText_WontHaveEffect, 1);
+	schedule_bg_copy_tilemap_to_vram(2);
+	gTasks[taskId].func = sub_81B6794;
+}
+
+static void do_ball_swap(u8 taskId)
+{
+    u8 medicineGroup;
+    u16 item = gSpecialVar_ItemId;
+    struct Struct203CEC8 *ptr = &gUnknown_0203CEC8; //is this needed?
+    struct Pokemon *mon;
+	
+	medicineGroup = ItemId_GetMedicineGroup(item);
+
+	// just a failsafe
+    if (ExecuteTableBasedItemEffect__(ptr->unk9, item, 0))
+        ball_swap_no_effect(taskId);
+    else
+    {
+        gUnknown_0203CEE8 = 1;
+        mon = &gPlayerParty[ptr->unk9];
+        PlaySE(SE_KAIFUKU);
+        RemoveBagItem(item, 1);
+        GetMedicineItemEffectMessage(item);
+        sub_81B1B5C(gStringVar4, 1);
+        schedule_bg_copy_tilemap_to_vram(2);
+        gTasks[taskId].func = sub_81B6794;
+    }
+}
+
 void dp05_pp_up(u8 taskId, TaskFunc task)
 {
+	bool8 noUse;
+	
     PlaySE(SE_SELECT);
     display_pokemon_menu_message(23);
-    sub_81B6A10(gUnknown_0203CEC8.unk9);
-    gTasks[taskId].func = ether_effect_related_3;
+    noUse = sub_81B6A10(gUnknown_0203CEC8.unk9);
+	if (!noUse)
+		gTasks[taskId].func = ether_effect_related_3;
+	else //no effect if all moves have max PP
+		gTasks[taskId].func = ether_effect_related;
 }
 
 u16 ItemIdToBattleMoveId(u16 item)
@@ -5917,8 +6216,11 @@ void dp05_rare_candy(u8 taskId, TaskFunc task)
     s16 *arrayPtr = ptr->data;
     u16 *itemPtr = &gSpecialVar_ItemId;
     bool8 cannotUseEffect;
+	u8 oldLevel;
+	
+	oldLevel = GetMonData(mon, MON_DATA_LEVEL);
 
-    if (GetMonData(mon, MON_DATA_LEVEL) != MAX_LEVEL)
+    if (oldLevel != MAX_LEVEL)
     {
         sub_81B79A0(mon, arrayPtr);
         cannotUseEffect = ExecuteTableBasedItemEffect__(gUnknown_0203CEC8.unk9, *itemPtr, 0);
@@ -5938,20 +6240,48 @@ void dp05_rare_candy(u8 taskId, TaskFunc task)
     }
     else
     {
+        u8 newLevel;
+
         gUnknown_0203CEE8 = 1;
-        PlayFanfareByFanfareNum(0);
-        sub_81B754C(gUnknown_0203CEC8.unk9, mon);
+		sub_81B754C(gUnknown_0203CEC8.unk9, mon);
         RemoveBagItem(gSpecialVar_ItemId, 1);
         GetMonNickname(mon, gStringVar1);
-        ConvertIntToDecimalStringN(gStringVar2, GetMonData(mon, MON_DATA_LEVEL), 0, 3);
-        StringExpandPlaceholders(gStringVar4, gText_PkmnElevatedToLvVar2);
-        sub_81B1B5C(gStringVar4, 1);
-        schedule_bg_copy_tilemap_to_vram(2);
-        gTasks[taskId].func = sub_81B75D4;
+        newLevel = GetMonData(mon, MON_DATA_LEVEL);
+		if (oldLevel < newLevel) //mon has leveled up
+		{
+			PlayFanfareByFanfareNum(0);
+			ConvertIntToDecimalStringN(gStringVar2, newLevel, 0, 3);
+			StringExpandPlaceholders(gStringVar4, gText_PkmnElevatedToLvVar2);
+			sub_81B1B5C(gStringVar4, 1);
+			schedule_bg_copy_tilemap_to_vram(2);
+			gTasks[taskId].func = sub_81B75D4;
+		}
+		else
+		{
+			PlaySE(SE_SELECT);
+			StringExpandPlaceholders(gStringVar4, gText_ExpRaised);
+			sub_81B1B5C(gStringVar4, 1);
+			schedule_bg_copy_tilemap_to_vram(2);
+			gTasks[taskId].func = task;
+		}
     }
 }
 
-static void sub_81B754C(u8 slot, struct Pokemon *mon)
+//RedrawPokemonInfoInMenu
+void sub_81B754C(u8 slot, struct Pokemon *mon)
+{
+    party_menu_get_status_condition_and_update_object(mon, &gUnknown_0203CEDC[slot]);
+    if (gSprites[gUnknown_0203CEDC[slot].unkC].invisible)
+        DisplayPartyPokemonLevelCheck(mon, &gUnknown_0203CEDC[slot], 1);
+    DisplayPartyPokemonHPCheck(mon, &gUnknown_0203CEDC[slot], 1);
+    DisplayPartyPokemonMaxHPCheck(mon, &gUnknown_0203CEDC[slot], 1);
+    DisplayPartyPokemonHPBarCheck(mon, &gUnknown_0203CEDC[slot]);
+    sub_81B5B38(gUnknown_0203CEDC[slot].unk9, mon);
+    sub_81B0FCC(slot, 1);
+    schedule_bg_copy_tilemap_to_vram(0);
+}
+
+static void RedrawPokemonInfoInMenuNoTextChange(u8 slot, struct Pokemon *mon)
 {
     party_menu_get_status_condition_and_update_object(mon, &gUnknown_0203CEDC[slot]);
     if (gSprites[gUnknown_0203CEDC[slot].unkC].invisible)
@@ -6199,152 +6529,117 @@ void sub_81B7C74(u8 taskId, TaskFunc task)
 
 u8 GetItemEffectType(u16 item)
 {
-    const u8 *itemEffect;
-#ifndef NONMATCHING
-    register u8 itemEffect0 asm("r1");
-    register u8 itemEffect3 asm("r3");
-    register u32 itemEffect0_r0 asm("r0"); // u32 to prevent shifting when transferring itemEffect0 to this
-    u8 mask;
-#else
-#define itemEffect0 itemEffect[0]
-#define itemEffect3 itemEffect[3]
-#define mask 0x3F
-#endif
+    u8 medicineGroup = ItemId_GetMedicineGroup(item);
 
-    if (!IS_POKEMON_ITEM(item))
-    {
-        return 22;
-    }
-    else
-    {
-        // Read the item's effect properties.
-        if (item == ITEM_ENIGMA_BERRY)
-        {
-            itemEffect = gSaveBlock1Ptr->enigmaBerry.itemEffect;
-        }
-        else
-        {
-            itemEffect = gItemEffectTable[item - ITEM_POTION];
-        }
-
-#ifndef NONMATCHING
-        itemEffect0 = itemEffect[0];
-        mask = 0x3F;
-#endif
-
-        if ((itemEffect0 & mask) || itemEffect[1] || itemEffect[2])
-        {
-            return 0;
-        }
-#ifndef NONMATCHING
-        itemEffect3 = itemEffect[3];
-#endif
-        if (itemEffect3 & 0x80)
-        {
-            return 0;
-        }
-        else if (itemEffect0 & 0x40)
-        {
-            return 10;
-        }
-        else if (itemEffect3 & 0x40)
-        {
-            return 1;
-        }
-        else if ((itemEffect3 & mask) || (itemEffect0 >> 7))
-        {
-            if ((itemEffect3 & mask) == 0x20)
-            {
-                return 4;
-            }
-            else if ((itemEffect3 & mask) == 0x10)
-            {
-                return 3;
-            }
-            else if ((itemEffect3 & mask) == 0x8)
-            {
-                return 5;
-            }
-            else if ((itemEffect3 & mask) == 0x4)
-            {
-                return 6;
-            }
-            else if ((itemEffect3 & mask) == 0x2)
-            {
-                return 7;
-            }
-            else if ((itemEffect3 & mask) == 0x1)
-            {
-                return 8;
-            }
-            // alternate fakematching
-            // itemEffect0_r0 = itemEffect0 >> 7;
-            // asm(""); // increase live length for greg
-            // if ((itemEffect0_r0 != 0) && (itemEffect3 & mask) == 0)
-#ifndef NONMATCHING
-            else if (((itemEffect0_r0 = itemEffect0 >> 7) != 0) && (itemEffect3 & mask) == 0)
-#else
-            else if (((itemEffect[0] >> 7) != 0) && (itemEffect[3] & 0x3F) == 0)
-#endif
-            {
-                return 9;
-            }
-            else
-            {
-                return 11;
-            }
-        }
-        else if (itemEffect[4] & 0x44)
-        {
-            return 2;
-        }
-        else if (itemEffect[4] & 0x2)
-        {
-            return 12;
-        }
-        else if (itemEffect[4] & 0x1)
-        {
-            return 13;
-        }
-        else if (itemEffect[5] & 0x8)
-        {
-            return 14;
-        }
-        else if (itemEffect[5] & 0x4)
-        {
-            return 15;
-        }
-        else if (itemEffect[5] & 0x2)
-        {
-            return 16;
-        }
-        else if (itemEffect[5] & 0x1)
-        {
-            return 17;
-        }
-        else if (itemEffect[4] & 0x80)
-        {
-            return 18;
-        }
-        else if (itemEffect[4] & 0x20)
-        {
-            return 19;
-        }
-        else if (itemEffect[5] & 0x10)
-        {
-            return 20;
-        }
-        else if (itemEffect[4] & 0x18)
-        {
-            return 21;
-        }
-        return 22;
-    }
-#ifdef NONMATCHING
-#undef itemEffect0
-#undef itemEffect3
-#undef mask
-#endif
+	switch(medicineGroup)
+	{
+		case MEDICINE_GROUP_HP_RESTORE:
+			switch (item)
+			{
+				case ITEM_FULL_RESTORE:
+					return 11;
+			}
+		case MEDICINE_GROUP_STATUS_RESTORE:
+			switch (item)
+			{
+				case ITEM_ANTIDOTE:
+					return 3;
+				case ITEM_PARALYZE_HEAL:
+					return 7;
+				case ITEM_AWAKENING:
+					return 4;
+				case ITEM_BURN_HEAL:
+					return 5;
+				case ITEM_ICE_HEAL:
+					return 6;
+				case ITEM_MINOR_HEAL:
+				case ITEM_FULL_HEAL:
+				case ITEM_HEALING_SEEDS:
+				case ITEM_HEALING_DUST:
+					return 11;
+			}
+		case MEDICINE_GROUP_PP_RESTORE:
+			switch (item)
+			{
+				case ITEM_ETHER:
+				case ITEM_MAX_ETHER:
+				case ITEM_ELIXIR:
+				case ITEM_MAX_ELIXIR:
+					return 21;
+			}
+		case MEDICINE_GROUP_PP_BOOSTER:
+			switch (item)
+			{
+				case ITEM_PP_UP:
+					return 19;
+				case ITEM_PP_MAX:
+					return 20;
+			}
+		case MEDICINE_GROUP_EV_VITAMIN:
+			switch (item)
+			{
+				case ITEM_POMEG_BERRY:
+				case ITEM_HP_UP:
+					return 13;
+				case ITEM_KELPSY_BERRY:
+				case ITEM_PROTEIN:
+					return 12;
+				case ITEM_QUALOT_BERRY:
+				case ITEM_IRON:
+					return 17;
+				case ITEM_TAMATO_BERRY:
+				case ITEM_CARBOS:
+					return 16;
+				case ITEM_HONDEW_BERRY:
+				case ITEM_CALCIUM:
+					return 14;
+				case ITEM_GREPA_BERRY:
+				case ITEM_ZINC:
+					return 15;
+			}
+		case MEDICINE_GROUP_IV_TONIC:
+			switch (item)
+			{
+				case ITEM_VITAL_TONIC:
+					return 26;
+				case ITEM_STRONG_TONIC:
+					return 27;
+				case ITEM_GUARD_TONIC:
+					return 28;
+				case ITEM_RAPID_TONIC:
+					return 29;
+				case ITEM_MENTAL_TONIC:
+					return 30;
+				case ITEM_SHIELD_TONIC:
+					return 31;
+			}
+		case MEDICINE_GROUP_HIDDEN_TYPE:
+			return 33;
+		case MEDICINE_GROUP_TYPE_MODIFIER:
+			switch (item)
+			{
+				case ITEM_ROLL_TYPES:
+					return 23;
+			}
+		case MEDICINE_GROUP_ABILITY_MODIFIER:
+			switch (item)
+			{
+				case ITEM_ROLL_ABILITY:
+					return 24;
+				case ITEM_ABILITY_CAPSULE:
+					return 32;
+			}
+		case MEDICINE_GROUP_NATURE_MODIFIER:
+			switch (item)
+			{
+				case ITEM_ROLL_NATURE:
+					return 25;
+			}
+		case MEDICINE_GROUP_BALL:
+			return 34;
+		default:
+			return 0;
+	}
 }
 
 static void sub_81B7E4C(u8 taskId)
@@ -6468,6 +6763,8 @@ static void sub_81B81A8(void)
     {
         TakeMailFromMon(mon);
         SetMonData(mon, MON_DATA_HELD_ITEM, &gUnknown_0203CEFC);
+		CalculateMonStats(mon);
+		sub_81B754C(gUnknown_0203CEC8.unk9, mon);
         RemoveBagItem(gUnknown_0203CEFC, 1);
         sub_81B841C(item);
         SetMainCallback2(gUnknown_0203CEC8.exitCallback);

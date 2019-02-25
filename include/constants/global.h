@@ -51,7 +51,7 @@
 #define HALL_FACILITIES_COUNT 9 // 7 facilities for single mode + tower double mode + tower multi mode.
 
 // string lengths
-#define ITEM_NAME_LENGTH 14
+#define ITEM_NAME_LENGTH 18
 #define POKEMON_NAME_LENGTH 10
 #define PLAYER_NAME_LENGTH 7
 #define MAIL_WORDS_COUNT 9

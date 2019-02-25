@@ -177,7 +177,7 @@ static const struct FrontierBrainMon sFrontierBrainsMons[][2][3] =
             },
             {
                 .species = SPECIES_CHARIZARD,
-                .heldItem = ITEM_WHITE_HERB,
+                .heldItem = ITEM_BITTER_HERB,
                 .fixedIV = 20,
                 .nature = 17,
                 .evs = {100, 152, 106, 152, 0, 0},
@@ -245,7 +245,7 @@ static const struct FrontierBrainMon sFrontierBrainsMons[][2][3] =
         {
             {
                 .species = SPECIES_ARCANINE,
-                .heldItem = ITEM_WHITE_HERB,
+                .heldItem = ITEM_BITTER_HERB,
                 .fixedIV = 31,
                 .nature = 11,
                 .evs = {6, 252, 252, 0, 0, 0},

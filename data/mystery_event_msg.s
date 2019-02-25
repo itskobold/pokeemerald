@@ -173,16 +173,16 @@ MysteryEventScript_AuroraTicket:: @ 867533C
 	vgoto_if 1, AuroraTicket_Obtained
 	checkflag FLAG_BATTLED_DEOXYS
 	vgoto_if 1, AuroraTicket_Obtained
-	checkitem ITEM_AURORA_TICKET, 1
+	checkitem ITEM_POTION, 1
 	compare_var_to_value VAR_RESULT, 1
 	vgoto_if 1, AuroraTicket_Obtained
 	vmessage sText_AuroraTicket1
 	waitmessage
 	waitbuttonpress
-	checkitemspace ITEM_AURORA_TICKET, 1
+	checkitemspace ITEM_POTION, 1
 	compare_var_to_value VAR_RESULT, 0
 	vgoto_if 1, AuroraTicket_NoBagSpace
-	giveitem_std ITEM_AURORA_TICKET
+	giveitem_std ITEM_POTION
 	setflag FLAG_ENABLE_SHIP_BIRTH_ISLAND
 	setflag FLAG_RECEIVED_AURORA_TICKET
 	vmessage sText_AuroraTicket2
@@ -227,16 +227,16 @@ MysteryEventScript_MysticTicket:: @ 867550B
 	vgoto_if 1, MysticTicket_Obtained
 	checkflag FLAG_CAUGHT_HO_OH
 	vgoto_if 1, MysticTicket_Obtained
-	checkitem ITEM_MYSTIC_TICKET, 1
+	checkitem ITEM_POTION, 1
 	compare_var_to_value VAR_RESULT, 1
 	vgoto_if 1, MysticTicket_Obtained
 	vmessage sText_MysticTicket2
 	waitmessage
 	waitbuttonpress
-	checkitemspace ITEM_MYSTIC_TICKET, 1
+	checkitemspace ITEM_POTION, 1
 	compare_var_to_value VAR_RESULT, 0
 	vgoto_if 1, MysticTicket_NoBagSpace
-	giveitem_std ITEM_MYSTIC_TICKET
+	giveitem_std ITEM_POTION
 	setflag FLAG_ENABLE_SHIP_NAVEL_ROCK
 	setflag FLAG_RECEIVED_MYSTIC_TICKET
 	vmessage sText_MysticTicket1
@@ -297,16 +297,16 @@ MysteryEventScript_OldSeaMap:: @ 86757F4
 	vgoto_if 1, OldSeaMap_Obtained
 	checkflag FLAG_CAUGHT_MEW
 	vgoto_if 1, OldSeaMap_Obtained
-	checkitem ITEM_OLD_SEA_MAP, 1
+	checkitem ITEM_POTION, 1
 	compare_var_to_value VAR_RESULT, 1
 	vgoto_if 1, OldSeaMap_Obtained
 	vmessage sText_MysteryGiftOldSeaMap
 	waitmessage
 	waitbuttonpress
-	checkitemspace ITEM_OLD_SEA_MAP, 1
+	checkitemspace ITEM_POTION, 1
 	compare_var_to_value VAR_RESULT, 0
 	vgoto_if 1, OldSeaMap_NoBagSpace
-	giveitem_std ITEM_OLD_SEA_MAP
+	giveitem_std ITEM_POTION
 	setflag FLAG_ENABLE_SHIP_FARAWAY_ISLAND
 	setflag FLAG_RECEIVED_OLD_SEA_MAP
 	vmessage sText_MysteryGiftOldSeaMap_1

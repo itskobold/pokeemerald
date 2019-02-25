@@ -244,6 +244,7 @@ EWRAM_DATA u8 gActionSelectionCursor[MAX_BATTLERS_COUNT] = {0};
 EWRAM_DATA u8 gMoveSelectionCursor[MAX_BATTLERS_COUNT] = {0};
 EWRAM_DATA u8 gBattlerStatusSummaryTaskId[MAX_BATTLERS_COUNT] = {0};
 EWRAM_DATA u8 gBattlerInMenuId = 0;
+EWRAM_DATA u8 gStatBoosted = 0;
 EWRAM_DATA bool8 gDoingBattleAnim = FALSE;
 EWRAM_DATA u32 gTransformedPersonalities[MAX_BATTLERS_COUNT] = {0};
 EWRAM_DATA u8 gPlayerDpadHoldFrames = 0;
@@ -629,6 +630,10 @@ const u8 gStatusConditionString_BurnJpn[8] = _("やけど$$$$");
 const u8 gStatusConditionString_IceJpn[8] = _("こおり$$$$");
 const u8 gStatusConditionString_ConfusionJpn[8] = _("こんらん$$$");
 const u8 gStatusConditionString_LoveJpn[8] = _("メロメロ$$$");
+const u8 gStatusConditionString_NightmareJpn[] = _("nightmare$"); //wow such convincing japanese
+const u8 gStatusConditionString_CursedJpn[] = _("curse$");
+const u8 gStatusConditionString_TormentJpn[] = _("torment$");
+const u8 gStatusConditionString_YawnJpn[] = _("drowziness$");
 
 const u8 * const gStatusConditionStringsTable[7][2] =
 {
@@ -1043,7 +1048,7 @@ static void CB2_HandleStartBattle(void)
                     *(&gBattleStruct->field_180) = 0;
                     *(&gBattleStruct->field_181) = 3;
                     sub_8036A5C();
-                    SetPlayerBerryDataInBattleStruct();
+                    //SetPlayerBerryDataInBattleStruct();
 
                     if (gTrainerBattleOpponent_A == TRAINER_OPPONENT_C00)
                     {
@@ -1063,7 +1068,7 @@ static void CB2_HandleStartBattle(void)
             if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
                 gBattleTypeFlags |= BATTLE_TYPE_IS_MASTER;
             gBattleCommunication[MULTIUSE_STATE] = 15;
-            SetAllPlayersBerryData();
+            //SetAllPlayersBerryData();
         }
         break;
     case 2:
@@ -1073,7 +1078,7 @@ static void CB2_HandleStartBattle(void)
 
             ResetBlockReceivedFlags();
             sub_8036EB8(2, playerMultiplayerId);
-            SetAllPlayersBerryData();
+            //SetAllPlayersBerryData();
             taskId = CreateTask(sub_8035D74, 0);
             gTasks[taskId].data[1] = 0x10E;
             gTasks[taskId].data[2] = 0x5A;
@@ -1251,7 +1256,7 @@ static void CB2_HandleStartMultiPartnerBattle(void)
                     *(&gBattleStruct->field_180) = 0;
                     *(&gBattleStruct->field_181) = 3;
                     sub_8036A5C();
-                    SetPlayerBerryDataInBattleStruct();
+                    //SetPlayerBerryDataInBattleStruct();
                     SendBlock(bitmask_all_link_players_but_self(), &gBattleStruct->field_180, 32);
                     gBattleCommunication[MULTIUSE_STATE] = 2;
                 }
@@ -1265,7 +1270,7 @@ static void CB2_HandleStartMultiPartnerBattle(void)
             if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
                 gBattleTypeFlags |= BATTLE_TYPE_IS_MASTER;
             gBattleCommunication[MULTIUSE_STATE] = 13;
-            SetAllPlayersBerryData();
+            //SetAllPlayersBerryData();
         }
         break;
     case 2:
@@ -1275,7 +1280,7 @@ static void CB2_HandleStartMultiPartnerBattle(void)
 
             ResetBlockReceivedFlags();
             sub_8036EB8(2, playerMultiplayerId);
-            SetAllPlayersBerryData();
+            //SetAllPlayersBerryData();
             taskId = CreateTask(sub_8035D74, 0);
             gTasks[taskId].data[1] = 0x10E;
             gTasks[taskId].data[2] = 0x5A;
@@ -1638,7 +1643,7 @@ static void CB2_HandleStartMultiBattle(void)
                     *(&gBattleStruct->field_180) = 0;
                     *(&gBattleStruct->field_181) = 3;
                     sub_8036A5C();
-                    SetPlayerBerryDataInBattleStruct();
+                    //SetPlayerBerryDataInBattleStruct();
 
                     SendBlock(bitmask_all_link_players_but_self(), &gBattleStruct->field_180, 32);
                     gBattleCommunication[MULTIUSE_STATE]++;
@@ -1652,7 +1657,7 @@ static void CB2_HandleStartMultiBattle(void)
             if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
                 gBattleTypeFlags |= BATTLE_TYPE_IS_MASTER;
             gBattleCommunication[MULTIUSE_STATE] = 7;
-            SetAllPlayersBerryData();
+            //SetAllPlayersBerryData();
         }
         break;
     case 2:
@@ -1660,7 +1665,7 @@ static void CB2_HandleStartMultiBattle(void)
         {
             ResetBlockReceivedFlags();
             sub_8036EB8(4, playerMultiplayerId);
-            SetAllPlayersBerryData();
+            //SetAllPlayersBerryData();
             SetDeoxysStats();
             var = CreateTask(sub_8035D74, 0);
             gTasks[var].data[1] = 0x10E;
@@ -4146,10 +4151,7 @@ u8 IsRunningFromBattleImpossible(void)
     u8 side;
     s32 i;
 
-    if (gBattleMons[gActiveBattler].item == ITEM_ENIGMA_BERRY)
-        holdEffect = gEnigmaBerries[gActiveBattler].holdEffect;
-    else
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[gActiveBattler].item);
+    holdEffect = ItemId_GetHoldEffect(gBattleMons[gActiveBattler].item);
 
     gPotentialItemEffectBattler = gActiveBattler;
 
@@ -4753,16 +4755,8 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
                 * (gStatStageRatios[gBattleMons[battler1].statStages[STAT_SPEED]][0])
                 / (gStatStageRatios[gBattleMons[battler1].statStages[STAT_SPEED]][1]);
 
-    if (gBattleMons[battler1].item == ITEM_ENIGMA_BERRY)
-    {
-        holdEffect = gEnigmaBerries[battler1].holdEffect;
-        holdEffectParam = gEnigmaBerries[battler1].holdEffectParam;
-    }
-    else
-    {
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[battler1].item);
-        holdEffectParam = ItemId_GetHoldEffectParam(gBattleMons[battler1].item);
-    }
+	holdEffect = ItemId_GetHoldEffect(gBattleMons[battler1].item);
+	holdEffectParam = ItemId_GetHoldEffectParam(gBattleMons[battler1].item);
 
     // badge boost
     if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_x2000000 | BATTLE_TYPE_FRONTIER))
@@ -4778,7 +4772,9 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
     if (gBattleMons[battler1].status1 & STATUS1_PARALYSIS)
         speedBattler1 /= 4;
 
-    if (holdEffect == HOLD_EFFECT_QUICK_CLAW && gRandomTurnNumber < (0xFFFF * holdEffectParam) / 100)
+    if (gStatuses3[battler1] & STATUS3_CUSTAP_BERRY)
+		speedBattler1 = UINT_MAX;
+    else if (holdEffect == HOLD_EFFECT_QUICK_CLAW && gRandomTurnNumber < (0xFFFF * holdEffectParam) / 100)
         speedBattler1 = UINT_MAX;
 
     // check second battlerId's speed
@@ -4787,16 +4783,8 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
                 * (gStatStageRatios[gBattleMons[battler2].statStages[STAT_SPEED]][0])
                 / (gStatStageRatios[gBattleMons[battler2].statStages[STAT_SPEED]][1]);
 
-    if (gBattleMons[battler2].item == ITEM_ENIGMA_BERRY)
-    {
-        holdEffect = gEnigmaBerries[battler2].holdEffect;
-        holdEffectParam = gEnigmaBerries[battler2].holdEffectParam;
-    }
-    else
-    {
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[battler2].item);
-        holdEffectParam = ItemId_GetHoldEffectParam(gBattleMons[battler2].item);
-    }
+	holdEffect = gEnigmaBerries[battler2].holdEffect;
+	holdEffectParam = gEnigmaBerries[battler2].holdEffectParam;
 
     // badge boost
     if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_x2000000 | BATTLE_TYPE_FRONTIER))
@@ -4812,7 +4800,9 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
     if (gBattleMons[battler2].status1 & STATUS1_PARALYSIS)
         speedBattler2 /= 4;
 
-    if (holdEffect == HOLD_EFFECT_QUICK_CLAW && gRandomTurnNumber < (0xFFFF * holdEffectParam) / 100)
+    if (gStatuses3[battler2] & STATUS3_CUSTAP_BERRY)
+		speedBattler2 = UINT_MAX;
+    else if (holdEffect == HOLD_EFFECT_QUICK_CLAW && gRandomTurnNumber < (0xFFFF * holdEffectParam) / 100)
         speedBattler2 = UINT_MAX;
 
     if (ignoreChosenMoves)
@@ -5600,6 +5590,9 @@ static void HandleAction_UseMove(void)
 
     if (gBattleTypeFlags & BATTLE_TYPE_ARENA)
         BattleArena_AddMindPoints(gBattlerAttacker);
+	
+	if (gStatuses3[gBattlerAttacker] & STATUS3_CUSTAP_BERRY)
+		gStatuses3[gBattlerAttacker] &= ~(STATUS3_CUSTAP_BERRY);
 
     gCurrentActionFuncId = B_ACTION_EXEC_SCRIPT;
 }
@@ -5634,7 +5627,7 @@ static void HandleAction_UseItem(void)
     {
         gBattlescriptCurrInstr = gBattlescriptsForBallThrow[gLastUsedItem];
     }
-    else if (gLastUsedItem == ITEM_POKE_DOLL || gLastUsedItem == ITEM_FLUFFY_TAIL)
+    else if (gLastUsedItem == ITEM_POKE_DOLL)
     {
         gBattlescriptCurrInstr = gBattlescriptsForRunningByItem[0];
     }
@@ -5708,10 +5701,7 @@ bool8 TryRunFromBattle(u8 battler)
     u8 pyramidMultiplier;
     u8 speedVar;
 
-    if (gBattleMons[battler].item == ITEM_ENIGMA_BERRY)
-        holdEffect = gEnigmaBerries[battler].holdEffect;
-    else
-        holdEffect = ItemId_GetHoldEffect(gBattleMons[battler].item);
+    holdEffect = ItemId_GetHoldEffect(gBattleMons[battler].item);
 
     gPotentialItemEffectBattler = battler;
 

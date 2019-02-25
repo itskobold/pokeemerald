@@ -150,9 +150,11 @@ static const u8 sText_PkmnClamped[] = _("{B_ATK_NAME_WITH_PREFIX} CLAMPED\n{B_DE
 static const u8 sText_PkmnHurtBy[] = _("{B_ATK_NAME_WITH_PREFIX} is hurt\nby {B_BUFF1}!");
 static const u8 sText_PkmnFreedFrom[] = _("{B_ATK_NAME_WITH_PREFIX} was freed\nfrom {B_BUFF1}!");
 static const u8 sText_PkmnCrashed[] = _("{B_ATK_NAME_WITH_PREFIX} kept going\nand crashed!");
-const u8 gText_PkmnShroudedInMist[] = _("{B_ATK_PREFIX2} became\nshrouded in MIST!");
+static const u8 gText_PkmnShroudedInMist[] = _("{B_ATK_PREFIX2} became\nshrouded in MIST!");
+const u8 gText_GuardSpec[] = _("{B_ATK_PREFIX2} stats are protected for 5 turns!");
 static const u8 sText_PkmnProtectedByMist[] = _("{B_SCR_ACTIVE_NAME_WITH_PREFIX} is protected\nby MIST!");
-const u8 gText_PkmnGettingPumped[] = _("{B_ATK_NAME_WITH_PREFIX} is getting\npumped!");
+static const u8 gText_PkmnGettingPumped[] = _("{B_ATK_NAME_WITH_PREFIX} is getting\npumped!");
+const u8 gText_DireHit[] = _("{B_ATK_NAME_WITH_PREFIX} became more likely\nto deliver a critical hit!");
 static const u8 sText_PkmnHitWithRecoil[] = _("{B_ATK_NAME_WITH_PREFIX} is hit\nwith recoil!");
 static const u8 sText_PkmnProtectedItself2[] = _("{B_ATK_NAME_WITH_PREFIX} protected\nitself!");
 static const u8 sText_PkmnBuffetedBySandstorm[] = _("{B_ATK_NAME_WITH_PREFIX} is buffeted\nby the sandstorm!");
@@ -299,7 +301,9 @@ static const u8 sText_PkmnsXPreventsFlinching[] = _("{B_EFF_NAME_WITH_PREFIX}'s 
 static const u8 sText_PkmnsXPreventsYsZ[] = _("{B_ATK_NAME_WITH_PREFIX}'s {B_ATK_ABILITY}\nprevents {B_DEF_NAME_WITH_PREFIX}'s\l{B_DEF_ABILITY} from working!");
 static const u8 sText_PkmnsXCuredItsYProblem[] = _("{B_SCR_ACTIVE_NAME_WITH_PREFIX}'s {B_SCR_ACTIVE_ABILITY}\ncured its {B_BUFF1} problem!");
 static const u8 sText_PkmnsXHadNoEffectOnY[] = _("{B_SCR_ACTIVE_NAME_WITH_PREFIX}'s {B_SCR_ACTIVE_ABILITY}\nhad no effect on {B_EFF_NAME_WITH_PREFIX}!");
+const u8 gText_StatWasMaximized[] = _("was maximized!");
 static const u8 sText_StatSharply[] = _("sharply ");
+const u8 gText_StatSharplyRose[] = _("sharply rose!"); //i'm lazy
 const u8 gText_StatRose[] = _("rose!");
 static const u8 sText_StatHarshly[] = _("harshly ");
 static const u8 sText_StatFell[] = _("fell!");
@@ -432,6 +436,13 @@ static const u8 sText_SpAtk2[] = _("SP. ATK");
 static const u8 sText_SpDef2[] = _("SP. DEF");
 static const u8 sText_Accuracy[] = _("accuracy");
 static const u8 sText_Evasiveness[] = _("evasiveness");
+const u8 sText_MoveFirst[] = _("{B_ATK_NAME_WITH_PREFIX} can move first next\ndue to it's {B_LAST_ITEM}!");
+static const u8 sText_HalfSuperEffectiveDmg[] = _("{B_SCR_ACTIVE_NAME_WITH_PREFIX} absorbed damage\ndue to it's {B_LAST_ITEM}!");
+static const u8 sText_BerryInflictedDmg[] = _("{B_DEF_NAME_WITH_PREFIX} took damage due to\n{B_ATK_NAME_WITH_PREFIX}'s {B_LAST_ITEM}!");
+static const u8 sText_MoveFirstNextTurn[] = _("{STR_VAR_1} can move first\nnext turn!");
+const u8 sText_StatsReset[] = _("{STR_VAR_1}'s stats\nwere reset!");
+static const u8 sText_GrandWard[] = _("Using {B_LAST_ITEM}, {B_ATK_NAME_WITH_PREFIX}\nraised all of its stats!");
+static const u8 sText_GrandTotem[] = _("Using {B_LAST_ITEM}, {B_ATK_NAME_WITH_PREFIX}\nsharply raised all of its stats!");
 
 const u8 * const gStatNamesTable[] =
 {
@@ -880,6 +891,11 @@ const u8 * const gBattleStringsTable[BATTLESTRINGS_COUNT] =
     [STRINGID_PKMNBOXLANETTESPCFULL - 12] = gText_PkmnBoxLanettesPCFull,
     [STRINGID_TRAINER1WINTEXT - 12] = sText_Trainer1WinText,
     [STRINGID_TRAINER2WINTEXT - 12] = sText_Trainer2WinText,
+	[STRINGID_GRANDWARD - 12] = sText_GrandWard,
+	[STRINGID_GRANDTOTEM - 12] = sText_GrandTotem,
+	[STRINGID_MOVEFIRST - 12] = sText_MoveFirst,
+	[STRINGID_BERRYINFLICTEDDMG - 12] = sText_BerryInflictedDmg,
+	[STRINGID_HALFSUPEREFFECTIVEDMG - 12] = sText_HalfSuperEffectiveDmg,
 };
 
 const u16 gMissStringIds[] =
@@ -2437,39 +2453,31 @@ u32 BattleStringExpandPlaceholders(const u8 *src, u8 *dst)
             case B_TXT_LAST_ITEM: // last used item
                 if (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_x2000000))
                 {
-                    if (gLastUsedItem == ITEM_ENIGMA_BERRY)
-                    {
-                        if (!(gBattleTypeFlags & BATTLE_TYPE_MULTI))
-                        {
-                            if ((gBattleScripting.multiplayerId != 0 && (gPotentialItemEffectBattler & BIT_SIDE))
-                                || (gBattleScripting.multiplayerId == 0 && !(gPotentialItemEffectBattler & BIT_SIDE)))
-                            {
-                                StringCopy(text, gEnigmaBerries[gPotentialItemEffectBattler].name);
-                                StringAppend(text, sText_BerrySuffix);
-                                toCpy = text;
-                            }
-                            else
-                            {
-                                toCpy = sText_EnigmaBerry;
-                            }
-                        }
-                        else
-                        {
-                            if (gLinkPlayers[gBattleScripting.multiplayerId].id == gPotentialItemEffectBattler)
-                            {
-                                StringCopy(text, gEnigmaBerries[gPotentialItemEffectBattler].name);
-                                StringAppend(text, sText_BerrySuffix);
-                                toCpy = text;
-                            }
-                            else
-                                toCpy = sText_EnigmaBerry;
-                        }
-                    }
-                    else
-                    {
-                        CopyItemName(gLastUsedItem, text);
-                        toCpy = text;
-                    }
+					if (!(gBattleTypeFlags & BATTLE_TYPE_MULTI))
+					{
+						if ((gBattleScripting.multiplayerId != 0 && (gPotentialItemEffectBattler & BIT_SIDE))
+							|| (gBattleScripting.multiplayerId == 0 && !(gPotentialItemEffectBattler & BIT_SIDE)))
+						{
+							StringCopy(text, gEnigmaBerries[gPotentialItemEffectBattler].name);
+							StringAppend(text, sText_BerrySuffix);
+							toCpy = text;
+						}
+						else
+						{
+							toCpy = sText_EnigmaBerry;
+						}
+					}
+					else
+					{
+						if (gLinkPlayers[gBattleScripting.multiplayerId].id == gPotentialItemEffectBattler)
+						{
+							StringCopy(text, gEnigmaBerries[gPotentialItemEffectBattler].name);
+							StringAppend(text, sText_BerrySuffix);
+							toCpy = text;
+						}
+						else
+							toCpy = sText_EnigmaBerry;
+					}
                 }
                 else
                 {
@@ -2816,29 +2824,7 @@ static void ExpandBattleTextBuffPlaceholders(const u8 *src, u8 *dst)
             break;
         case B_BUFF_ITEM: // item name
             hword = T1_READ_16(&src[srcID + 1]);
-            if (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_x2000000))
-            {
-                if (hword == ITEM_ENIGMA_BERRY)
-                {
-                    if (gLinkPlayers[gBattleScripting.multiplayerId].id == gPotentialItemEffectBattler)
-                    {
-                        StringCopy(dst, gEnigmaBerries[gPotentialItemEffectBattler].name);
-                        StringAppend(dst, sText_BerrySuffix);
-                    }
-                    else
-                    {
-                        StringAppend(dst, sText_EnigmaBerry);
-                    }
-                }
-                else
-                {
-                    CopyItemName(hword, dst);
-                }
-            }
-            else
-            {
-                CopyItemName(hword, dst);
-            }
+			CopyItemName(hword, dst);
             srcID += 3;
             break;
         }

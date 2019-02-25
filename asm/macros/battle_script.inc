@@ -679,7 +679,7 @@
 	.4byte \ptr
 	.endm
 
-	.macro nop
+	.macro jabocarowapdmg
 	.byte 0x83
 	.endm
 

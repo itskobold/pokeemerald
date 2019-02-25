@@ -64,7 +64,7 @@ MtPyre_Summit_EventScript_23203C:: @ 823203C
 	compare VAR_0x8008, 2
 	call_if_eq MtPyre_Summit_EventScript_232117
 	msgbox MtPyre_Summit_Text_23290E, MSGBOX_DEFAULT
-	giveitem_std ITEM_MAGMA_EMBLEM
+	giveitem_std ITEM_POTION
 	setflag FLAG_RECEIVED_RED_OR_BLUE_ORB
 	setflag FLAG_HIDE_JAGGED_PASS_MAGMA_GUARD
 	releaseall

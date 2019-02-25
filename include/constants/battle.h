@@ -101,9 +101,12 @@
 #define STATUS1_FREEZE           0x20
 #define STATUS1_PARALYSIS        0x40
 #define STATUS1_TOXIC_POISON     0x80
+//#define STATUS1_SCORCH		   0x100
+//#define STATUS1_BERZERK		   0x200
 #define STATUS1_TOXIC_COUNTER    0xF00
 #define STATUS1_PSN_ANY          (STATUS1_POISON | STATUS1_TOXIC_POISON)
-#define STATUS1_ANY              (STATUS1_SLEEP | STATUS1_POISON | STATUS1_BURN | STATUS1_FREEZE | STATUS1_PARALYSIS | STATUS1_TOXIC_POISON)
+//#define STATUS1_BRN_ANY          (STATUS1_BURN | STATUS1_SCORCH)
+#define STATUS1_ANY              (STATUS1_SLEEP | STATUS1_POISON | STATUS1_BURN | STATUS1_FREEZE | STATUS1_PARALYSIS | STATUS1_TOXIC_POISON)//STATUS1_SCORCH | STATUS1_BERZERK)
 
 // Volatile status ailments
 // These are removed after exiting the battle or switching out
@@ -128,6 +131,7 @@
 #define STATUS2_FORESIGHT             0x20000000
 #define STATUS2_DEFENSE_CURL          0x40000000
 #define STATUS2_TORMENT               0x80000000
+#define STATUS2_CURABLE				  (STATUS2_CONFUSION | STATUS2_INFATUATION | STATUS2_NIGHTMARE | STATUS2_CURSED | STATUS2_TORMENT)
 
 // Seems like per-battler statuses. Not quite sure how to categorize these
 #define STATUS3_LEECHSEED_BATTLER       0x3
@@ -148,7 +152,9 @@
 #define STATUS3_UNDERWATER              0x40000
 #define STATUS3_INTIMIDATE_POKES        0x80000
 #define STATUS3_TRACE                   0x100000
+#define STATUS3_CUSTAP_BERRY			0x200000
 #define STATUS3_SEMI_INVULNERABLE       (STATUS3_UNDERGROUND | STATUS3_ON_AIR | STATUS3_UNDERWATER)
+#define STATUS3_CURABLE					(STATUS3_YAWN)		//might add more here later
 
 // Not really sure what a "hitmarker" is.
 #define HITMARKER_x10                   0x00000010

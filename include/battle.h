@@ -757,6 +757,7 @@ extern u8 gActionSelectionCursor[MAX_BATTLERS_COUNT];
 extern u8 gMoveSelectionCursor[MAX_BATTLERS_COUNT];
 extern u8 gBattlerStatusSummaryTaskId[MAX_BATTLERS_COUNT];
 extern u8 gBattlerInMenuId;
+extern u8 gStatBoosted;
 extern bool8 gDoingBattleAnim;
 extern u32 gTransformedPersonalities[MAX_BATTLERS_COUNT];
 extern u8 gPlayerDpadHoldFrames;

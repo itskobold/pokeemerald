@@ -11,7 +11,7 @@ JaggedPass_MapScript1_230666: @ 8230666
 	end
 
 JaggedPass_EventScript_230674:: @ 8230674
-	checkitem ITEM_MAGMA_EMBLEM, 1
+	checkitem ITEM_POTION, 1
 	compare VAR_RESULT, 1
 	goto_if_eq JaggedPass_EventScript_230685
 	return
