@@ -489,10 +489,10 @@ static const u16 sShortStreakRewardItems[] =
 static const u16 sLongStreakRewardItems[] =
 {
     ITEM_BRIGHT_POWDER,
-    ITEM_WHITE_HERB,
+    ITEM_PERSIM_BERRY,
     ITEM_QUICK_CLAW,
     ITEM_LEFTOVERS,
-    ITEM_MENTAL_HERB,
+    ITEM_BITTER_HERB,
     ITEM_KINGS_ROCK,
     ITEM_FOCUS_BAND,
     ITEM_SCOPE_LENS,
