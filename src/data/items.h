@@ -2263,6 +2263,25 @@ const struct Item gItems[] =
 		.medicineGroup = MEDICINE_GROUP_EV_VITAMIN,
     },
 	
+	[ITEM_HONDEW_BERRY] =
+    {
+        .name = _("HONDEW BERRY"),
+        .itemId = ITEM_HONDEW_BERRY,
+        .price = 20,
+        .holdEffect = HOLD_EFFECT_NONE,
+        .holdEffectParam = 0,
+        .description = gHondewBerryItemDescription,
+        .importance = 0,
+        .unk19 = 0,
+        .pocket = POCKET_BERRIES,
+        .type = 1,
+        .fieldUseFunc = ItemUseOutOfBattle_Medicine,
+        .battleUsage = 0,
+        .battleUseFunc = NULL,
+        .secondaryId = STAT_SPATK,
+		.medicineGroup = MEDICINE_GROUP_EV_VITAMIN,
+    },
+	
 	[ITEM_GREPA_BERRY] =
     {
         .name = _("GREPA BERRY"),
