@@ -189,8 +189,6 @@ extern u16 gUnknown_02022C3C;
 extern u8 gUnknown_02022C20[];
 extern u8 gFieldLinkPlayerCount;
 extern u8 gUnknown_03005DB4;
-extern struct MailStruct gUnknown_020321C0[PARTY_SIZE];
-extern u8 gUnknown_02032298[2];
 
 // IWRAM vars
 IWRAM_DATA struct UnkStruct_Leader *gUnknown_03000DA0;
@@ -1105,7 +1103,7 @@ void sub_80134E8(u8 taskId)
             RedrawListMenu(data->listTaskId);
             break;
         case 0:
-            id = ListMenuHandleInputGetItemId(data->listTaskId);
+            id = ListMenu_ProcessInput(data->listTaskId);
             if (gMain.newKeys & A_BUTTON && id != -1)
             {
                 // this unused variable along with the assignment is needed to match
@@ -1632,7 +1630,7 @@ void sub_8014210(u16 battleFlags)
 
 void sub_8014290(u16 arg0, u16 x, u16 y)
 {
-    VarSet(VAR_0x4087, arg0);
+    VarSet(VAR_CABLE_CLUB_STATE, arg0);
     SetWarpDestination(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum, -1, x, y);
     SetDynamicWarpWithCoords(0, gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum, -1, x, y);
     WarpIntoMap();
@@ -1641,7 +1639,7 @@ void sub_8014290(u16 arg0, u16 x, u16 y)
 void sub_8014304(s8 mapGroup, s8 mapNum, s32 x, s32 y, u16 arg4)
 {
     gSpecialVar_0x8004 = arg4;
-    VarSet(VAR_0x4087, arg4);
+    VarSet(VAR_CABLE_CLUB_STATE, arg4);
     gFieldLinkPlayerCount = GetLinkPlayerCount();
     gUnknown_03005DB4 = GetMultiplayerId();
     SetCableClubWarp();
@@ -1689,7 +1687,7 @@ void sub_801440C(u8 taskId)
     case 9 ... 11:
     case 13:
     case 15:
-        sub_800E3A8();
+        RecordMixTrainerNames();
         break;
     }
 
@@ -1802,12 +1800,12 @@ void sub_8014790(u8 taskId)
             sendBuff[1] = GetMonData(&gPlayerParty[gSelectedOrderFromParty[1] - 1], MON_DATA_SPECIES, NULL);
             gMain.savedCallback = NULL;
             data[0] = 4;
-            sub_800E3A8();
+            RecordMixTrainerNames();
             ResetBlockReceivedFlags();
             break;
         case 16:
         case 23 ... 27:
-            sub_800E3A8();
+            RecordMixTrainerNames();
             DestroyTask(taskId);
         default:
             EnableBothScriptContexts();
@@ -2176,7 +2174,7 @@ void sub_8014F48(u8 taskId)
             RedrawListMenu(data->listTaskId);
             break;
         case 0:
-            id = ListMenuHandleInputGetItemId(data->listTaskId);
+            id = ListMenu_ProcessInput(data->listTaskId);
             if (gMain.newKeys & A_BUTTON && id != -1)
             {
                 // this unused variable along with the assignment is needed to match
@@ -2340,7 +2338,7 @@ void sub_80152F4(u8 taskId)
             break;
         case 0:
             if (data->field_13 != 0)
-                id = ListMenuHandleInputGetItemId(data->listTaskId);
+                id = ListMenu_ProcessInput(data->listTaskId);
             if (data->field_14 > 120)
             {
                 if (data->field_0->arr[0].field_1A_0 == 1 && !data->field_0->arr[0].unk.field_0.unk_0a_7)

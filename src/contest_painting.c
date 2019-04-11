@@ -20,10 +20,11 @@
 #include "window.h"
 #include "constants/rgb.h"
 
-extern u16 (*gUnknown_03006190)[][32];
-extern struct ContestWinner *gUnknown_030061C0;
-extern u16 *gContestPaintingMonPalette;
-extern struct Unk030061A0 gUnknown_030061A0;
+// IWRAM common
+u16 (*gUnknown_03006190)[][32];
+struct Unk030061A0 gUnknown_030061A0;
+struct ContestWinner *gUnknown_030061C0;
+u16 *gContestPaintingMonPalette;
 
 // IWRAM bss
 IWRAM_DATA u8 gContestPaintingState;
@@ -103,7 +104,7 @@ const u8 *const gContestRankTextPointers[] =
     gContestLink,
 };
 
-const struct BgTemplate gUnknown_085B07E8[] = 
+const struct BgTemplate gUnknown_085B07E8[] =
 {
     {
         .bg = 1,
@@ -116,7 +117,7 @@ const struct BgTemplate gUnknown_085B07E8[] =
     },
 };
 
-const struct WindowTemplate gUnknown_085B07EC = 
+const struct WindowTemplate gUnknown_085B07EC =
 {
     .bg = 1,
     .tilemapLeft = 2,
@@ -553,7 +554,7 @@ static void sub_8130430(u8 arg0, u8 arg1)
             break;
         }
 
-#define VRAM_PICTURE_DATA(x, y) (((u16 *)(VRAM + 0x6000))[(y) * 32 + (x)])
+#define VRAM_PICTURE_DATA(x, y) (((u16 *)(BG_SCREEN_ADDR(12)))[(y) * 32 + (x)])
 
         // Set the background
         for (y = 0; y < 20; y++)
@@ -578,7 +579,7 @@ static void sub_8130430(u8 arg0, u8 arg1)
     else if (arg0 < 8)
     {
         RLUnCompVram(gPictureFrameTiles_5, (void *)VRAM);
-        RLUnCompVram(gPictureFrameTilemap_5, (void *)(VRAM + 0x6000));
+        RLUnCompVram(gPictureFrameTilemap_5, (void *)(BG_SCREEN_ADDR(12)));
     }
     else
     {
@@ -586,23 +587,23 @@ static void sub_8130430(u8 arg0, u8 arg1)
         {
         case CONTEST_CATEGORY_COOL:
             RLUnCompVram(gPictureFrameTiles_0, (void *)VRAM);
-            RLUnCompVram(gPictureFrameTilemap_0, (void *)(VRAM + 0x6000));
+            RLUnCompVram(gPictureFrameTilemap_0, (void *)(BG_SCREEN_ADDR(12)));
             break;
         case CONTEST_CATEGORY_BEAUTY:
             RLUnCompVram(gPictureFrameTiles_1, (void *)VRAM);
-            RLUnCompVram(gPictureFrameTilemap_1, (void *)(VRAM + 0x6000));
+            RLUnCompVram(gPictureFrameTilemap_1, (void *)(BG_SCREEN_ADDR(12)));
             break;
         case CONTEST_CATEGORY_CUTE:
             RLUnCompVram(gPictureFrameTiles_2, (void *)VRAM);
-            RLUnCompVram(gPictureFrameTilemap_2, (void *)(VRAM + 0x6000));
+            RLUnCompVram(gPictureFrameTilemap_2, (void *)(BG_SCREEN_ADDR(12)));
             break;
         case CONTEST_CATEGORY_SMART:
             RLUnCompVram(gPictureFrameTiles_3, (void *)VRAM);
-            RLUnCompVram(gPictureFrameTilemap_3, (void *)(VRAM + 0x6000));
+            RLUnCompVram(gPictureFrameTilemap_3, (void *)(BG_SCREEN_ADDR(12)));
             break;
         case CONTEST_CATEGORY_TOUGH:
             RLUnCompVram(gPictureFrameTiles_4, (void *)VRAM);
-            RLUnCompVram(gPictureFrameTilemap_4, (void *)(VRAM + 0x6000));
+            RLUnCompVram(gPictureFrameTilemap_4, (void *)(BG_SCREEN_ADDR(12)));
             break;
         }
     }

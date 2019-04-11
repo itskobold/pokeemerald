@@ -1427,7 +1427,7 @@ static void Blender_SetOpponentsBerryData(u16 playerBerryItemId, u8 playersNum, 
     {
         opponentBerryId = sOpponentBerrySets[opponentSetId][i];
         var = playerBerryItemId - 163;
-        if (!FlagGet(0x340) && gSpecialVar_0x8004 == 1)
+        if (!FlagGet(FLAG_HIDE_LILYCOVE_CONTEST_HALL_BLEND_MASTER_ONLOOKERS) && gSpecialVar_0x8004 == 1)
         {
             opponentSetId %= 5;
             opponentBerryId = sSpecialOpponentBerrySets[opponentSetId];
@@ -3093,7 +3093,7 @@ static void sub_8083170(u16 a0, u16 a1)
     s32 var1, var2, var3, var4;
     u16 *vram;
 
-    vram = (u16*)(VRAM + 0x6000);
+    vram = (u16*)(BG_SCREEN_ADDR(12));
     var1 = (a0 * 64) / a1;
     var2 = var1 / 8;
     for (var4 = 0; var4 < var2; var4++)

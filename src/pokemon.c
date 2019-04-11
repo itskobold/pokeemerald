@@ -39,6 +39,7 @@
 #include "constants/battle_move_effects.h"
 #include "constants/hold_effects.h"
 #include "constants/items.h"
+#include "constants/layouts.h"
 #include "constants/moves.h"
 #include "constants/songs.h"
 #include "constants/species.h"
@@ -54,14 +55,14 @@ extern const struct SpriteFrameImage gUnknown_082FF3A8[];
 extern const struct SpriteFrameImage gUnknown_082FF3C8[];
 extern const struct SpriteFrameImage gUnknown_082FF3E8[];
 extern const struct SpriteFrameImage gUnknown_082FF408[];
-extern const struct SpriteFrameImage gUnknown_082FF428[];
-extern const struct SpriteFrameImage gUnknown_082FF448[];
-extern const struct SpriteFrameImage gUnknown_082FF468[];
-extern const struct SpriteFrameImage gUnknown_082FF490[];
-extern const struct SpriteFrameImage gUnknown_082FF4B8[];
-extern const struct SpriteFrameImage gUnknown_082FF4D8[];
-extern const struct SpriteFrameImage gUnknown_082FF4F8[];
-extern const struct SpriteFrameImage gUnknown_082FF518[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_Brendan[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_May[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_Red[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_Leaf[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_RubySapphireBrendan[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_RubySapphireMay[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_Wally[];
+extern const struct SpriteFrameImage gTrainerBackPicTable_Steven[];
 extern const union AffineAnimCmd *const gUnknown_082FF618[];
 extern const union AffineAnimCmd *const gUnknown_082FF694[];
 extern const union AnimCmd *gPlayerMonSpriteAnimsTable[];
@@ -2238,9 +2239,9 @@ const struct CompressedSpritePalette gMonGoldPaletteStruct[] =
 	[0] = {gMonGoldPalette, 0},
 };
 
-const u8 gUnknown_08329D22[] = {0x03, 0x0c, 0x30, 0xc0}; // Masks for getting PP Up count, also PP Max values
-const u8 gUnknown_08329D26[] = {0xfc, 0xf3, 0xcf, 0x3f}; // Masks for setting PP Up count
-const u8 gUnknown_08329D2A[] = {0x01, 0x04, 0x10, 0x40}; // Values added to PP Up count
+const u8 gPPUpGetMask[] = {0x03, 0x0c, 0x30, 0xc0}; // Masks for getting PP Up count, also PP Max values
+const u8 gPPUpSetMask[] = {0xfc, 0xf3, 0xcf, 0x3f}; // Masks for setting PP Up count
+const u8 gPPUpAddMask[] = {0x01, 0x04, 0x10, 0x40}; // Values added to PP Up count
 
 const u8 gStatStageRatios[][2] =
 {
@@ -2340,14 +2341,14 @@ const struct SpriteTemplate gUnknown_08329D98[MAX_BATTLERS_COUNT] =
     },
 };
 
-static const struct SpriteTemplate gUnknown_08329DF8[] =
+static const struct SpriteTemplate gSpriteTemplateTable_TrainerBackSprites[] =
 {
     {
         .tileTag = 0xFFFF,
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF428,
+        .images = gTrainerBackPicTable_Brendan,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2356,7 +2357,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF448,
+        .images = gTrainerBackPicTable_May,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2365,7 +2366,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF468,
+        .images = gTrainerBackPicTable_Red,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2374,7 +2375,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF490,
+        .images = gTrainerBackPicTable_Leaf,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2383,7 +2384,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF4B8,
+        .images = gTrainerBackPicTable_RubySapphireBrendan,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2392,7 +2393,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF4D8,
+        .images = gTrainerBackPicTable_RubySapphireMay,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2401,7 +2402,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF4F8,
+        .images = gTrainerBackPicTable_Wally,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -2410,7 +2411,7 @@ static const struct SpriteTemplate gUnknown_08329DF8[] =
         .paletteTag = 0,
         .oam = &gOamData_831ACB0,
         .anims = NULL,
-        .images = gUnknown_082FF518,
+        .images = gTrainerBackPicTable_Steven,
         .affineAnims = gUnknown_082FF618,
         .callback = sub_8039BB4,
     },
@@ -4134,7 +4135,7 @@ void SetMultiuseSpriteTemplateToTrainerBack(u16 trainerSpriteId, u8 battlerPosit
     gMultiuseSpriteTemplate.paletteTag = trainerSpriteId;
     if (battlerPosition == B_POSITION_PLAYER_LEFT || battlerPosition == B_POSITION_PLAYER_RIGHT)
     {
-        gMultiuseSpriteTemplate = gUnknown_08329DF8[trainerSpriteId];
+        gMultiuseSpriteTemplate = gSpriteTemplateTable_TrainerBackSprites[trainerSpriteId];
         gMultiuseSpriteTemplate.anims = gTrainerBackAnimsPtrTable[trainerSpriteId];
     }
     else
@@ -5081,19 +5082,19 @@ void GetSpeciesName(u8 *name, u16 species)
 u8 CalculatePPWithBonus(u16 move, u8 ppBonuses, u8 moveIndex)
 {
     u8 basePP = gBattleMoves[move].pp;
-    return basePP + ((basePP * 20 * ((gUnknown_08329D22[moveIndex] & ppBonuses) >> (2 * moveIndex))) / 100);
+    return basePP + ((basePP * 20 * ((gPPUpGetMask[moveIndex] & ppBonuses) >> (2 * moveIndex))) / 100);
 }
 
 void RemoveMonPPBonus(struct Pokemon *mon, u8 moveIndex)
 {
     u8 ppBonuses = GetMonData(mon, MON_DATA_PP_BONUSES, NULL);
-    ppBonuses &= gUnknown_08329D26[moveIndex];
+    ppBonuses &= gPPUpSetMask[moveIndex];
     SetMonData(mon, MON_DATA_PP_BONUSES, &ppBonuses);
 }
 
 void RemoveBattleMonPPBonus(struct BattlePokemon *mon, u8 moveIndex)
 {
-    mon->ppBonuses &= gUnknown_08329D26[moveIndex];
+    mon->ppBonuses &= gPPUpSetMask[moveIndex];
 }
 
 void CopyPlayerPartyMonToBattleData(u8 battlerId, u8 partyIndex)
@@ -5238,7 +5239,7 @@ static bool8 RestorePPAllMoves(struct Pokemon *pkmn, u8 sp34, bool8 restoreAll)
 			SetMonData(pkmn, MON_DATA_PP1 + i, &pp);
 			if (gMain.inBattle
 			 && sp34 != 4 && !(gBattleMons[sp34].status2 & 0x200000)
-			 && !(gDisableStructs[sp34].unk18_b & gBitTable[i]))
+			 && !(gDisableStructs[sp34].mimickedMoves & gBitTable[i]))
 				gBattleMons[sp34].pp[i] = pp;
 				
 			retVal = FALSE;
@@ -5475,8 +5476,8 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 							gBattleMons[sp34].hp = data;
 							if (GetBattlerSide(gActiveBattler) == 0)
 							{
-								if (gBattleResults.unk3 < 255)
-									gBattleResults.unk3++;
+								if (gBattleResults.numHealingItemsUsed < 255)
+									gBattleResults.numHealingItemsUsed++;
 								data = gActiveBattler;
 								gActiveBattler = sp34;
 								BtlController_EmitGetMonData(0, 0, 0);
@@ -5493,14 +5494,14 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 							{
 								gAbsentBattlerFlags &= ~gBitTable[sp34];
 								CopyPlayerPartyMonToBattleData(sp34, pokemon_order_func(gBattlerPartyIndexes[sp34]));
-								if (GetBattlerSide(gActiveBattler) == 0 && gBattleResults.unk4 < 255)
-									gBattleResults.unk4++;
+								if (GetBattlerSide(gActiveBattler) == 0 && gBattleResults.numRevivesUsed < 255)
+									gBattleResults.numRevivesUsed++;
 							}
 							else
 							{
 								gAbsentBattlerFlags &= ~gBitTable[gActiveBattler ^ 2];
-								if (GetBattlerSide(gActiveBattler) == 0 && gBattleResults.unk4 < 255)
-									gBattleResults.unk4++;
+								if (GetBattlerSide(gActiveBattler) == 0 && gBattleResults.numRevivesUsed < 255)
+									gBattleResults.numRevivesUsed++;
 							}
 						}
 					}
@@ -5558,7 +5559,7 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 						SetMonData(pkmn, MON_DATA_PP1 + moveIndex, &data);
 						if (gMain.inBattle
 						 && sp34 != 4 && !(gBattleMons[sp34].status2 & 0x200000)
-						 && !(gDisableStructs[sp34].unk18_b & gBitTable[moveIndex]))
+						 && !(gDisableStructs[sp34].mimickedMoves & gBitTable[moveIndex]))
 							gBattleMons[sp34].pp[moveIndex] = data;
 						retVal = FALSE;
 					}
@@ -5566,7 +5567,7 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 			}
 			break;
 		case MEDICINE_GROUP_PP_BOOSTER:
-			data = (GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL) & gUnknown_08329D22[moveIndex]) >> (moveIndex * 2);
+			data = (GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL) & gPPUpGetMask[moveIndex]) >> (moveIndex * 2);
 			
 			switch (item)
 			{
@@ -5574,7 +5575,7 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 					data2 = CalculatePPWithBonus(GetMonData(pkmn, MON_DATA_MOVE1 + moveIndex, NULL), GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL), moveIndex);
 					if (data < 3 && data2 > 4)
 					{
-						data = GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL) + gUnknown_08329D2A[moveIndex];
+						data = GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL) + gPPUpAddMask[moveIndex];
 						
 						SetMonData(pkmn, MON_DATA_PP_BONUSES, &data);
 						data = CalculatePPWithBonus(GetMonData(pkmn, MON_DATA_MOVE1 + moveIndex, NULL), data, moveIndex) - data2;
@@ -5588,8 +5589,8 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 					{
 						data2 = CalculatePPWithBonus(GetMonData(pkmn, MON_DATA_MOVE1 + moveIndex, NULL), GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL), moveIndex);
 						data = GetMonData(pkmn, MON_DATA_PP_BONUSES, NULL);
-						data &= gUnknown_08329D26[moveIndex];
-						data += gUnknown_08329D2A[moveIndex] * 3;
+						data &= gPPUpSetMask[moveIndex];
+						data += gPPUpAddMask[moveIndex] * 3;
 
 						SetMonData(pkmn, MON_DATA_PP_BONUSES, &data);
 						data = CalculatePPWithBonus(GetMonData(pkmn, MON_DATA_MOVE1 + moveIndex, NULL), data, moveIndex) - data2;
@@ -6442,7 +6443,7 @@ s32 GetBattlerMultiplayerId(u16 a1)
 u8 GetTrainerEncounterMusicId(u16 trainerOpponentId)
 {
     if (InBattlePyramid())
-        return GetTrainerEncounterMusicIdInBattlePyramind(trainerOpponentId);
+        return GetBattlePyramindTrainerEncounterMusicId(trainerOpponentId);
     else if (sub_81D5C18())
         return GetTrainerEncounterMusicIdInTrainerHill(trainerOpponentId);
     else
@@ -7280,7 +7281,7 @@ void SetWildMonHeldItem(void)
             var1 = 20;
             var2 = 80;
         }
-        if (gMapHeader.mapLayoutId == 0x1A4)
+        if (gMapHeader.mapLayoutId == LAYOUT_ALTERING_CAVE)
         {
             s32 alteringCaveId = GetWildMonTableIdInAlteringCave(species);
             if (alteringCaveId != 0)
@@ -7458,7 +7459,7 @@ void PokemonSummaryDoMonAnimation(struct Sprite* sprite, u16 species, bool8 oneF
     }
 }
 
-void sub_806EE98(void)
+void StopPokemonAnimationDelayTask(void)
 {
     u8 delayTaskId = FindTaskIdByFunc(Task_PokemonSummaryAnimateAfterDelay);
     if (delayTaskId != 0xFF)

@@ -1,5 +1,5 @@
 RustboroCity_DevonCorp_1F_MapScripts:: @ 8211245
-	map_script 3, RustboroCity_DevonCorp_1F_MapScript1_21124B
+	map_script MAP_SCRIPT_ON_TRANSITION, RustboroCity_DevonCorp_1F_MapScript1_21124B
 	.byte 0
 
 RustboroCity_DevonCorp_1F_MapScript1_21124B: @ 821124B
@@ -8,7 +8,7 @@ RustboroCity_DevonCorp_1F_MapScript1_21124B: @ 821124B
 
 RustboroCity_DevonCorp_1F_EventScript_211255:: @ 8211255
 	setobjectxyperm 2, 14, 2
-	setobjectmovementtype 2, 8
+	setobjectmovementtype 2, MOVEMENT_TYPE_FACE_DOWN
 	return
 
 RustboroCity_DevonCorp_1F_EventScript_211261:: @ 8211261

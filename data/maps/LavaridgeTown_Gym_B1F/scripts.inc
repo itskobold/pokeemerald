@@ -1,5 +1,5 @@
 LavaridgeTown_Gym_B1F_MapScripts:: @ 81FF87E
-	map_script 3, LavaridgeTown_Gym_B1F_MapScript1_1FF884
+	map_script MAP_SCRIPT_ON_TRANSITION, LavaridgeTown_Gym_B1F_MapScript1_1FF884
 	.byte 0
 
 LavaridgeTown_Gym_B1F_MapScript1_1FF884: @ 81FF884
@@ -37,22 +37,22 @@ LavaridgeTown_Gym_B1F_EventScript_1FF8DB:: @ 81FF8DB
 LavaridgeTown_Gym_B1F_EventScript_1FF8DC:: @ 81FF8DC
 	checktrainerflag TRAINER_KEEGAN
 	goto_if_eq LavaridgeTown_Gym_B1F_EventScript_1FF8E9
-	setobjectmovementtype 2, 63
+	setobjectmovementtype 2, MOVEMENT_TYPE_HIDDEN
 
 LavaridgeTown_Gym_B1F_EventScript_1FF8E9:: @ 81FF8E9
 	checktrainerflag TRAINER_JACE
 	goto_if_eq LavaridgeTown_Gym_B1F_EventScript_1FF8F6
-	setobjectmovementtype 1, 63
+	setobjectmovementtype 1, MOVEMENT_TYPE_HIDDEN
 
 LavaridgeTown_Gym_B1F_EventScript_1FF8F6:: @ 81FF8F6
 	checktrainerflag TRAINER_JEFF
 	goto_if_eq LavaridgeTown_Gym_B1F_EventScript_1FF903
-	setobjectmovementtype 3, 63
+	setobjectmovementtype 3, MOVEMENT_TYPE_HIDDEN
 
 LavaridgeTown_Gym_B1F_EventScript_1FF903:: @ 81FF903
 	checktrainerflag TRAINER_ELI
 	goto_if_eq LavaridgeTown_Gym_B1F_EventScript_1FF910
-	setobjectmovementtype 4, 63
+	setobjectmovementtype 4, MOVEMENT_TYPE_HIDDEN
 
 LavaridgeTown_Gym_B1F_EventScript_1FF910:: @ 81FF910
 	return

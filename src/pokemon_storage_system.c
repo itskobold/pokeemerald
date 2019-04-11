@@ -1218,7 +1218,7 @@ static const u16 gWallpaperPalettes_Plain[][16] =
 static const u32 gWallpaperTiles_Plain[] = INCBIN_U32("graphics/pokemon_storage/plain.4bpp.lz");
 static const u32 gWallpaperTilemap_Plain[] = INCBIN_U32("graphics/pokemon_storage/plain.bin.lz");
 
-// 12×18 tilemap
+// 12x18 tilemap
 static const u32 gUnknown_085773C4[] = INCBIN_U32("graphics/unused/tilemap_5773C4.bin");
 
 static const u16 gUnknown_08577574[][2] =
@@ -1753,7 +1753,7 @@ static void Task_PokemonStorageSystemPC(u8 taskId)
         task->data[2] = Menu_ProcessInput();
         switch(task->data[2])
         {
-        case -2:
+        case MENU_NOTHING_CHOSEN:
             task->data[3] = task->data[1];
             if (gMain.newKeys & DPAD_UP && --task->data[3] < 0)
                 task->data[3] = 4;
@@ -1767,7 +1767,7 @@ static void Task_PokemonStorageSystemPC(u8 taskId)
                 AddTextPrinterParameterized2(0, 1, gUnknown_085716C0[task->data[1]].desc, 0, NULL, 2, 1, 3);
             }
             break;
-        case -1:
+        case MENU_B_PRESSED:
         case  4:
             sub_819746C(task->data[15], TRUE);
             ScriptContext2_Disable();
@@ -3927,7 +3927,7 @@ static void SetScrollingBackground(void)
 {
     SetGpuReg(REG_OFFSET_BG3CNT, BGCNT_PRIORITY(3) | BGCNT_CHARBASE(3) | BGCNT_16COLOR | BGCNT_SCREENBASE(31));
     DecompressAndLoadBgGfxUsingHeap(3, gPokemonStorageScrollingBGTileset, 0, 0, 0);
-    LZ77UnCompVram(gPokemonStorageScrollingBGTilemap, (void *)VRAM + 0xF800);
+    LZ77UnCompVram(gPokemonStorageScrollingBGTilemap, (void *)BG_SCREEN_ADDR(31));
 }
 
 static void ScrollBackground(void)
@@ -6654,7 +6654,7 @@ static void sub_80CE8E4(void)
     if (sIsMonBeingMoved)
         sub_80CE790();
     else
-        sBoxCursorPosition = gUnknown_0203CF20;
+        sBoxCursorPosition = gLastViewedMonIndex;
 }
 
 s16 CompactPartySlots(void)

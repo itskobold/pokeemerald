@@ -291,7 +291,7 @@ gSpecials:: @ 81DBA64
 	def_special GetPokeblockNameByMonNature
 	def_special GetSecretBaseNearbyMapName
 	def_special CheckRelicanthWailord
-	def_special ShouldDoBrailleStrengthEffectOld
+	def_special ShouldDoBrailleRegirockEffectOld
 	def_special sub_80B0534
 	def_special sub_80B058C
 	def_special WaitWeather
@@ -503,7 +503,7 @@ gSpecials:: @ 81DBA64
 	def_special sub_813B374
 	def_special sub_813B490
 	def_special sub_80A08CC
-	def_special sub_813B484
+	def_special Unused_SetWeatherSunny
 	def_special sub_81AFDA0
 	def_special sub_813B4E0
 	def_special ShouldDoBrailleRegicePuzzle

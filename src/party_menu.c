@@ -119,6 +119,7 @@ struct Struct203CEDC
     u8 unkC;
 };
 
+// EWRAM vars
 static EWRAM_DATA struct Struct203CEC4 *gUnknown_0203CEC4 = NULL;
 EWRAM_DATA struct Struct203CEC8 gUnknown_0203CEC8 = {0};
 static EWRAM_DATA struct Struct203CEDC *gUnknown_0203CEDC = NULL;
@@ -135,7 +136,8 @@ static EWRAM_DATA u16 gUnknown_0203CEFE = 0; // unused
 EWRAM_DATA u8 gUnknown_0203CF00[3] = {0};
 static EWRAM_DATA u16 gEtherPPUpMoveList[MAX_MON_MOVES - 1] = {0};
 
-extern void (*gUnknown_03006328)(u8, TaskFunc);
+// IWRAM common
+void (*gUnknown_03006328)(u8, TaskFunc);
 
 static void reset_brm(void);
 static void PartyMenuInitCallback(void);
@@ -2147,7 +2149,8 @@ static bool8 RenderPartyMenuBoxes(void)
     RenderPartyMenuBox(gUnknown_0203CEC4->data[0]);
     if (++gUnknown_0203CEC4->data[0] == 6)
         return TRUE;
-    return FALSE;
+    else
+        return FALSE;
 }
 
 static u8* GetPartyMiscGraphicsTile(u16 tileId)
@@ -2190,7 +2193,8 @@ static bool8 party_menu_add_per_mon_objects(void)
     party_menu_add_per_mon_objects_internal(gUnknown_0203CEC4->data[0]);
     if (++gUnknown_0203CEC4->data[0] == 6)
         return TRUE;
-    return FALSE;
+    else
+        return FALSE;
 }
 
 static void sub_81B0F28(void)
@@ -2262,6 +2266,7 @@ void sub_81B0FCC(u8 slot, u8 b)
 static u8 GetPartyBoxPalBitfield(u8 slot, u8 b)
 {
     u8 returnVar = 0;
+
     if (b == 1)
         returnVar |= 1;
     if (GetMonData(&gPlayerParty[slot], MON_DATA_HP) == 0)
@@ -2381,7 +2386,8 @@ static s8* sub_81B13EC(void)
 {
     if (gUnknown_0203CEC8.unkB == 8 || gUnknown_0203CEC8.unkB == 10)
         return &gUnknown_0203CEC8.unkA;
-    return &gUnknown_0203CEC8.unk9;
+    else
+        return &gUnknown_0203CEC8.unk9;
 }
 
 static void sub_81B140C(u8 taskId, s8 *ptr)
@@ -2898,7 +2904,7 @@ static void sub_81B1DB8(struct Pokemon *mon, u16 item)
 	RedrawPokemonInfoInMenuNoTextChange(gUnknown_0203CEC8.unk9, mon);
 }
 
-static u8 sub_81B1E00(struct Pokemon* mon)
+static u8 TryTakeMonItem(struct Pokemon* mon)
 {
     u16 item = GetMonData(mon, MON_DATA_HELD_ITEM);
 
@@ -3910,7 +3916,7 @@ static void sub_81B3828(void)
 static void sub_81B3894(void)
 {
     gPaletteFade.bufferTransferDisabled = TRUE;
-    gUnknown_0203CEC8.unk9 = gUnknown_0203CF20;
+    gUnknown_0203CEC8.unk9 = gLastViewedMonIndex;
     InitPartyMenu(gUnknown_0203CEC8.unk8_0, 0xFF, gUnknown_0203CEC8.unkB, 1, 21, sub_81B36FC, gUnknown_0203CEC8.exitCallback);
 }
 
@@ -4350,7 +4356,7 @@ static void CursorCb_TakeItem(u8 taskId)
     PlaySE(SE_SELECT);
     sub_81B302C(&gUnknown_0203CEC4->unkC[0]);
     sub_81B302C(&gUnknown_0203CEC4->unkC[1]);
-    switch (sub_81B1E00(mon))
+    switch (TryTakeMonItem(mon))
     {
     case 0:
         GetMonNickname(mon, gStringVar1);
@@ -5294,7 +5300,7 @@ void sub_81B617C(void)
     bool8 inBattle;
     u8 i;
     u8 msgIdMaybe;
-    register TaskFunc task asm("r0");
+    TaskFunc task;
 
     if (gMain.inBattle)
     {
@@ -5306,6 +5312,7 @@ void sub_81B617C(void)
         inBattle = FALSE;
         doubleBattleStatus = 0;
     }
+
     if (GetItemEffectType(gSpecialVar_ItemId) == 10)
     {
         gUnknown_0203CEC8.unk9 = 0;
@@ -5322,9 +5329,14 @@ void sub_81B617C(void)
     }
     else
     {
-        msgIdMaybe = (GetPocketByItemId(gSpecialVar_ItemId) == POCKET_TM_HM) ? 4 : 5;
+        if (GetPocketByItemId(gSpecialVar_ItemId) == POCKET_TM_HM)
+            msgIdMaybe = 4;
+        else
+            msgIdMaybe = 5;
+
         task = sub_81B1370;
     }
+
     InitPartyMenu(inBattle, doubleBattleStatus, 3, 1, msgIdMaybe, task, callback);
 }
 
@@ -5663,7 +5675,7 @@ static bool8 sub_81B6A10(u8 slot)
     {
 		move = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
 		pp = GetMonData(&gPlayerParty[slot], MON_DATA_PP1 + i);
-        ppBonus = (GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL) & gUnknown_08329D22[i]) >> (i * 2);
+        ppBonus = (GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL) & gPPUpGetMask[i]) >> (i * 2);
 		if (ppBonus < 3 && pp > 4 && move != MOVE_NONE)
 			moveCount++;
 	}
@@ -5678,7 +5690,7 @@ static bool8 sub_81B6A10(u8 slot)
     {
         move = GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i);
 		pp = GetMonData(&gPlayerParty[slot], MON_DATA_PP1 + i);
-		ppBonus = (GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL) & gUnknown_08329D22[i]) >> (i * 2);
+		ppBonus = (GetMonData(&gPlayerParty[slot], MON_DATA_PP_BONUSES, NULL) & gPPUpGetMask[i]) >> (i * 2);
 		if (ppBonus < 3 && pp > 4 && move != MOVE_NONE)
 		{
 			AddTextPrinterParameterized(windowId, fontId, gMoveNames[move], 8, (moveCount * 16) + 1, 0xFF, NULL);
@@ -7687,9 +7699,9 @@ static void sub_81B97DC(struct Pokemon *mon, u8 slotTo, u8 slotFrom)
     u8 pp1 = GetMonData(mon, MON_DATA_PP1 + slotTo);
     u8 pp0 = GetMonData(mon, MON_DATA_PP1 + slotFrom);
     u8 ppBonuses = GetMonData(mon, MON_DATA_PP_BONUSES);
-    u8 ppBonusMask1 = gUnknown_08329D22[slotTo];
+    u8 ppBonusMask1 = gPPUpGetMask[slotTo];
     u8 ppBonusMove1 = (ppBonuses & ppBonusMask1) >> (slotTo * 2);
-    u8 ppBonusMask2 = gUnknown_08329D22[slotFrom];
+    u8 ppBonusMask2 = gPPUpGetMask[slotFrom];
     u8 ppBonusMove2 = (ppBonuses & ppBonusMask2) >> (slotFrom * 2);
     ppBonuses &= ~ppBonusMask1;
     ppBonuses &= ~ppBonusMask2;
