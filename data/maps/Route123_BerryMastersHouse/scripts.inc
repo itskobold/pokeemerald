@@ -1,8 +1,8 @@
 Route123_BerryMastersHouse_MapScripts:: @ 826F83B
-	map_script MAP_SCRIPT_ON_TRANSITION, Route123_BerryMastersHouse_MapScript1_26F841
+	map_script MAP_SCRIPT_ON_TRANSITION, Route123_BerryMastersHouse_OnTransition
 	.byte 0
 
-Route123_BerryMastersHouse_MapScript1_26F841: @ 826F841
+Route123_BerryMastersHouse_OnTransition: @ 826F841
 	setflag FLAG_LANDMARK_BERRY_MASTERS_HOUSE
 	end
 
@@ -41,8 +41,8 @@ Route123_BerryMastersHouse_EventScript_26F8C0:: @ 826F8C0
 	dotimebasedevents
 	goto_if_set FLAG_DAILY_BERRY_MASTERS_WIFE, Route123_BerryMastersHouse_EventScript_26FA6F
 	msgbox Route123_BerryMastersHouse_Text_2A74E6, MSGBOX_DEFAULT
-	setvar VAR_0x8004, 13
-	call Route123_BerryMastersHouse_EventScript_271E7C
+	setvar VAR_0x8004, EASY_CHAT_TYPE_GOOD_SAYING
+	call Common_ShowEasyChatScreen
 	lock
 	faceplayer
 	compare VAR_RESULT, 1

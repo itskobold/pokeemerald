@@ -17,6 +17,8 @@
 #include "sound.h"
 #include "constants/songs.h"
 #include "new_game.h"
+#include "gba/m4a_internal.h"
+#include "constants/rgb.h"
 
 extern void SetPokemonCryStereo(u32 val);
 
@@ -338,7 +340,7 @@ void CB2_InitOptionMenu(void)
         break;
     }
     case 11:
-        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0x10, 0, 0);
+        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0x10, 0, RGB_BLACK);
         SetVBlankCallback(VBlankCB);
         SetMainCallback2(MainCB2);
         return;
@@ -492,7 +494,7 @@ static void DisplayNuzlockeConfirmMessage(u8 taskId)
 //	Menu_DrawStdWindowFrame(1, 14, 21, 19);
 //	Menu_PrintText(gSystemText_AreYouSure,  2,  15);
 	sub_81973A4();
-	DisplayYesNoMenu();
+	DisplayYesNoMenuDefaultYes();
 	DoYesNoFuncWithChoice(taskId, &gLowerNuzlockeFuncs);
 }
 
@@ -704,7 +706,7 @@ static void Task_OptionMenuSave(u8 taskId)
 	gSaveBlock2Ptr->optionsKeypadSound = gTasks[taskId].data[TD_KEYPADSOUND];
 	gSaveBlock2Ptr->optionsSound = gTasks[taskId].data[TD_SOUNDOUTPUT];
 
-    BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, 0);
+    BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, RGB_BLACK);
     gTasks[taskId].func = Task_OptionMenuFadeOut;
 }
 
@@ -999,8 +1001,21 @@ static void FrameType_DrawChoices(u8 selection, int yPos)
 	text[i] = CHAR_RIGHT_ARROW;
 	i++;
     text[i] = EOS;
+
     DrawOptionMenuChoice(gText_FrameType, 104, yPos, 0);
     DrawOptionMenuChoice(text, 137, yPos, 1);
+}
+
+static void DrawOptionMenuTexts(void)
+{
+    u8 i;
+
+    FillWindowPixelBuffer(WIN_OPTIONS, PIXEL_FILL(1));
+    for (i = 0; i < MENUITEM_COUNT; i++)
+    {
+        AddTextPrinterParameterized(WIN_OPTIONS, 1, sOptionMenuItemsNames[i], 8, (i * 16) + 1, TEXT_SPEED_FF, NULL);
+    }
+    CopyWindowToVram(WIN_OPTIONS, 3);
 }
 
 static void sub_80BB154(void)

@@ -10,7 +10,7 @@
 #include "battle_pyramid_bag.h"
 #include "bg.h"
 #include "contest.h"
-#include "data2.h"
+#include "data.h"
 #include "decompress.h"
 #include "easy_chat.h"
 #include "event_data.h"
@@ -37,18 +37,19 @@
 #include "main.h"
 #include "menu.h"
 #include "menu_helpers.h"
+#include "menu_specialized.h"
 #include "metatile_behavior.h"
 #include "overworld.h"
 #include "palette.h"
 #include "party_menu.h"
+#include "player_pc.h"
 #include "pokemon.h"
 #include "pokemon_icon.h"
 #include "pokemon_storage_system.h"
 #include "pokemon_summary_screen.h"
-#include "pokenav.h"
 #include "region_map.h"
 #include "reshow_battle_screen.h"
-#include "rom_8011DC0.h"
+#include "union_room.h"
 #include "scanline_effect.h"
 #include "script.h"
 #include "sound.h"
@@ -63,6 +64,7 @@
 #include "window.h"
 #include "constants/battle.h"
 #include "constants/battle_frontier.h"
+#include "constants/easy_chat.h"
 #include "constants/field_effects.h"
 #include "constants/flags.h"
 #include "constants/items.h"
@@ -1234,10 +1236,10 @@ static const struct OamData gOamData_83765EC =
     .objMode = 0,
     .mosaic = 0,
     .bpp = 0,
-    .shape = 0,
+    .shape = SPRITE_SHAPE(8x8),
     .x = 0,
     .matrixNum = 0,
-    .size = 0,
+    .size = SPRITE_SIZE(8x8),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -1290,10 +1292,10 @@ static const struct OamData sOamData_8615ED8 =
     .objMode = 0,
     .mosaic = 0,
     .bpp = 0,
-    .shape = 0,
+    .shape = SPRITE_SHAPE(32x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x32),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -1346,10 +1348,10 @@ static const struct OamData sOamData_8615F20 =
     .objMode = 0,
     .mosaic = 0,
     .bpp = 0,
-    .shape = 0,
+    .shape = SPRITE_SHAPE(16x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(16x16),
     .tileNum = 0,
     .priority = 2,
     .paletteNum = 0,
@@ -1425,10 +1427,10 @@ static const struct OamData sOamData_8615F90 =
     .objMode = 0,
     .mosaic = 0,
     .bpp = 0,
-    .shape = 1,
+    .shape = SPRITE_SHAPE(32x8),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(32x8),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -2813,7 +2815,7 @@ static void sub_81B1B8C(u8 taskId)
     {
         if (gTasks[taskId].data[0] == 0)
         {
-            sub_8198070(6, 0);
+            ClearStdWindowAndFrameToTransparent(6, 0);
             ClearWindowTilemap(6);
         }
         DestroyTask(taskId);
@@ -2838,7 +2840,7 @@ static void sub_81B1C1C(u8 taskId)
 {
     if (sub_81B1BD4() != TRUE)
     {
-        sub_8198070(6, 0);
+        ClearStdWindowAndFrameToTransparent(6, 0);
         ClearWindowTilemap(6);
         if (sub_81221AC() == TRUE)
         {
@@ -2999,7 +3001,7 @@ u8 pokemon_ailments_get_primary(u32 status)
     return AILMENT_NONE;
 }
 
-u8 sub_81B205C(struct Pokemon *mon)
+u8 GetMonAilment(struct Pokemon *mon)
 {
     u8 ailment;
 
@@ -3172,7 +3174,7 @@ static void sub_81B239C(u8 a)
     }
     DeactivateAllTextPrinters();
     for (i = 0; i < PARTY_SIZE; i++)
-        FillWindowPixelBuffer(i, 0);
+        FillWindowPixelBuffer(i, PIXEL_FILL(0));
     LoadUserWindowBorderGfx(0, 0x4F, 0xD0);
     LoadPalette(GetOverworldTextboxPalettePtr(), 0xE0, 0x20);
     LoadPalette(gUnknown_0860F074, 0xF0, 0x20);
@@ -3190,7 +3192,7 @@ static void sub_81B2428(bool8 a)
         if (a == TRUE)
         {
             firstWindowId = AddWindow(&gUnknown_08615918);
-            FillWindowPixelBuffer(firstWindowId, 0);
+            FillWindowPixelBuffer(firstWindowId, PIXEL_FILL(0));
             mainOffset = GetStringCenterAlignXOffset(0, gMenuText_Confirm, 48);
             AddTextPrinterParameterized4(firstWindowId, 0, mainOffset, 1, 0, 0, gUnknown_086157FC[0], -1, gMenuText_Confirm);
             PutWindowTilemap(firstWindowId);
@@ -3203,7 +3205,7 @@ static void sub_81B2428(bool8 a)
             windowId = AddWindow(&gUnknown_08615908);
             offset = 3;
         }
-        FillWindowPixelBuffer(windowId, 0);
+        FillWindowPixelBuffer(windowId, PIXEL_FILL(0));
         if (gUnknown_0203CEC8.unk8_0 != 10)
         {
             mainOffset = GetStringCenterAlignXOffset(0, gText_Cancel, 48);
@@ -3418,7 +3420,7 @@ static void DisplayPartyPokemonLevelCheck(struct Pokemon *mon, struct Struct203C
 {
     if (GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE)
     {
-        u8 ailment = sub_81B205C(mon);
+        u8 ailment = GetMonAilment(mon);
         if (ailment == AILMENT_NONE || ailment == AILMENT_PKRS)
         {
             if (c != 0)
@@ -3543,8 +3545,9 @@ static void DisplayPartyPokemonHPBar(u16 hp, u16 maxhp, struct Struct203CEDC *pt
     FillWindowPixelRect(ptr->windowId, gUnknown_08615AB8[0], ptr->unk0->unk4[20], ptr->unk0->unk4[21] + 1, hpFraction, 2);
     if (hpFraction != ptr->unk0->unk4[22])
     {
-        FillWindowPixelRect(ptr->windowId, 13, ptr->unk0->unk4[20] + hpFraction, ptr->unk0->unk4[21], ptr->unk0->unk4[22] - hpFraction, 1);
-        FillWindowPixelRect(ptr->windowId, 2, ptr->unk0->unk4[20] + hpFraction, ptr->unk0->unk4[21] + 1, ptr->unk0->unk4[22] - hpFraction, 2);
+        // This appears to be an alternating fill
+        FillWindowPixelRect(ptr->windowId, 0x0D, ptr->unk0->unk4[20] + hpFraction, ptr->unk0->unk4[21], ptr->unk0->unk4[22] - hpFraction, 1);
+        FillWindowPixelRect(ptr->windowId, 0x02, ptr->unk0->unk4[20] + hpFraction, ptr->unk0->unk4[21] + 1, ptr->unk0->unk4[22] - hpFraction, 2);
     }
     CopyWindowToVram(ptr->windowId, 2);
 }
@@ -3565,7 +3568,7 @@ static void sub_81B302C(u8 *ptr)
 {
     if (*ptr != 0xFF)
     {
-        sub_8198070(*ptr, 0);
+        ClearStdWindowAndFrameToTransparent(*ptr, 0);
         RemoveWindow(*ptr);
         *ptr = 0xFF;
         schedule_bg_copy_tilemap_to_vram(2);
@@ -3613,7 +3616,7 @@ void display_pokemon_menu_message(u32 stringID)
             else if (sub_81B314C() == FALSE)
                 stringID = 1;
         }
-        SetWindowBorderStyle(*windowPtr, FALSE, 0x4F, 0xD);
+        DrawStdFrameWithCustomTileAndPalette(*windowPtr, FALSE, 0x4F, 0xD);
         StringExpandPlaceholders(gStringVar4, gUnknown_08615AF4[stringID]);
         AddTextPrinterParameterized(*windowPtr, 1, gStringVar4, 0, 1, 0, 0);
         schedule_bg_copy_tilemap_to_vram(2);
@@ -3679,7 +3682,7 @@ static u8 sub_81B31B0(u8 a, u8 etherMoveCount)
     }
 
     gUnknown_0203CEC4->unkC[0] = AddWindow(&window);
-    SetWindowBorderStyle(gUnknown_0203CEC4->unkC[0], FALSE, 0x4F, 13);
+    DrawStdFrameWithCustomTileAndPalette(gUnknown_0203CEC4->unkC[0], FALSE, 0x4F, 13);
     if (a >= 3)
         return gUnknown_0203CEC4->unkC[0];
     cursorDimension = GetMenuCursorDimensionByFont(1, 0);
@@ -3699,7 +3702,7 @@ static u8 sub_81B31B0(u8 a, u8 etherMoveCount)
 
 static void sub_81B3300(const u8 *text)
 {
-    SetWindowBorderStyle(6, FALSE, 0x4F, 13);
+    DrawStdFrameWithCustomTileAndPalette(6, FALSE, 0x4F, 13);
     gTextFlags.canABSpeedUpPrint = TRUE;
     AddTextPrinterParameterized2(6, 1, text, GetPlayerTextSpeedDelay(), 0, 2, 1, 3);
 }
@@ -3712,7 +3715,7 @@ static void sub_81B334C(void)
 static u8 sub_81B3364(void)
 {
     gUnknown_0203CEC4->unkC[0] = AddWindow(&gUnknown_08615970);
-    SetWindowBorderStyle(gUnknown_0203CEC4->unkC[0], FALSE, 0x4F, 13);
+    DrawStdFrameWithCustomTileAndPalette(gUnknown_0203CEC4->unkC[0], FALSE, 0x4F, 13);
     return gUnknown_0203CEC4->unkC[0];
 }
 
@@ -4294,7 +4297,11 @@ static void sub_81B452C(void)
 {
     u8 mail = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_MAIL);
 
-    sub_811A20C(4, gSaveBlock1Ptr->mail[mail].words, sub_81B4578, 3);
+    DoEasyChatScreen(
+    	EASY_CHAT_TYPE_MAIL,
+    	gSaveBlock1Ptr->mail[mail].words,
+    	sub_81B4578,
+    	EASY_CHAT_PERSON_DISPLAY_NONE);
 }
 
 static void sub_81B4578(void)
@@ -5269,7 +5276,7 @@ static void party_menu_link_mon_status_condition_object(u16 species, u8 status, 
 
 static void party_menu_get_status_condition_and_update_object(struct Pokemon *mon, struct Struct203CEDC *ptr)
 {
-    party_menu_update_status_condition_object(sub_81B205C(mon), ptr);
+    party_menu_update_status_condition_object(GetMonAilment(mon), ptr);
 }
 
 static void party_menu_update_status_condition_object(u8 status, struct Struct203CEDC *ptr)
@@ -5903,7 +5910,7 @@ void dp05_pokeball(u8 taskId, TaskFunc task)
 		GetMonData(mon, MON_DATA_NICKNAME, gStringVar1);
 		StringCopy(gStringVar2, ItemId_GetName(item));
 		display_pokemon_menu_message(27);
-		SetWindowBorderStyle(0, FALSE, 0x250, 0x0d);
+		DrawStdFrameWithCustomTileAndPalette(0, FALSE, 0x250, 0x0d);
 		PutWindowTilemap(3);
 		schedule_bg_copy_tilemap_to_vram(3);
 		CreateYesNoMenu(&gBallSwapYesNo, 0x4F, 13, 0);
@@ -6331,7 +6338,7 @@ static void sub_81B767C(u8 taskId)
     s16 *arrayPtr = gUnknown_0203CEC4->data;
 
     arrayPtr[12] = sub_81B3364();
-    sub_81D3640(arrayPtr[12], arrayPtr, &arrayPtr[6], 1, 2, 3);
+    DrawLevelUpWindowPg1(arrayPtr[12], arrayPtr, &arrayPtr[6], 1, 2, 3);
     CopyWindowToVram(arrayPtr[12], 2);
     schedule_bg_copy_tilemap_to_vram(2);
 }
@@ -6340,7 +6347,7 @@ static void sub_81B76C8(u8 taskId)
 {
     s16 *arrayPtr = gUnknown_0203CEC4->data;
 
-    sub_81D3784(arrayPtr[12], &arrayPtr[6], 1, 2, 3);
+    DrawLevelUpWindowPg2(arrayPtr[12], &arrayPtr[6], 1, 2, 3);
     CopyWindowToVram(arrayPtr[12], 2);
     schedule_bg_copy_tilemap_to_vram(2);
 }
@@ -6763,7 +6770,11 @@ static void sub_81B814C(void)
 
     sub_81B1DB8(&gPlayerParty[gUnknown_0203CEC8.unk9], gUnknown_0203CEC8.unkC);
     mail = GetMonData(&gPlayerParty[gUnknown_0203CEC8.unk9], MON_DATA_MAIL);
-    sub_811A20C(4, gSaveBlock1Ptr->mail[mail].words, sub_81B81A8, 3);
+    DoEasyChatScreen(
+    	EASY_CHAT_TYPE_MAIL,
+    	gSaveBlock1Ptr->mail[mail].words,
+    	sub_81B81A8,
+    	EASY_CHAT_PERSON_DISPLAY_NONE);
 }
 
 static void sub_81B81A8(void)
@@ -6893,7 +6904,7 @@ static void sub_81B8474(u8 taskId)
     gTasks[taskId].func = sub_81B8104;
 }
 
-void sub_81B8518(u8 unused)
+void InitChooseHalfPartyForBattle(u8 unused)
 {
     sub_81B8558();
     InitPartyMenu(4, 0, 0, 0, 0, sub_81B1370, gMain.savedCallback);
@@ -7658,7 +7669,7 @@ static void sub_81B9640(u8 taskId)
 void sub_81B968C(void)
 {
     ShowPokemonSummaryScreen(PSS_MODE_SELECT_MOVE, gPlayerParty, gSpecialVar_0x8004, gPlayerPartyCount - 1, CB2_ReturnToField);
-    gFieldCallback = sub_80AF168;
+    gFieldCallback = FieldCallback_ReturnToEventScript2;
 }
 
 void sub_81B96D0(void)
