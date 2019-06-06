@@ -162,7 +162,7 @@ Route116_EventScript_1F2D95:: @ 81F2D95
 Route116_EventScript_1F2DB6:: @ 81F2DB6
 	lock
 	faceplayer
-	checkitem ITEM_BLACK_GLASSES, 1
+	checkitem ITEM_SHADES, 1
 	compare VAR_RESULT, 1
 	goto_if_eq Route116_EventScript_1F2DF1
 	specialvar VAR_RESULT, FoundBlackGlasses

@@ -347,7 +347,7 @@ const struct Item gItems[] =
 
     [ITEM_PARALYZE_HEAL] =
     {
-        .name = _("PARLYZ HEAL"),
+        .name = _("PARLYZE HEAL"),
         .itemId = ITEM_PARALYZE_HEAL,
         .price = 200,
         .holdEffect = HOLD_EFFECT_NONE,
@@ -933,14 +933,14 @@ const struct Item gItems[] =
 		.medicineGroup = MEDICINE_GROUP_HP_RESTORE,
     },
 	
-	[ITEM_HEALING_SEEDS] =
+	[ITEM_HEALING_DUST] =
     {
-        .name = _("HEALING SEEDS"),
-        .itemId = ITEM_HEALING_SEEDS,
+        .name = _("HEALING DUST"),
+        .itemId = ITEM_HEALING_DUST,
         .price = 1,
         .holdEffect = HOLD_EFFECT_CURE_MINOR_STATUS,
         .holdEffectParam = 0,
-        .description = gHealingSeedsItemDescription,
+        .description = gHealingDustItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -952,14 +952,14 @@ const struct Item gItems[] =
 		.medicineGroup = MEDICINE_GROUP_STATUS_RESTORE,
     },
 	
-	[ITEM_HEALING_DUST] =
+	[ITEM_HEALING_BULB] =
     {
-        .name = _("HEALING DUST"),
-        .itemId = ITEM_HEALING_DUST,
+        .name = _("HEALING BULB"),
+        .itemId = ITEM_HEALING_BULB,
         .price = 1,
         .holdEffect = HOLD_EFFECT_CURE_STATUS,
         .holdEffectParam = 0,
-        .description = gHealingDustItemDescription,
+        .description = gHealingBulbItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -4505,14 +4505,14 @@ const struct Item gItems[] =
 		.medicineGroup = 0,
     },
 
-    [ITEM_SMOKE_BALL] =
+    [ITEM_SMOKE_ROUND] =
     {
-        .name = _("SMOKE BALL"),
-        .itemId = ITEM_SMOKE_BALL,
+        .name = _("SMOKE ROUND"),
+        .itemId = ITEM_SMOKE_ROUND,
         .price = 200,
         .holdEffect = HOLD_EFFECT_CAN_ALWAYS_RUN,
         .holdEffectParam = 0,
-        .description = gSmokeBallItemDescription,
+        .description = gSmokeRoundItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -4551,6 +4551,25 @@ const struct Item gItems[] =
         .holdEffect = HOLD_EFFECT_FOCUS_BAND,
         .holdEffectParam = 10,
         .description = gFocusBandItemDescription,
+        .importance = 0,
+        .unk19 = 0,
+        .pocket = POCKET_ITEMS,
+        .type = 4,
+        .fieldUseFunc = ItemUseOutOfBattle_CannotUse,
+        .battleUsage = 0,
+        .battleUseFunc = NULL,
+        .secondaryId = 0,
+		.medicineGroup = 0,
+    },
+	
+	[ITEM_FOCUS_SASH] =
+    {
+        .name = _("FOCUS SASH"),
+        .itemId = ITEM_FOCUS_SASH,
+        .price = 200,
+        .holdEffect = HOLD_EFFECT_FOCUS_BAND,
+        .holdEffectParam = 10,
+        .description = gFocusSashItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -5170,14 +5189,14 @@ const struct Item gItems[] =
 		.medicineGroup = 0,
     },
 	
-	[ITEM_ABSORB_BULB] =
+	[ITEM_ABSORB_ROOT] =
     {
-        .name = _("ABSORB BULB"),
-        .itemId = ITEM_ABSORB_BULB,
+        .name = _("ABSORB ROOT"),
+        .itemId = ITEM_ABSORB_ROOT,
         .price = 100,
         .holdEffect = HOLD_EFFECT_PLACEHOLDER,
         .holdEffectParam = 0,
-        .description = gAbsorbBulbItemDescription,
+        .description = gAbsorbRootItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -5569,14 +5588,14 @@ const struct Item gItems[] =
 		.medicineGroup = 0,
     },
 
-    [ITEM_HARD_STONE] =
+    [ITEM_HARD_ROCK] =
     {
-        .name = _("HARD STONE"),
-        .itemId = ITEM_HARD_STONE,
+        .name = _("HARD ROCK"),
+        .itemId = ITEM_HARD_ROCK,
         .price = 100,
         .holdEffect = HOLD_EFFECT_ROCK_POWER,
         .holdEffectParam = 20,
-        .description = gHardStoneItemDescription,
+        .description = gHardRockItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -5607,14 +5626,14 @@ const struct Item gItems[] =
 		.medicineGroup = 0,
     },
 
-    [ITEM_BLACK_GLASSES] =
+    [ITEM_SHADES] =
     {
-        .name = _("BLACK GLASSES"),
-        .itemId = ITEM_BLACK_GLASSES,
+        .name = _("SHADES"),
+        .itemId = ITEM_SHADES,
         .price = 100,
         .holdEffect = HOLD_EFFECT_DARK_POWER,
         .holdEffectParam = 20,
-        .description = gBlackGlassesItemDescription,
+        .description = gShadesItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,
@@ -5873,14 +5892,14 @@ const struct Item gItems[] =
 		.medicineGroup = 0,
     },
 	
-	[ITEM_TIN_WHISTLE] =
+	[ITEM_WHISTLE] =
     {
-        .name = _("TIN WHISTLE"),
-        .itemId = ITEM_TIN_WHISTLE,
+        .name = _("WHISTLE"),
+        .itemId = ITEM_WHISTLE,
         .price = 1,
         .holdEffect = HOLD_EFFECT_AUDIO_POWER,
         .holdEffectParam = 20,
-        .description = gTinWhistleItemDescription,
+        .description = gWhistleItemDescription,
         .importance = 0,
         .unk19 = 0,
         .pocket = POCKET_ITEMS,

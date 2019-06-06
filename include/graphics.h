@@ -6085,499 +6085,890 @@ extern const u32 gRaySceneHushBg_Pal[];
 extern const u32 gRaySceneHushBg_Gfx[];
 extern const u32 gRaySceneHushRing_Gfx[];
 
-// Pokeballs
-extern const u32 gItemIcon_MasterBall[];
-extern const u32 gItemIconPalette_MasterBall[];
-extern const u32 gItemIcon_UltraBall[];
-extern const u32 gItemIconPalette_UltraBall[];
-extern const u32 gItemIcon_GreatBall[];
-extern const u32 gItemIconPalette_GreatBall[];
-extern const u32 gItemIcon_PokeBall[];
-extern const u32 gItemIconPalette_PokeBall[];
-extern const u32 gItemIcon_SafariBall[];
-extern const u32 gItemIconPalette_SafariBall[];
-extern const u32 gItemIcon_NetBall[];
-extern const u32 gItemIconPalette_NetBall[];
-extern const u32 gItemIcon_DiveBall[];
-extern const u32 gItemIconPalette_DiveBall[];
-extern const u32 gItemIcon_NestBall[];
-extern const u32 gItemIconPalette_NestBall[];
-extern const u32 gItemIcon_RepeatBall[];
-extern const u32 gItemIconPalette_RepeatBall[];
-extern const u32 gItemIcon_TimerBall[];
-extern const u32 gItemIcon_LuxuryBall[];
-extern const u32 gItemIconPalette_LuxuryBall[];
-extern const u32 gItemIcon_PremierBall[];
-// Medicine
-extern const u32 gItemIcon_Potion[];
-extern const u32 gItemIconPalette_Potion[];
-extern const u32 gItemIcon_Antidote[];
-extern const u32 gItemIconPalette_Antidote[];
-extern const u32 gItemIcon_StatusHeal[];
-extern const u32 gItemIconPalette_BurnHeal[];
-extern const u32 gItemIconPalette_IceHeal[];
-extern const u32 gItemIconPalette_Awakening[];
-extern const u32 gItemIconPalette_ParalyzeHeal[];
-extern const u32 gItemIcon_LargePotion[];
-extern const u32 gItemIconPalette_FullRestore[];
-extern const u32 gItemIconPalette_MaxPotion[];
-extern const u32 gItemIconPalette_HyperPotion[];
-extern const u32 gItemIconPalette_SuperPotion[];
-extern const u32 gItemIcon_FullHeal[];
-extern const u32 gItemIconPalette_FullHeal[];
-extern const u32 gItemIcon_Revive[];
-extern const u32 gItemIconPalette_Revive[];
-extern const u32 gItemIcon_MaxRevive[];
-extern const u32 gItemIcon_FreshWater[];
-extern const u32 gItemIconPalette_FreshWater[];
-extern const u32 gItemIcon_SodaPop[];
-extern const u32 gItemIconPalette_SodaPop[];
-extern const u32 gItemIcon_Lemonade[];
-extern const u32 gItemIconPalette_Lemonade[];
-extern const u32 gItemIcon_MoomooMilk[];
-extern const u32 gItemIconPalette_MoomooMilk[];
-extern const u32 gItemIcon_Powder[];
-extern const u32 gItemIconPalette_EnergyPowder[];
-extern const u32 gItemIcon_EnergyRoot[];
-extern const u32 gItemIconPalette_EnergyRoot[];
-extern const u32 gItemIconPalette_HealPowder[];
-extern const u32 gItemIcon_RevivalHerb[];
-extern const u32 gItemIconPalette_RevivalHerb[];
-extern const u32 gItemIcon_Ether[];
-extern const u32 gItemIconPalette_Ether[];
-extern const u32 gItemIconPalette_MaxEther[];
-extern const u32 gItemIconPalette_Elixir[];
-extern const u32 gItemIconPalette_MaxElixir[];
-extern const u32 gItemIcon_LavaCookie[];
-extern const u32 gItemIconPalette_LavaCookieAndLetter[];
-extern const u32 gItemIcon_Flute[];
-extern const u32 gItemIconPalette_BlueFlute[];
-extern const u32 gItemIconPalette_YellowFlute[];
-extern const u32 gItemIconPalette_RedFlute[];
-extern const u32 gItemIconPalette_BlackFlute[];
-extern const u32 gItemIconPalette_WhiteFlute[];
-extern const u32 gItemIcon_BerryJuice[];
-extern const u32 gItemIconPalette_BerryJuice[];
-extern const u32 gItemIcon_SacredAsh[];
-extern const u32 gItemIconPalette_SacredAsh[];
-// Collectibles
-extern const u32 gItemIconPalette_ShoalSalt[];
-extern const u32 gItemIcon_ShoalShell[];
-extern const u32 gItemIconPalette_Shell[];
-extern const u32 gItemIcon_Shard[];
-extern const u32 gItemIconPalette_RedShard[];
-extern const u32 gItemIconPalette_BlueShard[];
-extern const u32 gItemIconPalette_YellowShard[];
-extern const u32 gItemIconPalette_GreenShard[];
-// Vitamins
-extern const u32 gItemIcon_HPUp[];
-extern const u32 gItemIconPalette_HPUp[];
-extern const u32 gItemIcon_Vitamin[];
-extern const u32 gItemIconPalette_Protein[];
-extern const u32 gItemIconPalette_Iron[];
-extern const u32 gItemIconPalette_Carbos[];
-extern const u32 gItemIconPalette_Calcium[];
-extern const u32 gItemIcon_RareCandy[];
-extern const u32 gItemIconPalette_RareCandy[];
-extern const u32 gItemIcon_PPUp[];
-extern const u32 gItemIconPalette_PPUp[];
-extern const u32 gItemIconPalette_Zinc[];
-extern const u32 gItemIcon_PPMax[];
-extern const u32 gItemIconPalette_PPMax[];
-// Battle items
-extern const u32 gItemIcon_BattleStatItem[];
-extern const u32 gItemIconPalette_GuardSpec[];
-extern const u32 gItemIconPalette_DireHit[];
-extern const u32 gItemIconPalette_XAttack[];
-extern const u32 gItemIconPalette_XDefend[];
-extern const u32 gItemIconPalette_XSpeed[];
-extern const u32 gItemIconPalette_XAccuracy[];
-extern const u32 gItemIconPalette_XSpecial[];
-extern const u32 gItemIcon_PokeDoll[];
-extern const u32 gItemIconPalette_PokeDoll[];
-extern const u32 gItemIcon_FluffyTail[];
-extern const u32 gItemIconPalette_FluffyTail[];
-// Field items
-extern const u32 gItemIcon_Repel[];
-extern const u32 gItemIconPalette_SuperRepel[];
-extern const u32 gItemIconPalette_MaxRepel[];
-extern const u32 gItemIcon_EscapeRope[];
-extern const u32 gItemIconPalette_EscapeRope[];
-extern const u32 gItemIcon_Repel[];
-extern const u32 gItemIconPalette_Repel[];
-// Evolution stones
-extern const u32 gItemIcon_SunStone[];
-extern const u32 gItemIconPalette_SunStone[];
-extern const u32 gItemIcon_MoonStone[];
-extern const u32 gItemIconPalette_MoonStone[];
-extern const u32 gItemIcon_FireStone[];
-extern const u32 gItemIconPalette_FireStone[];
-extern const u32 gItemIcon_ThunderStone[];
-extern const u32 gItemIconPalette_ThunderStone[];
-extern const u32 gItemIcon_WaterStone[];
-extern const u32 gItemIconPalette_WaterStone[];
-extern const u32 gItemIcon_LeafStone[];
-extern const u32 gItemIconPalette_LeafStone[];
-// Valuables
-extern const u32 gItemIcon_TinyMushroom[];
-extern const u32 gItemIconPalette_Mushroom[];
-extern const u32 gItemIcon_BigMushroom[];
-extern const u32 gItemIcon_Pearl[];
-extern const u32 gItemIconPalette_Pearl[];
-extern const u32 gItemIcon_BigPearl[];
-extern const u32 gItemIcon_Stardust[];
-extern const u32 gItemIconPalette_Star[];
-extern const u32 gItemIcon_StarPiece[];
-extern const u32 gItemIcon_Nugget[];
-extern const u32 gItemIconPalette_Nugget[];
-extern const u32 gItemIcon_HeartScale[];
-extern const u32 gItemIconPalette_HeartScale[];
-// Mail
-extern const u32 gItemIcon_OrangeMail[];
-extern const u32 gItemIconPalette_OrangeMail[];
-extern const u32 gItemIcon_HarborMail[];
-extern const u32 gItemIconPalette_HarborMail[];
-extern const u32 gItemIcon_GlitterMail[];
-extern const u32 gItemIconPalette_GlitterMail[];
-extern const u32 gItemIcon_MechMail[];
-extern const u32 gItemIconPalette_MechMail[];
-extern const u32 gItemIcon_WoodMail[];
-extern const u32 gItemIconPalette_WoodMail[];
-extern const u32 gItemIcon_WaveMail[];
-extern const u32 gItemIconPalette_WaveMail[];
-extern const u32 gItemIcon_BeadMail[];
-extern const u32 gItemIconPalette_BeadMail[];
-extern const u32 gItemIcon_ShadowMail[];
-extern const u32 gItemIconPalette_ShadowMail[];
-extern const u32 gItemIcon_TropicMail[];
-extern const u32 gItemIconPalette_TropicMail[];
-extern const u32 gItemIcon_DreamMail[];
-extern const u32 gItemIconPalette_DreamMail[];
-extern const u32 gItemIcon_FabMail[];
-extern const u32 gItemIconPalette_FabMail[];
-extern const u32 gItemIcon_RetroMail[];
-extern const u32 gItemIconPalette_RetroMail[];
-// Berries
-extern const u32 gItemIcon_CheriBerry[];
-extern const u32 gItemIconPalette_CheriBerry[];
-extern const u32 gItemIcon_ChestoBerry[];
-extern const u32 gItemIconPalette_ChestoBerry[];
-extern const u32 gItemIcon_PechaBerry[];
-extern const u32 gItemIconPalette_PechaBerry[];
-extern const u32 gItemIcon_RawstBerry[];
-extern const u32 gItemIconPalette_RawstBerry[];
-extern const u32 gItemIcon_AspearBerry[];
-extern const u32 gItemIconPalette_AspearBerry[];
-extern const u32 gItemIcon_LeppaBerry[];
-extern const u32 gItemIconPalette_LeppaBerry[];
-extern const u32 gItemIcon_OranBerry[];
-extern const u32 gItemIconPalette_OranBerry[];
-extern const u32 gItemIcon_PersimBerry[];
-extern const u32 gItemIconPalette_PersimBerry[];
-extern const u32 gItemIcon_LumBerry[];
-extern const u32 gItemIconPalette_LumBerry[];
-extern const u32 gItemIcon_SitrusBerry[];
-extern const u32 gItemIconPalette_SitrusBerry[];
-extern const u32 gItemIcon_FigyBerry[];
-extern const u32 gItemIconPalette_FigyBerry[];
-extern const u32 gItemIcon_WikiBerry[];
-extern const u32 gItemIconPalette_WikiBerry[];
-extern const u32 gItemIcon_MagoBerry[];
-extern const u32 gItemIconPalette_MagoBerry[];
-extern const u32 gItemIcon_AguavBerry[];
-extern const u32 gItemIconPalette_AguavBerry[];
-extern const u32 gItemIcon_IapapaBerry[];
-extern const u32 gItemIconPalette_IapapaBerry[];
-extern const u32 gItemIcon_RazzBerry[];
-extern const u32 gItemIconPalette_RazzBerry[];
-extern const u32 gItemIcon_BlukBerry[];
-extern const u32 gItemIconPalette_BlukBerry[];
-extern const u32 gItemIcon_NanabBerry[];
-extern const u32 gItemIconPalette_NanabBerry[];
-extern const u32 gItemIcon_WepearBerry[];
-extern const u32 gItemIconPalette_WepearBerry[];
-extern const u32 gItemIcon_PinapBerry[];
-extern const u32 gItemIconPalette_PinapBerry[];
-extern const u32 gItemIcon_PomegBerry[];
-extern const u32 gItemIconPalette_PomegBerry[];
-extern const u32 gItemIcon_KelpsyBerry[];
-extern const u32 gItemIconPalette_KelpsyBerry[];
-extern const u32 gItemIcon_QualotBerry[];
-extern const u32 gItemIconPalette_QualotBerry[];
-extern const u32 gItemIcon_HondewBerry[];
-extern const u32 gItemIconPalette_HondewBerry[];
-extern const u32 gItemIcon_GrepaBerry[];
-extern const u32 gItemIconPalette_GrepaBerry[];
-extern const u32 gItemIcon_TamatoBerry[];
-extern const u32 gItemIconPalette_TamatoBerry[];
-extern const u32 gItemIcon_CornnBerry[];
-extern const u32 gItemIconPalette_CornnBerry[];
-extern const u32 gItemIcon_MagostBerry[];
-extern const u32 gItemIconPalette_MagostBerry[];
-extern const u32 gItemIcon_RabutaBerry[];
-extern const u32 gItemIconPalette_RabutaBerry[];
-extern const u32 gItemIcon_NomelBerry[];
-extern const u32 gItemIconPalette_NomelBerry[];
-extern const u32 gItemIcon_SpelonBerry[];
-extern const u32 gItemIconPalette_SpelonBerry[];
-extern const u32 gItemIcon_PamtreBerry[];
-extern const u32 gItemIconPalette_PamtreBerry[];
-extern const u32 gItemIcon_WatmelBerry[];
-extern const u32 gItemIconPalette_WatmelBerry[];
-extern const u32 gItemIcon_DurinBerry[];
-extern const u32 gItemIconPalette_DurinBerry[];
-extern const u32 gItemIcon_BelueBerry[];
-extern const u32 gItemIconPalette_BelueBerry[];
-extern const u32 gItemIcon_LiechiBerry[];
-extern const u32 gItemIconPalette_LiechiBerry[];
-extern const u32 gItemIcon_GanlonBerry[];
-extern const u32 gItemIconPalette_GanlonBerry[];
-extern const u32 gItemIcon_SalacBerry[];
-extern const u32 gItemIconPalette_SalacBerry[];
-extern const u32 gItemIcon_PetayaBerry[];
-extern const u32 gItemIconPalette_PetayaBerry[];
-extern const u32 gItemIcon_ApicotBerry[];
-extern const u32 gItemIconPalette_ApicotBerry[];
-extern const u32 gItemIcon_LansatBerry[];
-extern const u32 gItemIconPalette_LansatBerry[];
-extern const u32 gItemIcon_StarfBerry[];
-extern const u32 gItemIconPalette_StarfBerry[];
-extern const u32 gItemIcon_EnigmaBerry[];
-extern const u32 gItemIconPalette_EnigmaBerry[];
-// Hold items
-extern const u32 gItemIcon_BrightPowder[];
-extern const u32 gItemIconPalette_BrightPowder[];
-extern const u32 gItemIcon_InBattleHerb[];
-extern const u32 gItemIconPalette_WhiteHerb[];
-extern const u32 gItemIcon_MachoBrace[];
-extern const u32 gItemIconPalette_MachoBrace[];
-extern const u32 gItemIcon_ExpShare[];
-extern const u32 gItemIconPalette_ExpShare[];
-extern const u32 gItemIcon_QuickClaw[];
-extern const u32 gItemIconPalette_QuickClaw[];
-extern const u32 gItemIcon_SootheBell[];
-extern const u32 gItemIconPalette_SootheBell[];
-extern const u32 gItemIcon_InBattleHerb[];
-extern const u32 gItemIconPalette_MentalHerb[];
-extern const u32 gItemIcon_ChoiceBand[];
-extern const u32 gItemIconPalette_ChoiceBand[];
-extern const u32 gItemIcon_KingsRock[];
-extern const u32 gItemIconPalette_KingsRock[];
-extern const u32 gItemIcon_SilverPowder[];
-extern const u32 gItemIconPalette_SilverPowder[];
-extern const u32 gItemIcon_AmuletCoin[];
-extern const u32 gItemIconPalette_AmuletCoin[];
-extern const u32 gItemIcon_CleanseTag[];
-extern const u32 gItemIconPalette_CleanseTag[];
-extern const u32 gItemIcon_SoulDew[];
-extern const u32 gItemIconPalette_SoulDew[];
-extern const u32 gItemIcon_DeepSeaTooth[];
-extern const u32 gItemIconPalette_DeepSeaTooth[];
-extern const u32 gItemIcon_DeepSeaScale[];
-extern const u32 gItemIconPalette_DeepSeaScale[];
-extern const u32 gItemIcon_SmokeBall[];
-extern const u32 gItemIconPalette_SmokeBall[];
-extern const u32 gItemIcon_Everstone[];
-extern const u32 gItemIconPalette_Everstone[];
-extern const u32 gItemIcon_FocusBand[];
-extern const u32 gItemIconPalette_FocusBand[];
-extern const u32 gItemIcon_LuckyEgg[];
-extern const u32 gItemIconPalette_LuckyEgg[];
-extern const u32 gItemIcon_ScopeLens[];
-extern const u32 gItemIconPalette_ScopeLens[];
-extern const u32 gItemIcon_MetalCoat[];
-extern const u32 gItemIconPalette_MetalCoat[];
-extern const u32 gItemIcon_Leftovers[];
-extern const u32 gItemIconPalette_Leftovers[];
-extern const u32 gItemIcon_DragonScale[];
-extern const u32 gItemIconPalette_DragonScale[];
-extern const u32 gItemIcon_LightBall[];
-extern const u32 gItemIconPalette_LightBall[];
-extern const u32 gItemIcon_SoftSand[];
-extern const u32 gItemIconPalette_SoftSand[];
-extern const u32 gItemIcon_HardStone[];
-extern const u32 gItemIconPalette_HardStone[];
-extern const u32 gItemIcon_MiracleSeed[];
-extern const u32 gItemIconPalette_MiracleSeed[];
-extern const u32 gItemIcon_BlackGlasses[];
-extern const u32 gItemIconPalette_BlackTypeEnhancingItem[];
-extern const u32 gItemIcon_BlackBelt[];
-extern const u32 gItemIconPalette_BlackTypeEnhancingItem[];
-extern const u32 gItemIcon_Magnet[];
-extern const u32 gItemIconPalette_Magnet[];
-extern const u32 gItemIcon_MysticWater[];
-extern const u32 gItemIconPalette_MysticWater[];
-extern const u32 gItemIcon_SharpBeak[];
-extern const u32 gItemIconPalette_SharpBeak[];
-extern const u32 gItemIcon_PoisonBarb[];
-extern const u32 gItemIconPalette_PoisonBarb[];
-extern const u32 gItemIcon_NeverMeltIce[];
-extern const u32 gItemIconPalette_NeverMeltIce[];
-extern const u32 gItemIcon_SpellTag[];
-extern const u32 gItemIconPalette_SpellTag[];
-extern const u32 gItemIcon_TwistedSpoon[];
-extern const u32 gItemIconPalette_TwistedSpoon[];
-extern const u32 gItemIcon_Charcoal[];
-extern const u32 gItemIconPalette_Charcoal[];
-extern const u32 gItemIcon_DragonFang[];
-extern const u32 gItemIconPalette_DragonFang[];
-extern const u32 gItemIcon_SilkScarf[];
-extern const u32 gItemIconPalette_SilkScarf[];
-extern const u32 gItemIcon_UpGrade[];
-extern const u32 gItemIconPalette_UpGrade[];
-extern const u32 gItemIcon_ShellBell[];
-extern const u32 gItemIconPalette_Shell[];
-extern const u32 gItemIcon_SeaIncense[];
-extern const u32 gItemIconPalette_SeaIncense[];
-extern const u32 gItemIcon_LaxIncense[];
-extern const u32 gItemIconPalette_LaxIncense[];
-extern const u32 gItemIcon_LuckyPunch[];
-extern const u32 gItemIconPalette_LuckyPunch[];
-extern const u32 gItemIcon_MetalPowder[];
-extern const u32 gItemIconPalette_MetalPowder[];
-extern const u32 gItemIcon_ThickClub[];
-extern const u32 gItemIconPalette_ThickClub[];
-extern const u32 gItemIcon_Stick[];
-extern const u32 gItemIconPalette_Stick[];
-// Contest hold items
-extern const u32 gItemIcon_Scarf[];
-extern const u32 gItemIconPalette_RedScarf[];
-extern const u32 gItemIconPalette_BlueScarf[];
-extern const u32 gItemIconPalette_PinkScarf[];
-extern const u32 gItemIconPalette_GreenScarf[];
-extern const u32 gItemIconPalette_YellowScarf[];
-// Key items
-extern const u32 gItemIcon_MachBike[];
-extern const u32 gItemIconPalette_MachBike[];
-extern const u32 gItemIcon_CoinCase[];
-extern const u32 gItemIconPalette_CoinCase[];
-extern const u32 gItemIcon_Itemfinder[];
-extern const u32 gItemIconPalette_Itemfinder[];
-extern const u32 gItemIcon_OldRod[];
-extern const u32 gItemIconPalette_OldRod[];
-extern const u32 gItemIcon_GoodRod[];
-extern const u32 gItemIconPalette_GoodRod[];
-extern const u32 gItemIcon_SuperRod[];
-extern const u32 gItemIconPalette_SuperRod[];
-extern const u32 gItemIcon_SSTicket[];
-extern const u32 gItemIconPalette_SSTicket[];
-extern const u32 gItemIcon_ContestPass[];
-extern const u32 gItemIconPalette_ContestPass[];
-extern const u32 gItemIcon_WailmerPail[];
-extern const u32 gItemIconPalette_WailmerPail[];
-extern const u32 gItemIcon_DevonGoods[];
-extern const u32 gItemIconPalette_DevonGoods[];
-extern const u32 gItemIcon_SootSack[];
-extern const u32 gItemIconPalette_SootSack[];
-extern const u32 gItemIcon_BasementKey[];
-extern const u32 gItemIconPalette_OldKey[];
-extern const u32 gItemIcon_AcroBike[];
-extern const u32 gItemIconPalette_AcroBike[];
-extern const u32 gItemIcon_PokeblockCase[];
-extern const u32 gItemIconPalette_PokeblockCase[];
-extern const u32 gItemIcon_Letter[];
-extern const u32 gItemIcon_EonTicket[];
-extern const u32 gItemIconPalette_EonTicket[];
-extern const u32 gItemIcon_Orb[];
-extern const u32 gItemIconPalette_RedOrb[];
-extern const u32 gItemIconPalette_BlueOrb[];
-extern const u32 gItemIcon_Scanner[];
-extern const u32 gItemIconPalette_Scanner[];
-extern const u32 gItemIcon_GoGoggles[];
-extern const u32 gItemIconPalette_GoGoggles[];
-extern const u32 gItemIcon_Meteorite[];
-extern const u32 gItemIconPalette_Meteorite[];
-extern const u32 gItemIcon_Room1Key[];
-extern const u32 gItemIconPalette_Key[];
-extern const u32 gItemIcon_Room2Key[];
-extern const u32 gItemIcon_Room4Key[];
-extern const u32 gItemIcon_Room6Key[];
-extern const u32 gItemIcon_StorageKey[];
-extern const u32 gItemIcon_RootFossil[];
-extern const u32 gItemIconPalette_HoennFossil[];
-extern const u32 gItemIcon_ClawFossil[];
-extern const u32 gItemIcon_DevonScope[];
-extern const u32 gItemIconPalette_DevonScope[];
-// TMs/HMs
-extern const u32 gItemIcon_TM[];
-extern const u32 gItemIconPalette_FightingTMHM[];
-extern const u32 gItemIconPalette_DragonTMHM[];
-extern const u32 gItemIconPalette_WaterTMHM[];
-extern const u32 gItemIconPalette_PsychicTMHM[];
-extern const u32 gItemIconPalette_NormalTMHM[];
-extern const u32 gItemIconPalette_PoisonTMHM[];
-extern const u32 gItemIconPalette_IceTMHM[];
-extern const u32 gItemIconPalette_GrassTMHM[];
-extern const u32 gItemIconPalette_FireTMHM[];
-extern const u32 gItemIconPalette_DarkTMHM[];
-extern const u32 gItemIconPalette_SteelTMHM[];
-extern const u32 gItemIconPalette_ElectricTMHM[];
-extern const u32 gItemIconPalette_GroundTMHM[];
-extern const u32 gItemIconPalette_GhostTMHM[];
-extern const u32 gItemIconPalette_RockTMHM[];
-extern const u32 gItemIconPalette_FlyingTMHM[];
-extern const u32 gItemIcon_HM[];
-// FireRed/LeafGreen key items
-extern const u32 gItemIcon_OaksParcel[];
-extern const u32 gItemIconPalette_OaksParcel[];
-extern const u32 gItemIcon_PokeFlute[];
-extern const u32 gItemIconPalette_PokeFlute[];
-extern const u32 gItemIcon_SecretKey[];
-extern const u32 gItemIconPalette_SecretKey[];
-extern const u32 gItemIcon_BikeVoucher[];
-extern const u32 gItemIconPalette_BikeVoucher[];
-extern const u32 gItemIcon_GoldTeeth[];
-extern const u32 gItemIconPalette_GoldTeeth[];
-extern const u32 gItemIcon_OldAmber[];
-extern const u32 gItemIconPalette_OldAmber[];
-extern const u32 gItemIcon_CardKey[];
-extern const u32 gItemIconPalette_CardKey[];
-extern const u32 gItemIcon_LiftKey[];
-extern const u32 gItemIconPalette_Key[];
-extern const u32 gItemIcon_HelixFossil[];
-extern const u32 gItemIconPalette_KantoFossil[];
-extern const u32 gItemIcon_DomeFossil[];
-extern const u32 gItemIcon_SilphScope[];
-extern const u32 gItemIconPalette_SilphScope[];
-extern const u32 gItemIcon_Bicycle[];
-extern const u32 gItemIconPalette_Bicycle[];
-extern const u32 gItemIcon_TownMap[];
-extern const u32 gItemIconPalette_TownMap[];
-extern const u32 gItemIcon_VSSeeker[];
-extern const u32 gItemIconPalette_VSSeeker[];
-extern const u32 gItemIcon_FameChecker[];
-extern const u32 gItemIconPalette_FameChecker[];
-extern const u32 gItemIcon_TMCase[];
-extern const u32 gItemIconPalette_TMCase[];
-extern const u32 gItemIcon_BerryPouch[];
-extern const u32 gItemIconPalette_BerryPouch[];
-extern const u32 gItemIcon_TeachyTV[];
-extern const u32 gItemIconPalette_TeachyTV[];
-extern const u32 gItemIcon_TriPass[];
-extern const u32 gItemIconPalette_TriPass[];
-extern const u32 gItemIcon_RainbowPass[];
-extern const u32 gItemIconPalette_RainbowPass[];
-extern const u32 gItemIcon_Tea[];
-extern const u32 gItemIconPalette_Tea[];
-extern const u32 gItemIcon_MysticTicket[];
-extern const u32 gItemIconPalette_MysticTicket[];
-extern const u32 gItemIcon_AuroraTicket[];
-extern const u32 gItemIconPalette_AuroraTicket[];
-extern const u32 gItemIcon_PowderJar[];
-extern const u32 gItemIconPalette_PowderJar[];
-extern const u32 gItemIcon_Gem[];
-extern const u32 gItemIconPalette_Ruby[];
-extern const u32 gItemIconPalette_Sapphire[];
-// Emerald-only key items
-extern const u32 gItemIcon_MagmaEmblem[];
-extern const u32 gItemIconPalette_MagmaEmblem[];
-extern const u32 gItemIcon_OldSeaMap[];
-extern const u32 gItemIconPalette_OldSeaMap[];
+extern const u32 gItemIcon_QuestionMark[];
+extern const u32 gItemIconPalette_QuestionMark[];
 
 extern const u32 gItemIcon_ReturnToFieldArrow[];
 extern const u32 gItemIconPalette_ReturnToFieldArrow[];
 
-//menu graphics
+// Multi use item icons (alphabetical order)
+extern const u32 gItemIcon_BattleItem[]; //x items
+extern const u32 gItemIconPalette_XAccuracy[];
+extern const u32 gItemIconPalette_XAttack[];
+extern const u32 gItemIconPalette_XDefend[];
+extern const u32 gItemIconPalette_XSpAtk[];
+extern const u32 gItemIconPalette_XSpDef[];
+extern const u32 gItemIconPalette_XSpeed[];
+
+extern const u32 gItemIcon_Belt[]; //black belt/focus sash
+extern const u32 gItemIconPalette_BlackBelt[];
+extern const u32 gItemIconPalette_FocusSash[];
+
+extern const u32 gItemIcon_BigPotion[]; //max potion/full restore
+extern const u32 gItemIconPalette_FullRestore[];
+extern const u32 gItemIconPalette_MaxPotion[];
+
+extern const u32 gItemIcon_BottleCap[]; //bottle caps
+extern const u32 gItemIconPalette_BottleCap[];
+extern const u32 gItemIconPalette_GoldBottleCap[];
+
+extern const u32 gItemIcon_Coin[]; //relic coins
+extern const u32 gItemIconPalette_RelicCopper[];
+extern const u32 gItemIconPalette_RelicGold[];
+extern const u32 gItemIconPalette_RelicSilver[];
+
+extern const u32 gItemIcon_Flute[]; //black/white flute
+extern const u32 gItemIconPalette_BlackFlute[];
+extern const u32 gItemIconPalette_WhiteFlute[];
+
+extern const u32 gItemIcon_MaxBattleItem[]; //max items
+extern const u32 gItemIconPalette_MaxAccuracy[];
+extern const u32 gItemIconPalette_MaxAttack[];
+extern const u32 gItemIconPalette_MaxDefend[];
+extern const u32 gItemIconPalette_MaxSpAtk[];
+extern const u32 gItemIconPalette_MaxSpDef[];
+extern const u32 gItemIconPalette_MaxSpeed[];
+
+extern const u32 gItemIcon_Medicine[]; //status restore
+extern const u32 gItemIconPalette_Antidote[];
+extern const u32 gItemIconPalette_Awakening[];
+extern const u32 gItemIconPalette_BurnHeal[];
+extern const u32 gItemIconPalette_IceHeal[];
+extern const u32 gItemIconPalette_ParalyzeHeal[];
+
+extern const u32 gItemIcon_Moss[]; //luminous moss/potpourri
+extern const u32 gItemIconPalette_LuminousMoss[];
+extern const u32 gItemIconPalette_Potpourri[];
+
+extern const u32 gItemIcon_NuzlockeBuff[]; //nuzlocke buff + broken icon palette
+extern const u32 gItemIconPalette_NuzlockeBuff[];
+extern const u32 gItemIconPalette_NuzlockeBuffBroken[];
+
+extern const u32 gItemIcon_Potion[]; //potions (except max)
+extern const u32 gItemIconPalette_HyperPotion[];
+extern const u32 gItemIconPalette_Potion[];
+extern const u32 gItemIconPalette_SuperPotion[];
+extern const u32 gItemIconPalette_UltraPotion[];
+
+extern const u32 gItemIcon_Powder[]; //soft sand/bright powder/stardust/healing dust
+extern const u32 gItemIconPalette_BrightPowder[];
+extern const u32 gItemIconPalette_HealingDust[];
+extern const u32 gItemIconPalette_SoftSand[];
+extern const u32 gItemIconPalette_Stardust[];
+
+extern const u32 gItemIcon_PPRestore[]; //ether/elixir & max variants
+extern const u32 gItemIconPalette_Elixir[];
+extern const u32 gItemIconPalette_Ether[];
+extern const u32 gItemIconPalette_MaxElixir[];
+extern const u32 gItemIconPalette_MaxEther[];
+
+extern const u32 gItemIcon_Randomizer[]; //roll items
+extern const u32 gItemIconPalette_RollAbility[];
+extern const u32 gItemIconPalette_RollNature[];
+extern const u32 gItemIconPalette_RollTypes[];
+
+extern const u32 gItemIcon_Repel[]; //repels
+extern const u32 gItemIconPalette_MaxRepel[];
+extern const u32 gItemIconPalette_Repel[];
+extern const u32 gItemIconPalette_SuperRepel[];
+
+extern const u32 gItemIcon_Scarf[]; //base stat scarves
+extern const u32 gItemIconPalette_BlueScarf[];
+extern const u32 gItemIconPalette_GreenScarf[];
+extern const u32 gItemIconPalette_PinkScarf[];
+extern const u32 gItemIconPalette_PurpleScarf[];
+extern const u32 gItemIconPalette_RedScarf[];
+extern const u32 gItemIconPalette_YellowScarf[];
+
+extern const u32 gItemIcon_Seed[]; //terrain seeds
+extern const u32 gItemIconPalette_ElectricSeed[];
+extern const u32 gItemIconPalette_GrassySeed[];
+extern const u32 gItemIconPalette_MistySeed[];
+extern const u32 gItemIconPalette_PsychicSeed[];
+
+extern const u32 gItemIcon_Shard[]; //shards
+extern const u32 gItemIconPalette_BlueShard[];
+extern const u32 gItemIconPalette_CrystalShard[];
+extern const u32 gItemIconPalette_GoldShard[];
+extern const u32 gItemIconPalette_GreenShard[];
+extern const u32 gItemIconPalette_RedShard[];
+extern const u32 gItemIconPalette_SilverShard[];
+extern const u32 gItemIconPalette_YellowShard[];
+
+extern const u32 gItemIcon_SpecialBattleItem[]; //dire hit/guard spec
+extern const u32 gItemIconPalette_DireHit[];
+extern const u32 gItemIconPalette_GuardSpec[];
+
+extern const u32 gItemIcon_SpecialMedicine[]; //full heal/minor heal
+extern const u32 gItemIconPalette_FullHeal[];
+extern const u32 gItemIconPalette_MinorHeal[];
+
+extern const u32 gItemIcon_Star[]; //star piece/max revive
+
+extern const u32 gItemIcon_TM[]; //TMs
+extern const u32 gItemIconPalette_AudioTM[];
+extern const u32 gItemIconPalette_BugTM[];
+extern const u32 gItemIconPalette_CosmicTM[];
+extern const u32 gItemIconPalette_DarkTM[];
+extern const u32 gItemIconPalette_DragonTM[];
+extern const u32 gItemIconPalette_ElectricTM[];
+extern const u32 gItemIconPalette_FairyTM[];
+extern const u32 gItemIconPalette_FightingTM[];
+extern const u32 gItemIconPalette_FireTM[];
+extern const u32 gItemIconPalette_FlyingTM[];
+extern const u32 gItemIconPalette_GhostTM[];
+extern const u32 gItemIconPalette_GrassTM[];
+extern const u32 gItemIconPalette_GroundTM[];
+extern const u32 gItemIconPalette_IceTM[];
+extern const u32 gItemIconPalette_NormalTM[];
+extern const u32 gItemIconPalette_NullTM[];
+extern const u32 gItemIconPalette_PoisonTM[];
+extern const u32 gItemIconPalette_PsychicTM[];
+extern const u32 gItemIconPalette_RockTM[];
+extern const u32 gItemIconPalette_SteelTM[];
+extern const u32 gItemIconPalette_WaterTM[];
+
+extern const u32 gItemIcon_Tonic[]; //tonics (except vital)
+extern const u32 gItemIconPalette_GuardTonic[];
+extern const u32 gItemIconPalette_MentalTonic[];
+extern const u32 gItemIconPalette_RapidTonic[];
+extern const u32 gItemIconPalette_ShieldTonic[];
+extern const u32 gItemIconPalette_StrongTonic[];
+
+extern const u32 gItemIcon_Totem[]; //totems & wards (except grand)
+extern const u32 gItemIcon_Ward[];
+extern const u32 gItemIconPalette_AcuteWardTotem[];
+extern const u32 gItemIconPalette_EnduringWardTotem[];
+extern const u32 gItemIconPalette_GrandWardTotem[];
+extern const u32 gItemIconPalette_ReflexWardTotem[];
+extern const u32 gItemIconPalette_RoaringWardTotem[];
+extern const u32 gItemIconPalette_SpiritWardTotem[];
+extern const u32 gItemIconPalette_StoicWardTotem[];
+extern const u32 gItemIconPalette_VolatileWardTotem[];
+
+extern const u32 gItemIcon_TradingCard[]; //trading cards
+extern const u32 gItemIconPalette_HoloTradingCard[];
+extern const u32 gItemIconPalette_TradingCard[];
+
+extern const u32 gItemIcon_Vitamin[]; //vitamins (except HP/PP ups)
+extern const u32 gItemIconPalette_Calcium[];
+extern const u32 gItemIconPalette_Carbos[];
+extern const u32 gItemIconPalette_Iron[];
+extern const u32 gItemIconPalette_Protein[];
+extern const u32 gItemIconPalette_Zinc[];
+
+// Multi use palettes
+extern const u32 gItemIconPalette_Mushroom[]; //tiny mushroom/big mushroom
+extern const u32 gItemIconPalette_Nugget[]; //gold nugget/huge nugget
+extern const u32 gItemIconPalette_Pearl[]; //pearl/big pearl/pearl string
+extern const u32 gItemIconPalette_Relic[]; //relic items
+extern const u32 gItemIconPalette_Revive[]; //revive/max revive/full revive
+extern const u32 gItemIconPalette_StarItem[]; //star piece/star chunk
+
+// Unique item icons (alphabetical order)
+extern const u32 gItemIcon_AbilityCapsule[];
+extern const u32 gItemIconPalette_AbilityCapsule[];
+
+extern const u32 gItemIcon_AbraTicket[];
+extern const u32 gItemIconPalette_AbraTicket[];
+
+extern const u32 gItemIcon_AbsorbRoot[];
+extern const u32 gItemIconPalette_AbsorbRoot[];
+
+extern const u32 gItemIcon_AguavBerry[];
+extern const u32 gItemIconPalette_AguavBerry[];
+
+extern const u32 gItemIcon_AirBalloon[];
+extern const u32 gItemIconPalette_AirBalloon[];
+
+extern const u32 gItemIcon_AmuletCoin[];
+extern const u32 gItemIconPalette_AmuletCoin[];
+
+extern const u32 gItemIcon_ApicotBerry[];
+extern const u32 gItemIconPalette_ApicotBerry[];
+
+extern const u32 gItemIcon_AspearBerry[];
+extern const u32 gItemIconPalette_AspearBerry[];
+
+extern const u32 gItemIcon_AssaultVest[];
+extern const u32 gItemIconPalette_AssaultVest[];
+
+extern const u32 gItemIcon_BabiriBerry[];
+extern const u32 gItemIconPalette_BabiriBerry[];
+
+extern const u32 gItemIcon_BalanceBall[];
+extern const u32 gItemIconPalette_BalanceBall[];
+
+extern const u32 gItemIcon_BalmMushroom[];
+extern const u32 gItemIconPalette_BalmMushroom[];
+
+extern const u32 gItemIcon_BeastBall[];
+extern const u32 gItemIconPalette_BeastBall[];
+
+extern const u32 gItemIcon_BelueBerry[];
+extern const u32 gItemIconPalette_BelueBerry[];
+
+extern const u32 gItemIcon_BerryPulp[];
+extern const u32 gItemIconPalette_BerryPulp[];
+
+extern const u32 gItemIcon_BigMalasada[];
+extern const u32 gItemIconPalette_BigMalasada[];
+
+extern const u32 gItemIcon_BigMushroom[];
+
+extern const u32 gItemIcon_BigPearl[];
+
+extern const u32 gItemIcon_BindingBand[];
+extern const u32 gItemIconPalette_BindingBand[];
+
+extern const u32 gItemIcon_BitterHerb[];
+extern const u32 gItemIconPalette_BitterHerb[];
+
+extern const u32 gItemIcon_BlukBerry[];
+extern const u32 gItemIconPalette_BlukBerry[];
+
+extern const u32 gItemIcon_Candy[];
+extern const u32 gItemIconPalette_Candy[];
+
+extern const u32 gItemIcon_CasteliaCone[];
+extern const u32 gItemIconPalette_CasteliaCone[];
+
+extern const u32 gItemIcon_CellBattery[];
+extern const u32 gItemIconPalette_CellBattery[];
+
+extern const u32 gItemIcon_Charcoal[];
+extern const u32 gItemIconPalette_Charcoal[];
+
+extern const u32 gItemIcon_ChartiBerry[];
+extern const u32 gItemIconPalette_ChartiBerry[];
+
+extern const u32 gItemIcon_CheriBerry[];
+extern const u32 gItemIconPalette_CheriBerry[];
+
+extern const u32 gItemIcon_CherishBall[];
+extern const u32 gItemIconPalette_CherishBall[];
+
+extern const u32 gItemIcon_ChestoBerry[];
+extern const u32 gItemIconPalette_ChestoBerry[];
+
+extern const u32 gItemIcon_ChilanBerry[];
+extern const u32 gItemIconPalette_ChilanBerry[];
+
+extern const u32 gItemIcon_ChoiceBand[];
+extern const u32 gItemIconPalette_ChoiceBand[];
+
+extern const u32 gItemIcon_ChoiceScarf[];
+extern const u32 gItemIconPalette_ChoiceScarf[];
+
+extern const u32 gItemIcon_ChoiceSpecs[];
+extern const u32 gItemIconPalette_ChoiceSpecs[];
+
+extern const u32 gItemIcon_ChopleBerry[];
+extern const u32 gItemIconPalette_ChopleBerry[];
+
+extern const u32 gItemIcon_CleanseTag[];
+extern const u32 gItemIconPalette_CleanseTag[];
+
+extern const u32 gItemIcon_CobaBerry[];
+extern const u32 gItemIconPalette_CobaBerry[];
+
+extern const u32 gItemIcon_ColburBerry[];
+extern const u32 gItemIconPalette_ColburBerry[];
+
+extern const u32 gItemIcon_CornnBerry[];
+extern const u32 gItemIconPalette_CornnBerry[];
+
+extern const u32 gItemIcon_CreamPoffin[];
+extern const u32 gItemIconPalette_CreamPoffin[];
+
+extern const u32 gItemIcon_CustapBerry[];
+extern const u32 gItemIconPalette_CustapBerry[];
+
+extern const u32 gItemIcon_DampRock[];
+extern const u32 gItemIconPalette_DampRock[];
+
+extern const u32 gItemIcon_DawnBall[];
+extern const u32 gItemIconPalette_DawnBall[];
+
+extern const u32 gItemIcon_DawnStone[];
+extern const u32 gItemIconPalette_DawnStone[];
+
+extern const u32 gItemIcon_DeepSeaScale[];
+extern const u32 gItemIconPalette_DeepSeaScale[];
+
+extern const u32 gItemIcon_DeepSeaTooth[];
+extern const u32 gItemIconPalette_DeepSeaTooth[];
+
+extern const u32 gItemIcon_DragonFang[];
+extern const u32 gItemIconPalette_DragonFang[];
+
+extern const u32 gItemIcon_DragonScale[];
+extern const u32 gItemIconPalette_DragonScale[];
+
+extern const u32 gItemIcon_DurinBerry[];
+extern const u32 gItemIconPalette_DurinBerry[];
+
+extern const u32 gItemIcon_DuskBall[];
+extern const u32 gItemIconPalette_DuskBall[];
+
+extern const u32 gItemIcon_DuskStone[];
+extern const u32 gItemIconPalette_DuskStone[];
+
+extern const u32 gItemIcon_EjectButton[];
+extern const u32 gItemIconPalette_EjectButton[];
+
+extern const u32 gItemIcon_Electirizer[];
+extern const u32 gItemIconPalette_Electirizer[];
+
+extern const u32 gItemIcon_EnergyRoot[];
+extern const u32 gItemIconPalette_EnergyRoot[];
+
+extern const u32 gItemIcon_EnigmaBerry[];
+extern const u32 gItemIconPalette_EnigmaBerry[];
+
+extern const u32 gItemIcon_EscapeRope[];
+extern const u32 gItemIconPalette_EscapeRope[];
+
+extern const u32 gItemIcon_Everstone[];
+extern const u32 gItemIconPalette_Everstone[];
+
+extern const u32 gItemIcon_Eviolite[];
+extern const u32 gItemIconPalette_Eviolite[];
+
+extern const u32 gItemIcon_ExpShare[];
+extern const u32 gItemIconPalette_ExpShare[];
+
+extern const u32 gItemIcon_ExpertBelt[];
+extern const u32 gItemIconPalette_ExpertBelt[];
+
+extern const u32 gItemIcon_FableBall[];
+extern const u32 gItemIconPalette_FableBall[];
+
+extern const u32 gItemIcon_FigyBerry[];
+extern const u32 gItemIconPalette_FigyBerry[];
+
+extern const u32 gItemIcon_FireStone[];
+extern const u32 gItemIconPalette_FireStone[];
+
+extern const u32 gItemIcon_FlameOrb[];
+extern const u32 gItemIconPalette_FlameOrb[];
+
+extern const u32 gItemIcon_FloatRock[];
+extern const u32 gItemIconPalette_FloatRock[];
+
+extern const u32 gItemIcon_FocusBand[];
+extern const u32 gItemIconPalette_FocusBand[];
+
+extern const u32 gItemIcon_FreshWater[];
+extern const u32 gItemIconPalette_FreshWater[];
+
+extern const u32 gItemIcon_FrigidOrb[];
+extern const u32 gItemIconPalette_FrigidOrb[];
+
+extern const u32 gItemIcon_FrostStone[];
+extern const u32 gItemIconPalette_FrostStone[];
+
+extern const u32 gItemIcon_FullRevive[];
+
+extern const u32 gItemIcon_GanlonBerry[];
+extern const u32 gItemIconPalette_GanlonBerry[];
+
+extern const u32 gItemIcon_GoldNugget[];
+
+extern const u32 gItemIcon_GrandTotem[];
+
+extern const u32 gItemIcon_GreatBall[];
+extern const u32 gItemIconPalette_GreatBall[];
+
+extern const u32 gItemIcon_GrepaBerry[];
+extern const u32 gItemIconPalette_GrepaBerry[];
+
+extern const u32 gItemIcon_GripClaw[];
+extern const u32 gItemIconPalette_GripClaw[];
+
+extern const u32 gItemIcon_HabanBerry[];
+extern const u32 gItemIconPalette_HabanBerry[];
+
+extern const u32 gItemIcon_HardRock[];
+extern const u32 gItemIconPalette_HardRock[];
+
+extern const u32 gItemIcon_HealingBulb[];
+extern const u32 gItemIconPalette_HealingBulb[];
+
+extern const u32 gItemIcon_HeartScale[];
+extern const u32 gItemIconPalette_HeartScale[];
+
+extern const u32 gItemIcon_HeatRock[];
+extern const u32 gItemIconPalette_HeatRock[];
+
+extern const u32 gItemIcon_HeavyBall[];
+extern const u32 gItemIconPalette_HeavyBall[];
+
+extern const u32 gItemIcon_HeavyWeight[];
+extern const u32 gItemIconPalette_HeavyWeight[];
+
+extern const u32 gItemIcon_HondewBerry[];
+extern const u32 gItemIconPalette_HondewBerry[];
+
+extern const u32 gItemIcon_Honey[];
+extern const u32 gItemIconPalette_Honey[];
+
+extern const u32 gItemIcon_HPUp[];
+extern const u32 gItemIconPalette_HPUp[];
+
+extern const u32 gItemIcon_HugeNugget[];
+
+extern const u32 gItemIcon_HyperBall[];
+extern const u32 gItemIconPalette_HyperBall[];
+
+extern const u32 gItemIcon_IcyRock[];
+extern const u32 gItemIconPalette_IcyRock[];
+
+extern const u32 gItemIcon_IronNugget[];
+extern const u32 gItemIconPalette_IronNugget[];
+
+extern const u32 gItemIcon_JabocaBerry[];
+extern const u32 gItemIconPalette_JabocaBerry[];
+
+extern const u32 gItemIcon_KasibBerry[];
+extern const u32 gItemIconPalette_KasibBerry[];
+
+extern const u32 gItemIcon_KebiaBerry[];
+extern const u32 gItemIconPalette_KebiaBerry[];
+
+extern const u32 gItemIcon_KeeBerry[];
+extern const u32 gItemIconPalette_KeeBerry[];
+
+extern const u32 gItemIcon_KelpsyBerry[];
+extern const u32 gItemIconPalette_KelpsyBerry[];
+
+extern const u32 gItemIcon_KingsRock[];
+extern const u32 gItemIconPalette_KingsRock[];
+
+extern const u32 gItemIcon_LaggingTail[];
+extern const u32 gItemIconPalette_LaggingTail[];
+
+extern const u32 gItemIcon_LairBall[];
+extern const u32 gItemIconPalette_LairBall[];
+
+extern const u32 gItemIcon_LandFossil[];
+extern const u32 gItemIconPalette_LandFossil[];
+
+extern const u32 gItemIcon_LavaCookie[];
+extern const u32 gItemIconPalette_LavaCookie[];
+
+extern const u32 gItemIcon_LeafStone[];
+extern const u32 gItemIconPalette_LeafStone[];
+
+extern const u32 gItemIcon_Leftovers[];
+extern const u32 gItemIconPalette_Leftovers[];
+
+extern const u32 gItemIcon_Lemonade[];
+extern const u32 gItemIconPalette_Lemonade[];
+
+extern const u32 gItemIcon_LeppaBerry[];
+extern const u32 gItemIconPalette_LeppaBerry[];
+
+extern const u32 gItemIcon_LevelBall[];
+extern const u32 gItemIconPalette_LevelBall[];
+
+extern const u32 gItemIcon_LiechiBerry[];
+extern const u32 gItemIconPalette_LiechiBerry[];
+
+extern const u32 gItemIcon_LifeOrb[];
+extern const u32 gItemIconPalette_LifeOrb[];
+
+extern const u32 gItemIcon_LightClay[];
+extern const u32 gItemIconPalette_LightClay[];
+
+extern const u32 gItemIcon_LuckyEgg[];
+extern const u32 gItemIconPalette_LuckyEgg[];
+
+extern const u32 gItemIcon_LumBerry[];
+extern const u32 gItemIconPalette_LumBerry[];
+
+extern const u32 gItemIcon_LureBall[];
+extern const u32 gItemIconPalette_LureBall[];
+
+extern const u32 gItemIcon_LuxuryBall[];
+extern const u32 gItemIconPalette_LuxuryBall[];
+
+extern const u32 gItemIcon_MachoBrace[];
+extern const u32 gItemIconPalette_MachoBrace[];
+
+extern const u32 gItemIcon_Magmarizer[];
+extern const u32 gItemIconPalette_Magmarizer[];
+
+extern const u32 gItemIcon_Magnet[];
+extern const u32 gItemIconPalette_Magnet[];
+
+extern const u32 gItemIcon_MagostBerry[];
+extern const u32 gItemIconPalette_MagostBerry[];
+
+extern const u32 gItemIcon_MarangaBerry[];
+extern const u32 gItemIconPalette_MarangaBerry[];
+
+extern const u32 gItemIcon_MasterBall[];
+extern const u32 gItemIconPalette_MasterBall[];
+
+extern const u32 gItemIcon_MateBall[];
+extern const u32 gItemIconPalette_MateBall[];
+
+extern const u32 gItemIcon_MetalCoat[];
+extern const u32 gItemIconPalette_MetalCoat[];
+
+extern const u32 gItemIcon_Metronome[];
+extern const u32 gItemIconPalette_Metronome[];
+
+extern const u32 gItemIcon_MicleBerry[];
+extern const u32 gItemIconPalette_MicleBerry[];
+
+extern const u32 gItemIcon_MindControl[];
+extern const u32 gItemIconPalette_MindControl[];
+
+extern const u32 gItemIcon_MiracleSeed[];
+extern const u32 gItemIconPalette_MiracleSeed[];
+
+extern const u32 gItemIcon_MoneyBag[];
+extern const u32 gItemIconPalette_MoneyBag[];
+
+extern const u32 gItemIcon_MoomooMilk[];
+extern const u32 gItemIconPalette_MoomooMilk[];
+
+extern const u32 gItemIcon_MoonStone[];
+extern const u32 gItemIconPalette_MoonStone[];
+
+extern const u32 gItemIcon_MorphGem[];
+extern const u32 gItemIconPalette_MorphGem[];
+
+extern const u32 gItemIcon_MuscleBand[];
+extern const u32 gItemIconPalette_MuscleBand[];
+
+extern const u32 gItemIcon_MysticWater[];
+extern const u32 gItemIconPalette_MysticWater[];
+
+extern const u32 gItemIcon_NanabBerry[];
+extern const u32 gItemIconPalette_NanabBerry[];
+
+extern const u32 gItemIcon_NestBall[];
+extern const u32 gItemIconPalette_NestBall[];
+
+extern const u32 gItemIcon_NeutronBall[];
+extern const u32 gItemIconPalette_NeutronBall[];
+
+extern const u32 gItemIcon_NeverMeltIce[];
+extern const u32 gItemIconPalette_NeverMeltIce[];
+
+extern const u32 gItemIcon_NomelBerry[];
+extern const u32 gItemIconPalette_NomelBerry[];
+
+extern const u32 gItemIcon_OccaBerry[];
+extern const u32 gItemIconPalette_OccaBerry[];
+
+extern const u32 gItemIcon_OmniStone[];
+extern const u32 gItemIconPalette_OmniStone[];
+
+extern const u32 gItemIcon_OranBerry[];
+extern const u32 gItemIconPalette_OranBerry[];
+
+extern const u32 gItemIcon_OranTea[];
+extern const u32 gItemIconPalette_OranTea[];
+
+extern const u32 gItemIcon_OvalPebble[];
+extern const u32 gItemIconPalette_OvalPebble[];
+
+extern const u32 gItemIcon_PamtreBerry[];
+extern const u32 gItemIconPalette_PamtreBerry[];
+
+extern const u32 gItemIcon_PasshoBerry[];
+extern const u32 gItemIconPalette_PasshoBerry[];
+
+extern const u32 gItemIcon_PayapaBerry[];
+extern const u32 gItemIconPalette_PayapaBerry[];
+
+extern const u32 gItemIcon_Pearl[];
+
+extern const u32 gItemIcon_PearlString[];
+
+extern const u32 gItemIcon_PechaBerry[];
+extern const u32 gItemIconPalette_PechaBerry[];
+
+extern const u32 gItemIcon_PersimBerry[];
+extern const u32 gItemIconPalette_PersimBerry[];
+
+extern const u32 gItemIcon_PetayaBerry[];
+extern const u32 gItemIconPalette_PetayaBerry[];
+
+extern const u32 gItemIcon_PicnicBasket[];
+extern const u32 gItemIconPalette_PicnicBasket[];
+
+extern const u32 gItemIcon_PinapBerry[];
+extern const u32 gItemIconPalette_PinapBerry[];
+
+extern const u32 gItemIcon_PoisonBarb[];
+extern const u32 gItemIconPalette_PoisonBarb[];
+
+extern const u32 gItemIcon_PokeBall[];
+extern const u32 gItemIconPalette_PokeBall[];
+
+extern const u32 gItemIcon_PokeDoll[];
+extern const u32 gItemIconPalette_PokeDoll[];
+
+extern const u32 gItemIcon_PomegBerry[];
+extern const u32 gItemIconPalette_PomegBerry[];
+
+extern const u32 gItemIcon_PPMax[];
+extern const u32 gItemIconPalette_PPMax[];
+
+extern const u32 gItemIcon_PPUp[];
+extern const u32 gItemIconPalette_PPUp[];
+
+extern const u32 gItemIcon_PremierBall[];
+extern const u32 gItemIconPalette_PremierBall[];
+
+extern const u32 gItemIcon_PrismScale[];
+extern const u32 gItemIconPalette_PrismScale[];
+
+extern const u32 gItemIcon_ProtectivePads[];
+extern const u32 gItemIconPalette_ProtectivePads[];
+
+extern const u32 gItemIcon_Protector[];
+extern const u32 gItemIconPalette_Protector[];
+
+extern const u32 gItemIcon_QualotBerry[];
+extern const u32 gItemIconPalette_QualotBerry[];
+
+extern const u32 gItemIcon_QuickClaw[];
+extern const u32 gItemIconPalette_QuickClaw[];
+
+extern const u32 gItemIcon_RabutaBerry[];
+extern const u32 gItemIconPalette_RabutaBerry[];
+
+extern const u32 gItemIcon_RageCandyBar[];
+extern const u32 gItemIconPalette_RageCandyBar[];
+
+extern const u32 gItemIcon_RareCandy[];
+extern const u32 gItemIconPalette_RareCandy[];
+
+extern const u32 gItemIcon_RareFossil[];
+extern const u32 gItemIconPalette_RareFossil[];
+
+extern const u32 gItemIcon_RawstBerry[];
+extern const u32 gItemIconPalette_RawstBerry[];
+
+extern const u32 gItemIcon_RazorClaw[];
+extern const u32 gItemIconPalette_RazorClaw[];
+
+extern const u32 gItemIcon_RazzBerry[];
+extern const u32 gItemIconPalette_RazzBerry[];
+
+extern const u32 gItemIcon_ReaperCloth[];
+extern const u32 gItemIconPalette_ReaperCloth[];
+
+extern const u32 gItemIcon_RedCard[];
+extern const u32 gItemIconPalette_RedCard[];
+
+extern const u32 gItemIcon_RelicBand[];
+
+extern const u32 gItemIcon_RelicCrown[];
+
+extern const u32 gItemIcon_RelicStatue[];
+
+extern const u32 gItemIcon_RelicVase[];
+
+extern const u32 gItemIcon_RepeatBall[];
+extern const u32 gItemIconPalette_RepeatBall[];
+
+extern const u32 gItemIcon_RevivalHerb[];
+extern const u32 gItemIconPalette_RevivalHerb[];
+
+extern const u32 gItemIcon_Revive[];
+
+extern const u32 gItemIcon_RindoBerry[];
+extern const u32 gItemIconPalette_RindoBerry[];
+
+extern const u32 gItemIcon_RingTarget[];
+extern const u32 gItemIconPalette_RingTarget[];
+
+extern const u32 gItemIcon_RockyHelmet[];
+extern const u32 gItemIconPalette_RockyHelmet[];
+
+extern const u32 gItemIcon_RoseliBerry[];
+extern const u32 gItemIconPalette_RoseliBerry[];
+
+extern const u32 gItemIcon_RowapBerry[];
+extern const u32 gItemIconPalette_RowapBerry[];
+
+extern const u32 gItemIcon_Sachet[];
+extern const u32 gItemIconPalette_Sachet[];
+
+extern const u32 gItemIcon_SafariBall[];
+extern const u32 gItemIconPalette_SafariBall[];
+
+extern const u32 gItemIcon_SafetyGoggles[];
+extern const u32 gItemIconPalette_SafetyGoggles[];
+
+extern const u32 gItemIcon_SalacBerry[];
+extern const u32 gItemIconPalette_SalacBerry[];
+
+extern const u32 gItemIcon_ScopeLens[];
+extern const u32 gItemIconPalette_ScopeLens[];
+
+extern const u32 gItemIcon_SeaFossil[];
+extern const u32 gItemIconPalette_SeaFossil[];
+
+extern const u32 gItemIcon_Shades[];
+extern const u32 gItemIconPalette_Shades[];
+
+extern const u32 gItemIcon_ShalourSable[];
+extern const u32 gItemIconPalette_ShalourSable[];
+
+extern const u32 gItemIcon_SharpBeak[];
+extern const u32 gItemIconPalette_SharpBeak[];
+
+extern const u32 gItemIcon_SharpFang[];
+extern const u32 gItemIconPalette_SharpFang[];
+
+extern const u32 gItemIcon_ShedShell[];
+extern const u32 gItemIconPalette_ShedShell[];
+
+extern const u32 gItemIcon_ShellBell[];
+extern const u32 gItemIconPalette_ShellBell[];
+
+extern const u32 gItemIcon_ShinyCharm[];
+extern const u32 gItemIconPalette_ShinyCharm[];
+
+extern const u32 gItemIcon_ShinyStone[];
+extern const u32 gItemIconPalette_ShinyStone[];
+
+extern const u32 gItemIcon_ShucaBerry[];
+extern const u32 gItemIconPalette_ShucaBerry[];
+
+extern const u32 gItemIcon_SilkRibbon[];
+extern const u32 gItemIconPalette_SilkRibbon[];
+
+extern const u32 gItemIcon_SilverPowder[];
+extern const u32 gItemIconPalette_SilverPowder[];
+
+extern const u32 gItemIcon_SitrusBerry[];
+extern const u32 gItemIconPalette_SitrusBerry[];
+
+extern const u32 gItemIcon_SitrusJuice[];
+extern const u32 gItemIconPalette_SitrusJuice[];
+
+extern const u32 gItemIcon_SkyFossil[];
+extern const u32 gItemIconPalette_SkyFossil[];
+
+extern const u32 gItemIcon_SmokeRound[];
+extern const u32 gItemIconPalette_SmokeRound[];
+
+extern const u32 gItemIcon_SmoothRock[];
+extern const u32 gItemIconPalette_SmoothRock[];
+
+extern const u32 gItemIcon_Snowball[];
+extern const u32 gItemIconPalette_Snowball[];
+
+extern const u32 gItemIcon_SootheBell[];
+extern const u32 gItemIconPalette_SootheBell[];
+
+extern const u32 gItemIcon_SpaceRock[];
+extern const u32 gItemIconPalette_SpaceRock[];
+
+extern const u32 gItemIcon_SparkOrb[];
+extern const u32 gItemIconPalette_SparkOrb[];
+
+extern const u32 gItemIcon_SpellTag[];
+extern const u32 gItemIconPalette_SpellTag[];
+
+extern const u32 gItemIcon_StarChunk[];
+
+extern const u32 gItemIcon_Stardust[];
+extern const u32 gItemIconPalette_Stardust[];
+
+extern const u32 gItemIcon_StarfBerry[];
+extern const u32 gItemIconPalette_StarfBerry[];
+
+extern const u32 gItemIcon_StickyBarb[];
+extern const u32 gItemIconPalette_StickyBarb[];
+
+extern const u32 gItemIcon_SunStone[];
+extern const u32 gItemIconPalette_SunStone[];
+
+extern const u32 gItemIcon_TamatoBerry[];
+extern const u32 gItemIconPalette_TamatoBerry[];
+
+extern const u32 gItemIcon_TangaBerry[];
+extern const u32 gItemIconPalette_TangaBerry[];
+
+extern const u32 gItemIcon_Terraformer[];
+extern const u32 gItemIconPalette_Terraformer[];
+
+extern const u32 gItemIcon_ThunderStone[];
+extern const u32 gItemIconPalette_ThunderStone[];
+
+extern const u32 gItemIcon_TimerBall[];
+extern const u32 gItemIconPalette_TimerBall[];
+
+extern const u32 gItemIcon_TinyMushroom[];
+
+extern const u32 gItemIcon_ToughOre[];
+extern const u32 gItemIconPalette_ToughOre[];
+
+extern const u32 gItemIcon_ToxicOrb[];
+extern const u32 gItemIconPalette_ToxicOrb[];
+
+extern const u32 gItemIcon_TranquilOrb[];
+extern const u32 gItemIconPalette_TranquilOrb[];
+
+extern const u32 gItemIcon_TreasureMap[];
+extern const u32 gItemIconPalette_TreasureMap[];
+
+extern const u32 gItemIcon_TwistedSpoon[];
+extern const u32 gItemIconPalette_TwistedSpoon[];
+
+extern const u32 gItemIcon_UltraBall[];
+extern const u32 gItemIconPalette_UltraBall[];
+
+extern const u32 gItemIcon_UpGrade[];
+extern const u32 gItemIconPalette_UpGrade[];
+
+extern const u32 gItemIcon_VitalTonic[];
+extern const u32 gItemIconPalette_VitalTonic[];
+
+extern const u32 gItemIcon_WacanBerry[];
+extern const u32 gItemIconPalette_WacanBerry[];
+
+extern const u32 gItemIcon_WaterStone[];
+extern const u32 gItemIconPalette_WaterStone[];
+
+extern const u32 gItemIcon_WatmelBerry[];
+extern const u32 gItemIconPalette_WatmelBerry[];
+
+extern const u32 gItemIcon_WeaknessPolicy[];
+extern const u32 gItemIconPalette_WeaknessPolicy[];
+
+extern const u32 gItemIcon_WhippedDream[];
+extern const u32 gItemIconPalette_WhippedDream[];
+
+extern const u32 gItemIcon_Whistle[];
+extern const u32 gItemIconPalette_Whistle[];
+
+extern const u32 gItemIcon_WikiBerry[];
+extern const u32 gItemIconPalette_WikiBerry[];
+
+extern const u32 gItemIcon_WiseGlasses[];
+extern const u32 gItemIconPalette_WiseGlasses[];
+
+extern const u32 gItemIcon_YacheBerry[];
+extern const u32 gItemIconPalette_YacheBerry[];
+
+extern const u32 gItemIcon_ZCrystal[];
+extern const u32 gItemIconPalette_ZCrystal[];
+
+extern const u32 gItemIcon_ZoomLens[];
+extern const u32 gItemIconPalette_ZoomLens[];
+
+// menu graphics
 extern const u16 gFireRedMenuElements1_Pal[16];
 extern const u16 gFireRedMenuElements2_Pal[16];
 extern const u16 gFireRedMenuElements3_Pal[16];

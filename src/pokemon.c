@@ -5166,7 +5166,7 @@ bool8 PokemonUseItemEffects(struct Pokemon *pkmn, u16 item, u8 partyIndex, u8 mo
 			
 			retVal = DoCureStatusCheck(pkmn, partyIndex, status, sp34);
 			
-			if (item == ITEM_HEALING_SEEDS || item == ITEM_HEALING_DUST)
+			if (item == ITEM_HEALING_DUST || item == ITEM_HEALING_BULB)
 			{
 				s16 friendship = GetMonData(pkmn, MON_DATA_HP, NULL);
 						

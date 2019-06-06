@@ -6573,8 +6573,8 @@ u8 GetItemEffectType(u16 item)
 					return 6;
 				case ITEM_MINOR_HEAL:
 				case ITEM_FULL_HEAL:
-				case ITEM_HEALING_SEEDS:
 				case ITEM_HEALING_DUST:
+				case ITEM_HEALING_BULB:
 					return 11;
 			}
 		case MEDICINE_GROUP_PP_RESTORE:

@@ -86,7 +86,7 @@ Route110_TrickHouseEnd_EventScript_26ADFC:: @ 826ADFC
 	msgbox Route110_TrickHouseEnd_Text_26B1AD, MSGBOX_DEFAULT
 	msgbox Route110_TrickHouseEnd_Text_26B73D, MSGBOX_DEFAULT
 	setvar VAR_TRICK_HOUSE_PRIZE_PICKUP, 0
-	giveitem_std ITEM_HARD_STONE
+	giveitem_std ITEM_HARD_ROCK
 	compare VAR_RESULT, 0
 	call_if_eq Route110_TrickHouseEnd_EventScript_26AFEF
 	msgbox Route110_TrickHouseEnd_Text_26B7EF, MSGBOX_DEFAULT
@@ -99,7 +99,7 @@ Route110_TrickHouseEnd_EventScript_26AE38:: @ 826AE38
 	msgbox Route110_TrickHouseEnd_Text_26B223, MSGBOX_DEFAULT
 	msgbox Route110_TrickHouseEnd_Text_26B73D, MSGBOX_DEFAULT
 	setvar VAR_TRICK_HOUSE_PRIZE_PICKUP, 0
-	giveitem_std ITEM_SMOKE_BALL
+	giveitem_std ITEM_SMOKE_ROUND
 	compare VAR_RESULT, 0
 	call_if_eq Route110_TrickHouseEnd_EventScript_26AFEF
 	msgbox Route110_TrickHouseEnd_Text_26B7EF, MSGBOX_DEFAULT

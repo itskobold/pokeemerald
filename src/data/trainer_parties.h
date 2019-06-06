@@ -5584,7 +5584,7 @@ static const struct TrainerMonItemCustomMoves sParty_Lao5[] = {
     .iv = 40,
     .lvl = 35,
     .species = SPECIES_WEEZING,
-    .heldItem = ITEM_SMOKE_BALL,
+    .heldItem = ITEM_SMOKE_ROUND,
     .moves = MOVE_TACKLE, MOVE_SLUDGE, MOVE_NONE, MOVE_NONE
     }
 };

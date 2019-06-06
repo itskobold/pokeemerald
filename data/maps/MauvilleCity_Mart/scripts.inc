@@ -61,8 +61,8 @@ MauvilleCity_Mart_Pokemart_211100: @ 8211100
 	.2byte ITEM_PICNIC_BASKET 		
 	.2byte ITEM_ENERGY_PULP 		
 	.2byte ITEM_ENERGY_ROOT 		
-	.2byte ITEM_HEALING_SEEDS 		
 	.2byte ITEM_HEALING_DUST 		
+	.2byte ITEM_HEALING_BULB 		
 	.2byte ITEM_REVIVAL_HERB 		
 	.2byte ITEM_BITTER_HERB 		
 	.2byte ITEM_CANDY 				
@@ -249,9 +249,10 @@ MauvilleCity_Mart_Pokemart_211100: @ 8211100
 	.2byte ITEM_KINGS_ROCK 		
 	.2byte ITEM_AMULET_COIN 		
 	.2byte ITEM_CLEANSE_TAG 		
-	.2byte ITEM_SMOKE_BALL 		
+	.2byte ITEM_SMOKE_ROUND		
 	.2byte ITEM_EVERSTONE 			
 	.2byte ITEM_FOCUS_BAND 		
+	.2byte ITEM_FOCUS_SASH
 	.2byte ITEM_LUCKY_EGG 			
 	.2byte ITEM_SCOPE_LENS 		
 	.2byte ITEM_LEFTOVERS 			
@@ -284,7 +285,7 @@ MauvilleCity_Mart_Pokemart_211100: @ 8211100
 	.2byte ITEM_JETPACK			
 	.2byte ITEM_RED_CARD			
 	.2byte ITEM_RING_TARGET		
-	.2byte ITEM_ABSORB_BULB		
+	.2byte ITEM_ABSORB_ROOT
 	.2byte ITEM_BINDING_BAND		
 	.2byte ITEM_CELL_BATTERY		
 	.2byte ITEM_EJECT_BUTTON		
@@ -304,9 +305,9 @@ MauvilleCity_Mart_Pokemart_211100: @ 8211100
 	.2byte ITEM_NUZLOCKE_BUFF 		
 	.2byte ITEM_SOFT_SAND 			
 	.2byte ITEM_TOUGH_ORE	 		
-	.2byte ITEM_HARD_STONE 		
+	.2byte ITEM_HARD_ROCK		
 	.2byte ITEM_MIRACLE_SEED 		
-	.2byte ITEM_BLACK_GLASSES 		
+	.2byte ITEM_SHADES 		
 	.2byte ITEM_BLACK_BELT 		
 	.2byte ITEM_MAGNET 			
 	.2byte ITEM_MYSTIC_WATER 		
@@ -320,7 +321,7 @@ MauvilleCity_Mart_Pokemart_211100: @ 8211100
 	.2byte ITEM_SILK_RIBBON 		
 	.2byte ITEM_SILVER_POWDER 		
 	.2byte ITEM_POTPOURRI 			
-	.2byte ITEM_TIN_WHISTLE 		
+	.2byte ITEM_WHISTLE 		
 	.2byte ITEM_SPACE_ROCK 		
 	.2byte ITEM_SHELL_BELL 		
 	.2byte ITEM_ACUTE_WARD			

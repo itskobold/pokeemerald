@@ -380,7 +380,7 @@ Route110_TrickHouseEntrance_EventScript_269F1B:: @ 8269F1B
 	end
 
 Route110_TrickHouseEntrance_EventScript_269F47:: @ 8269F47
-	giveitem_std ITEM_HARD_STONE
+	giveitem_std ITEM_HARD_ROCK
 	compare VAR_RESULT, 1
 	goto_if_eq Route110_TrickHouseEntrance_EventScript_26A023
 	compare VAR_RESULT, 0
@@ -390,7 +390,7 @@ Route110_TrickHouseEntrance_EventScript_269F47:: @ 8269F47
 	end
 
 Route110_TrickHouseEntrance_EventScript_269F73:: @ 8269F73
-	giveitem_std ITEM_SMOKE_BALL
+	giveitem_std ITEM_SMOKE_ROUND
 	compare VAR_RESULT, 1
 	goto_if_eq Route110_TrickHouseEntrance_EventScript_26A023
 	compare VAR_RESULT, 0
