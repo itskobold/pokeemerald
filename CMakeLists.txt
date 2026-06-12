@@ -13,7 +13,7 @@ set(CMAKE_CXX_COMPILER /opt/devkitpro/devkitARM/bin/arm-none-eabi-g++)
 
 project(pokeemerald_ide C CXX)
 
-file(GLOB_RECURSE POKEEMERALD_IDE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE POKEEMERALD_IDE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
 
 add_library(pokeemerald_ide EXCLUDE_FROM_ALL ${POKEEMERALD_IDE_SOURCES})
 
