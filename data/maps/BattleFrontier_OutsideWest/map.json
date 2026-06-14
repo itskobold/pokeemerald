@@ -16,7 +16,7 @@
     {
       "map": "MAP_BATTLE_FRONTIER_OUTSIDE_EAST",
       "offset": 0,
-      "direction": "right"
+      "direction": "east"
     }
   ],
   "object_events": [

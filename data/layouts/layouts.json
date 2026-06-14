@@ -4410,6 +4410,46 @@
       "secondary_tileset": "gTileset_MysteryEventsHouse",
       "border_filepath": "data/layouts/SootopolisCity_MysteryEventsHouse_1F_StairsUnblocked/border.bin",
       "blockdata_filepath": "data/layouts/SootopolisCity_MysteryEventsHouse_1F_StairsUnblocked/map.bin"
+    },
+    {
+      "id": "LAYOUT_OW_0_0",
+      "name": "ow_0_0_Layout",
+      "width": 80,
+      "height": 80,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Petalburg",
+      "border_filepath": "data/layouts/ow_0_0/border.bin",
+      "blockdata_filepath": "data/layouts/ow_0_0/map.bin"
+    },
+    {
+      "id": "LAYOUT_OW_0_1",
+      "name": "ow_0_1_Layout",
+      "width": 80,
+      "height": 80,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Petalburg",
+      "border_filepath": "data/layouts/ow_0_1/border.bin",
+      "blockdata_filepath": "data/layouts/ow_0_1/map.bin"
+    },
+    {
+      "id": "LAYOUT_OW_1_0",
+      "name": "ow_1_0_Layout",
+      "width": 80,
+      "height": 80,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Petalburg",
+      "border_filepath": "data/layouts/ow_1_0/border.bin",
+      "blockdata_filepath": "data/layouts/ow_1_0/map.bin"
+    },
+    {
+      "id": "LAYOUT_OW_1_1",
+      "name": "ow_1_1_Layout",
+      "width": 80,
+      "height": 80,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Petalburg",
+      "border_filepath": "data/layouts/ow_1_1/border.bin",
+      "blockdata_filepath": "data/layouts/ow_1_1/map.bin"
     }
   ]
 }

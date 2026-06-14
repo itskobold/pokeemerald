@@ -16,17 +16,17 @@
     {
       "map": "MAP_RUSTBORO_CITY",
       "offset": 0,
-      "direction": "up"
+      "direction": "north"
     },
     {
       "map": "MAP_ROUTE105",
       "offset": 0,
-      "direction": "down"
+      "direction": "south"
     },
     {
       "map": "MAP_PETALBURG_CITY",
       "offset": 50,
-      "direction": "right"
+      "direction": "east"
     }
   ],
   "object_events": [

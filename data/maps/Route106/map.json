@@ -16,12 +16,12 @@
     {
       "map": "MAP_ROUTE105",
       "offset": 0,
-      "direction": "up"
+      "direction": "north"
     },
     {
       "map": "MAP_DEWFORD_TOWN",
       "offset": 60,
-      "direction": "down"
+      "direction": "south"
     }
   ],
   "object_events": [

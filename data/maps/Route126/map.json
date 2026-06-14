@@ -16,12 +16,12 @@
     {
       "map": "MAP_ROUTE124",
       "offset": 0,
-      "direction": "up"
+      "direction": "north"
     },
     {
       "map": "MAP_ROUTE127",
       "offset": 0,
-      "direction": "right"
+      "direction": "east"
     },
     {
       "map": "MAP_UNDERWATER_ROUTE126",

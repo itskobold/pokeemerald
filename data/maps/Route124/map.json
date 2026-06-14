@@ -16,22 +16,22 @@
     {
       "map": "MAP_ROUTE126",
       "offset": 0,
-      "direction": "down"
+      "direction": "south"
     },
     {
       "map": "MAP_LILYCOVE_CITY",
       "offset": 10,
-      "direction": "left"
+      "direction": "west"
     },
     {
       "map": "MAP_ROUTE125",
       "offset": 0,
-      "direction": "right"
+      "direction": "east"
     },
     {
       "map": "MAP_MOSSDEEP_CITY",
       "offset": 40,
-      "direction": "right"
+      "direction": "east"
     },
     {
       "map": "MAP_UNDERWATER_ROUTE124",

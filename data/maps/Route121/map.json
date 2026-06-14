@@ -16,17 +16,17 @@
     {
       "map": "MAP_ROUTE122",
       "offset": 20,
-      "direction": "down"
+      "direction": "south"
     },
     {
       "map": "MAP_ROUTE120",
       "offset": -80,
-      "direction": "left"
+      "direction": "west"
     },
     {
       "map": "MAP_LILYCOVE_CITY",
       "offset": -10,
-      "direction": "right"
+      "direction": "east"
     }
   ],
   "object_events": [

@@ -140,11 +140,15 @@
 
 
 	@ Directions for connecting maps
-	@ The map.json files will only have e.g. "down" as direction data, and this will be appended to "connection_" by the connection macro
-	.equiv connection_down, CONNECTION_SOUTH
-	.equiv connection_up, CONNECTION_NORTH
-	.equiv connection_left, CONNECTION_WEST
-	.equiv connection_right, CONNECTION_EAST
+	@ The map.json files will only have e.g. "south" as direction data, and this will be appended to "connection_" by the connection macro
+	.equiv connection_north, CONNECTION_NORTH
+	.equiv connection_south, CONNECTION_SOUTH
+	.equiv connection_west, CONNECTION_WEST
+	.equiv connection_east, CONNECTION_EAST
+	.equiv connection_northwest, CONNECTION_NORTHWEST
+	.equiv connection_northeast, CONNECTION_NORTHEAST
+	.equiv connection_southwest, CONNECTION_SOUTHWEST
+	.equiv connection_southeast, CONNECTION_SOUTHEAST
 	.equiv connection_dive, CONNECTION_DIVE
 	.equiv connection_emerge, CONNECTION_EMERGE
 

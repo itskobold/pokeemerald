@@ -16,17 +16,17 @@
     {
       "map": "MAP_ROUTE119",
       "offset": 40,
-      "direction": "up"
+      "direction": "north"
     },
     {
       "map": "MAP_MAUVILLE_CITY",
       "offset": 0,
-      "direction": "left"
+      "direction": "west"
     },
     {
       "map": "MAP_ROUTE123",
       "offset": 0,
-      "direction": "right"
+      "direction": "east"
     }
   ],
   "object_events": [

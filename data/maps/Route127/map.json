@@ -16,17 +16,17 @@
     {
       "map": "MAP_MOSSDEEP_CITY",
       "offset": 0,
-      "direction": "up"
+      "direction": "north"
     },
     {
       "map": "MAP_ROUTE128",
       "offset": 0,
-      "direction": "down"
+      "direction": "south"
     },
     {
       "map": "MAP_ROUTE126",
       "offset": 0,
-      "direction": "left"
+      "direction": "west"
     },
     {
       "map": "MAP_UNDERWATER_ROUTE127",

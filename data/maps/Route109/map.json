@@ -16,12 +16,12 @@
     {
       "map": "MAP_SLATEPORT_CITY",
       "offset": 0,
-      "direction": "up"
+      "direction": "north"
     },
     {
       "map": "MAP_ROUTE108",
       "offset": 40,
-      "direction": "left"
+      "direction": "west"
     }
   ],
   "object_events": [

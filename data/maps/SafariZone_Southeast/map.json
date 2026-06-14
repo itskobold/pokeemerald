@@ -16,12 +16,12 @@
     {
       "map": "MAP_SAFARI_ZONE_SOUTH",
       "offset": 0,
-      "direction": "left"
+      "direction": "west"
     },
     {
       "map": "MAP_SAFARI_ZONE_NORTHEAST",
       "offset": 0,
-      "direction": "up"
+      "direction": "north"
     }
   ],
   "object_events": [

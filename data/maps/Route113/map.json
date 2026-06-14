@@ -16,17 +16,17 @@
     {
       "map": "MAP_ROUTE112",
       "offset": 60,
-      "direction": "down"
+      "direction": "south"
     },
     {
       "map": "MAP_FALLARBOR_TOWN",
       "offset": 0,
-      "direction": "left"
+      "direction": "west"
     },
     {
       "map": "MAP_ROUTE111",
       "offset": 0,
-      "direction": "right"
+      "direction": "east"
     }
   ],
   "object_events": [

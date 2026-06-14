@@ -23,6 +23,10 @@ struct ConnectionFlags
     u8 north:1;
     u8 west:1;
     u8 east:1;
+    u8 southwest:1;
+    u8 southeast:1;
+    u8 northwest:1;
+    u8 northeast:1;
 };
 
 EWRAM_DATA static u16 ALIGNED(4) sBackupMapData[MAX_MAP_DATA_SIZE] = {0};
@@ -41,6 +45,10 @@ static void FillSouthConnection(struct MapHeader const *mapHeader, struct MapHea
 static void FillNorthConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void FillWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void FillEastConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
+static void FillSouthWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
+static void FillSouthEastConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
+static void FillNorthWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
+static void FillNorthEastConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void InitBackupMapLayoutConnections(struct MapHeader *mapHeader);
 static void LoadSavedMapView(void);
 static bool8 SkipCopyingMetatileFromSavedMap(u16 *mapBlock, u16 mapWidth, u8 yMode);
@@ -162,6 +170,22 @@ static void InitBackupMapLayoutConnections(struct MapHeader *mapHeader)
             case CONNECTION_EAST:
                 FillEastConnection(mapHeader, cMap, offset);
                 sMapConnectionFlags.east = TRUE;
+                break;
+            case CONNECTION_SOUTHWEST:
+                FillSouthWestConnection(mapHeader, cMap, offset);
+                sMapConnectionFlags.southwest = TRUE;
+                break;
+            case CONNECTION_SOUTHEAST:
+                FillSouthEastConnection(mapHeader, cMap, offset);
+                sMapConnectionFlags.southeast = TRUE;
+                break;
+            case CONNECTION_NORTHWEST:
+                FillNorthWestConnection(mapHeader, cMap, offset);
+                sMapConnectionFlags.northwest = TRUE;
+                break;
+            case CONNECTION_NORTHEAST:
+                FillNorthEastConnection(mapHeader, cMap, offset);
+                sMapConnectionFlags.northeast = TRUE;
                 break;
             }
         }
@@ -339,6 +363,76 @@ static void FillEastConnection(struct MapHeader const *mapHeader, struct MapHead
             connectedMapHeader,
             /*x2*/ 0, y2,
             /*width*/ MAP_OFFSET + 1, height);
+    }
+}
+
+static void FillSouthWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset)
+{
+    int y;
+    int cWidth;
+
+    if (connectedMapHeader)
+    {
+        cWidth = connectedMapHeader->mapLayout->width;
+        y = mapHeader->mapLayout->height + MAP_OFFSET;
+
+        FillConnection(
+            /*x*/ 0, y,
+            connectedMapHeader,
+            /*x2*/ cWidth - MAP_OFFSET, /*y2*/ 0,
+            /*width*/ MAP_OFFSET, /*height*/ MAP_OFFSET);
+    }
+}
+
+static void FillSouthEastConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset)
+{
+    int x, y;
+
+    if (connectedMapHeader)
+    {
+        x = mapHeader->mapLayout->width + MAP_OFFSET;
+        y = mapHeader->mapLayout->height + MAP_OFFSET;
+
+        FillConnection(
+            x, y,
+            connectedMapHeader,
+            /*x2*/ 0, /*y2*/ 0,
+            /*width*/ MAP_OFFSET + 1, /*height*/ MAP_OFFSET);
+    }
+}
+
+static void FillNorthWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset)
+{
+    int cWidth, cHeight;
+
+    if (connectedMapHeader)
+    {
+        cWidth = connectedMapHeader->mapLayout->width;
+        cHeight = connectedMapHeader->mapLayout->height;
+
+        FillConnection(
+            /*x*/ 0, /*y*/ 0,
+            connectedMapHeader,
+            /*x2*/ cWidth - MAP_OFFSET, /*y2*/ cHeight - MAP_OFFSET,
+            /*width*/ MAP_OFFSET, /*height*/ MAP_OFFSET);
+    }
+}
+
+static void FillNorthEastConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset)
+{
+    int x;
+    int cHeight;
+
+    if (connectedMapHeader)
+    {
+        cHeight = connectedMapHeader->mapLayout->height;
+        x = mapHeader->mapLayout->width + MAP_OFFSET;
+
+        FillConnection(
+            x, /*y*/ 0,
+            connectedMapHeader,
+            /*x2*/ 0, /*y2*/ cHeight - MAP_OFFSET,
+            /*width*/ MAP_OFFSET + 1, /*height*/ MAP_OFFSET);
     }
 }
 
