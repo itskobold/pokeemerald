@@ -59,7 +59,9 @@ static const struct BgTemplate sFieldRegionMapBgTemplates[] = {
         .bg = 2,
         .charBaseIndex = 2,
         .mapBaseIndex = 28,
-        .screenSize = 2,
+        // Screen-sized (<=32x32) regular tilemap in a single screenblock; the
+        // unmanaged path runs in BG mode 0 (no affine/zoom).
+        .screenSize = 0,
         .paletteMode = 1,
         .priority = 2,
         .baseTile = 0
@@ -112,7 +114,9 @@ static void MCB2_InitRegionMapRegisters(void)
     ResetSpriteData();
     FreeAllSpritePalettes();
     ResetBgsAndClearDma3BusyFlags(0);
-    InitBgsFromTemplates(1, sFieldRegionMapBgTemplates, ARRAY_COUNT(sFieldRegionMapBgTemplates));
+    // BG mode 0: BG2 is a regular text BG (not affine), so its 2-byte tilemap
+    // entries address the full >256-tile region map tileset.
+    InitBgsFromTemplates(0, sFieldRegionMapBgTemplates, ARRAY_COUNT(sFieldRegionMapBgTemplates));
     InitWindows(sFieldRegionMapWindowTemplates);
     DeactivateAllTextPrinters();
     LoadUserWindowBorderGfx(0, 0x27, BG_PLTT_ID(13));

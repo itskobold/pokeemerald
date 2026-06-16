@@ -87,8 +87,6 @@ static const struct WindowTemplate sHelpBarWindowTemplate[] =
 static const u8 *const sHelpBarTexts[HELPBAR_COUNT] =
 {
     [HELPBAR_NONE]                 = gText_Pokenav_ClearButtonList,
-    [HELPBAR_MAP_ZOOMED_OUT]       = gText_PokenavMap_ZoomedOutButtons,
-    [HELPBAR_MAP_ZOOMED_IN]        = gText_PokenavMap_ZoomedInButtons,
     [HELPBAR_CONDITION_MON_LIST]   = gText_PokenavCondition_MonListButtons,
     [HELPBAR_CONDITION_MON_STATUS] = gText_PokenavCondition_MonStatusButtons,
     [HELPBAR_CONDITION_MARKINGS]   = gText_PokenavCondition_MarkingButtons,
@@ -125,7 +123,7 @@ static const struct SpritePalette sSpinningNavgearPalettes[] =
 
 static const struct CompressedSpriteSheet sMenuLeftHeaderSpriteSheet =
 {
-    .data = gPokenavLeftHeaderHoennMap_Gfx, // Hoenn map is the first of the headers listed
+    .data = gPokenavLeftHeaderRibbons_Gfx, // Ribbons is the first of the headers listed with header graphics
     .size = 0xC00,
     .tag = 2
 };
@@ -151,16 +149,6 @@ static const struct CompressedSpriteSheet sMenuLeftHeaderSpriteSheets[] =
         .data = gPokenavLeftHeaderMatchCall_Gfx,
         .size = 0x20,
         .tag = 4
-    },
-    [POKENAV_GFX_MAP_MENU_ZOOMED_OUT] = {
-        .data = gPokenavLeftHeaderHoennMap_Gfx,
-        .size = 0x20,
-        .tag = 0
-    },
-    [POKENAV_GFX_MAP_MENU_ZOOMED_IN] = {
-        .data = gPokenavLeftHeaderHoennMap_Gfx,
-        .size = 0x40,
-        .tag = 0
     }
 };
 

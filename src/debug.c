@@ -9,6 +9,9 @@
 
 void SetDebugNewGameFlags()
 {
+    struct Pokemon *mon;
+    int nationalDexNum;
+
     FlagSet(FLAG_SYS_B_DASH);
     FlagSet(FLAG_SYS_POKEMON_GET);
     FlagSet(FLAG_SYS_POKENAV_GET);
@@ -40,13 +43,15 @@ void SetDebugNewGameFlags()
     FlagSet(FLAG_VISITED_MOSSDEEP_CITY);
     FlagSet(FLAG_VISITED_SOOTOPOLIS_CITY);
     FlagSet(FLAG_VISITED_EVER_GRANDE_CITY);
+    FlagSet(FLAG_LANDMARK_BATTLE_FRONTIER);
+    FlagSet(FLAG_SYS_FRONTIER_PASS);
 
-    struct Pokemon *mon = AllocZeroed(sizeof(struct Pokemon));
+    mon = AllocZeroed(sizeof(struct Pokemon));
     CreateMon(mon, SPECIES_RAYQUAZA, 100, 31, FALSE, 0, OT_ID_PLAYER_ID, 0);
     SetMonMoveSlot(mon, MOVE_FLY, 0);
     GiveMonToPlayer(mon);
     Free(mon);
-    int nationalDexNum = SpeciesToNationalPokedexNum(SPECIES_RAYQUAZA);
+    nationalDexNum = SpeciesToNationalPokedexNum(SPECIES_RAYQUAZA);
     GetSetPokedexFlag(nationalDexNum, FLAG_SET_SEEN);
     GetSetPokedexFlag(nationalDexNum, FLAG_SET_CAUGHT);
 

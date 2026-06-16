@@ -38,12 +38,25 @@
  *
  */
 
-#define MAP_WIDTH 28
-#define MAP_HEIGHT 15
-#define MAPCURSOR_X_MIN 1
-#define MAPCURSOR_Y_MIN 2
+#define MAP_WIDTH 22
+#define MAP_HEIGHT 18
+#define MAPCURSOR_X_MIN 4
+#define MAPCURSOR_Y_MIN 0
 #define MAPCURSOR_X_MAX (MAPCURSOR_X_MIN + MAP_WIDTH - 1)
 #define MAPCURSOR_Y_MAX (MAPCURSOR_Y_MIN + MAP_HEIGHT - 1)
+
+// Screen-space offset (in pixels) of the cursor's locked position while zoomed in.
+// Converts between the BG scroll position and the cursor's tile coordinates:
+//   scroll = cursorTile * 8 - offset    cursorTile = (scroll + offset) / 8
+#define ZOOM_CURSOR_OFFSET_X 0x34
+#define ZOOM_CURSOR_OFFSET_Y 0x44
+
+// Scroll bounds while zoomed, derived so the zoomed cursor reaches exactly the same
+// tile range as the non-zoomed cursor (MAPCURSOR_*_MIN .. MAPCURSOR_*_MAX).
+#define ZOOM_SCROLL_X_MIN (MAPCURSOR_X_MIN * 8 - ZOOM_CURSOR_OFFSET_X)
+#define ZOOM_SCROLL_X_MAX (MAPCURSOR_X_MAX * 8 - ZOOM_CURSOR_OFFSET_X)
+#define ZOOM_SCROLL_Y_MIN (MAPCURSOR_Y_MIN * 8 - ZOOM_CURSOR_OFFSET_Y)
+#define ZOOM_SCROLL_Y_MAX (MAPCURSOR_Y_MAX * 8 - ZOOM_CURSOR_OFFSET_Y)
 
 #define FLYDESTICON_RED_OUTLINE 6
 
@@ -110,7 +123,6 @@ static void SetFlyMapCallback(void callback(void));
 static void DrawFlyDestTextWindow(void);
 static void LoadFlyDestIcons(void);
 static void CreateFlyDestIcons(void);
-static void TryCreateRedOutlineFlyDestIcons(void);
 static void SpriteCB_FlyDestIcon(struct Sprite *sprite);
 static void CB_FadeInFlyMap(void);
 static void CB_HandleFlyMapInput(void);
@@ -120,8 +132,17 @@ static const u16 sRegionMapCursorPal[] = INCGFX_U16("graphics/pokenav/region_map
 static const u32 sRegionMapCursorSmallGfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/cursor_small.png", ".4bpp.lz");
 static const u32 sRegionMapCursorLargeGfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/cursor_large.png", ".4bpp.lz");
 static const u16 sRegionMapBg_Pal[] = INCGFX_U16("graphics/pokenav/region_map/map.pal", ".gbapal");
-static const u32 sRegionMapBg_GfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/map.png", ".8bpp.lz", "-num_tiles 233 -Wnum_tiles");
-static const u32 sRegionMapBg_TilemapLZ[] = INCGFX_U32("graphics/pokenav/region_map/map.bin", ".lz");
+static const u32 sRegionMapBg_GfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/west_hoenn.png", ".8bpp.lz", "-num_tiles 304 -Wnum_tiles");
+static const u32 sRegionMapBg_TilemapLZ[] = INCGFX_U32("graphics/pokenav/region_map/west_hoenn.bin", ".lz");
+// Managed path only: the region map is split across two affine BGs (BG2 + BG3)
+// so the combined tileset can exceed one affine BG's 256-tile cap. Each tileset
+// must be <= 256 tiles (one char block) with tile ID 0 reserved as transparent;
+// each tilemap must be the full 64x64 affine map (4096 bytes), padding the rows
+// the other BG owns with the transparent tile.
+static const u32 sRegionMapTopBg_GfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/west_hoenn_top.png", ".8bpp.lz");
+static const u32 sRegionMapTopBg_TilemapLZ[] = INCGFX_U32("graphics/pokenav/region_map/west_hoenn_top.bin", ".lz");
+static const u32 sRegionMapBottomBg_GfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/west_hoenn_btm.png", ".8bpp.lz");
+static const u32 sRegionMapBottomBg_TilemapLZ[] = INCGFX_U32("graphics/pokenav/region_map/west_hoenn_btm.bin", ".lz");
 static const u16 sRegionMapPlayerIcon_BrendanPal[] = INCGFX_U16("graphics/pokenav/region_map/brendan_icon.png", ".gbapal");
 static const u8 sRegionMapPlayerIcon_BrendanGfx[] = INCGFX_U8("graphics/pokenav/region_map/brendan_icon.png", ".4bpp");
 static const u16 sRegionMapPlayerIcon_MayPal[] = INCGFX_U16("graphics/pokenav/region_map/may_icon.png", ".gbapal");
@@ -367,7 +388,9 @@ static const struct BgTemplate sFlyMapBgTemplates[] =
     },
     {
         .bg = 1,
-        .charBaseIndex = 3,
+        // Frame tiles live in char block 1; char block 3 is left free for the
+        // region map's 8bpp tileset (>256 tiles) to spill past char block 2.
+        .charBaseIndex = 1,
         .mapBaseIndex = 30,
         .screenSize = 0,
         .paletteMode = 0,
@@ -377,7 +400,10 @@ static const struct BgTemplate sFlyMapBgTemplates[] =
         .bg = 2,
         .charBaseIndex = 2,
         .mapBaseIndex = 28,
-        .screenSize = 2,
+        // Screen-sized (<=32x32) regular tilemap in a single screenblock; the
+        // unmanaged path runs in BG mode 0 (no affine/zoom), so the map is a
+        // plain text BG anchored at the top-left.
+        .screenSize = 0,
         .paletteMode = 1,
         .priority = 2
     }
@@ -419,18 +445,6 @@ static const struct SpritePalette sFlyTargetIconsSpritePalette =
 {
     .data = sFlyTargetIcons_Pal,
     .tag = TAG_FLY_ICON
-};
-
-static const mapsec_u16_t sRedOutlineFlyDestinations[][2] =
-{
-    {
-        FLAG_LANDMARK_BATTLE_FRONTIER,
-        MAPSEC_BATTLE_FRONTIER
-    },
-    {
-        -1,
-        MAPSEC_NONE
-    }
 };
 
 static const struct OamData sFlyDestIcon_OamData =
@@ -507,11 +521,13 @@ static const struct SpriteTemplate sFlyDestIconSpriteTemplate =
 
 void InitRegionMap(struct RegionMap *regionMap, bool8 zoomed)
 {
-    InitRegionMapData(regionMap, NULL, zoomed);
+    InitRegionMapData(regionMap, NULL, NULL, zoomed);
     while (LoadRegionMapGfx());
 }
 
-void InitRegionMapData(struct RegionMap *regionMap, const struct BgTemplate *template, bool8 zoomed)
+// template2 is optional: when non-NULL the region map is rendered across two
+// affine BGs (see the two-half gfx above). Pass NULL for a single-BG map.
+void InitRegionMapData(struct RegionMap *regionMap, const struct BgTemplate *template, const struct BgTemplate *template2, bool8 zoomed)
 {
     sRegionMap = regionMap;
     sRegionMap->initStep = 0;
@@ -531,6 +547,16 @@ void InitRegionMapData(struct RegionMap *regionMap, const struct BgTemplate *tem
         sRegionMap->mapBaseIdx = 28;
         sRegionMap->bgManaged = FALSE;
     }
+    if (template2 != NULL)
+    {
+        sRegionMap->bgNum2 = template2->bg;
+        sRegionMap->charBaseIdx2 = template2->charBaseIndex;
+        sRegionMap->mapBaseIdx2 = template2->mapBaseIndex;
+    }
+    else
+    {
+        sRegionMap->bgNum2 = 0; // no second BG
+    }
 }
 
 void ShowRegionMapForPokedexAreaScreen(struct RegionMap *regionMap)
@@ -547,7 +573,12 @@ bool8 LoadRegionMapGfx(void)
     {
     case 0:
         if (sRegionMap->bgManaged)
-            DecompressAndCopyTileDataToVram(sRegionMap->bgNum, sRegionMapBg_GfxLZ, 0, 0, 0);
+        {
+            // Each tileset is loaded at tile 0 of its own BG's char block.
+            DecompressAndCopyTileDataToVram(sRegionMap->bgNum, sRegionMapTopBg_GfxLZ, 0, 0, 0);
+            if (sRegionMap->bgNum2)
+                DecompressAndCopyTileDataToVram(sRegionMap->bgNum2, sRegionMapBottomBg_GfxLZ, 0, 0, 0);
+        }
         else
             LZ77UnCompVram(sRegionMapBg_GfxLZ, (u16 *)BG_CHAR_ADDR(2));
         break;
@@ -555,7 +586,13 @@ bool8 LoadRegionMapGfx(void)
         if (sRegionMap->bgManaged)
         {
             if (!FreeTempTileDataBuffersIfPossible())
-                DecompressAndCopyTileDataToVram(sRegionMap->bgNum, sRegionMapBg_TilemapLZ, 0, 0, 1);
+            {
+                // Each tilemap is the full 64x64 affine map, loaded at offset 0
+                // of its own BG's map block.
+                DecompressAndCopyTileDataToVram(sRegionMap->bgNum, sRegionMapTopBg_TilemapLZ, 0, 0, 1);
+                if (sRegionMap->bgNum2)
+                    DecompressAndCopyTileDataToVram(sRegionMap->bgNum2, sRegionMapBottomBg_TilemapLZ, 0, 0, 1);
+            }
         }
         else
         {
@@ -564,7 +601,7 @@ bool8 LoadRegionMapGfx(void)
         break;
     case 2:
         if (!FreeTempTileDataBuffersIfPossible())
-            LoadPalette(sRegionMapBg_Pal, BG_PLTT_ID(7), 3 * PLTT_SIZE_4BPP);
+            LoadPalette(sRegionMapBg_Pal, BG_PLTT_ID(7), 6 * PLTT_SIZE_4BPP);
         break;
     case 3:
         LZ77UnCompWram(sRegionMapCursorSmallGfxLZ, sRegionMap->cursorSmallImage);
@@ -608,6 +645,14 @@ bool8 LoadRegionMapGfx(void)
             SetBgAttribute(sRegionMap->bgNum, BG_ATTR_MAPBASEINDEX, sRegionMap->mapBaseIdx);
             SetBgAttribute(sRegionMap->bgNum, BG_ATTR_WRAPAROUND, 1);
             SetBgAttribute(sRegionMap->bgNum, BG_ATTR_PALETTEMODE, 1);
+            if (sRegionMap->bgNum2)
+            {
+                SetBgAttribute(sRegionMap->bgNum2, BG_ATTR_SCREENSIZE, 2);
+                SetBgAttribute(sRegionMap->bgNum2, BG_ATTR_CHARBASEINDEX, sRegionMap->charBaseIdx2);
+                SetBgAttribute(sRegionMap->bgNum2, BG_ATTR_MAPBASEINDEX, sRegionMap->mapBaseIdx2);
+                SetBgAttribute(sRegionMap->bgNum2, BG_ATTR_WRAPAROUND, 1);
+                SetBgAttribute(sRegionMap->bgNum2, BG_ATTR_PALETTEMODE, 1);
+            }
         }
         sRegionMap->initStep++;
         return FALSE;
@@ -731,22 +776,22 @@ static u8 ProcessRegionMapInput_Zoomed(void)
     input = MAP_INPUT_NONE;
     sRegionMap->zoomedCursorDeltaX = 0;
     sRegionMap->zoomedCursorDeltaY = 0;
-    if (JOY_HELD(DPAD_UP) && sRegionMap->scrollY > -0x34)
+    if (JOY_HELD(DPAD_UP) && sRegionMap->scrollY > ZOOM_SCROLL_Y_MIN)
     {
         sRegionMap->zoomedCursorDeltaY = -1;
         input = MAP_INPUT_MOVE_START;
     }
-    if (JOY_HELD(DPAD_DOWN) && sRegionMap->scrollY < 0x3c)
+    if (JOY_HELD(DPAD_DOWN) && sRegionMap->scrollY < ZOOM_SCROLL_Y_MAX)
     {
         sRegionMap->zoomedCursorDeltaY = +1;
         input = MAP_INPUT_MOVE_START;
     }
-    if (JOY_HELD(DPAD_LEFT) && sRegionMap->scrollX > -0x2c)
+    if (JOY_HELD(DPAD_LEFT) && sRegionMap->scrollX > ZOOM_SCROLL_X_MIN)
     {
         sRegionMap->zoomedCursorDeltaX = -1;
         input = MAP_INPUT_MOVE_START;
     }
-    if (JOY_HELD(DPAD_RIGHT) && sRegionMap->scrollX < 0xac)
+    if (JOY_HELD(DPAD_RIGHT) && sRegionMap->scrollX < ZOOM_SCROLL_X_MAX)
     {
         sRegionMap->zoomedCursorDeltaX = +1;
         input = MAP_INPUT_MOVE_START;
@@ -779,8 +824,8 @@ static u8 MoveRegionMapCursor_Zoomed(void)
     sRegionMap->zoomedCursorMovementFrameCounter++;
     if (sRegionMap->zoomedCursorMovementFrameCounter == 8)
     {
-        x = (sRegionMap->scrollX + 0x2c) / 8 + 1;
-        y = (sRegionMap->scrollY + 0x34) / 8 + 2;
+        x = (sRegionMap->scrollX + ZOOM_CURSOR_OFFSET_X) / 8;
+        y = (sRegionMap->scrollY + ZOOM_CURSOR_OFFSET_Y) / 8;
         if (x != sRegionMap->zoomedCursorPosX || y != sRegionMap->zoomedCursorPosY)
         {
             sRegionMap->zoomedCursorPosX = x;
@@ -809,8 +854,8 @@ void SetRegionMapDataForZoom(void)
         sRegionMap->scrollX = 0;
         sRegionMap->unk_040 = 0;
         sRegionMap->unk_03c = 0;
-        sRegionMap->unk_060 = sRegionMap->cursorPosX * 8 - 0x34;
-        sRegionMap->unk_062 = sRegionMap->cursorPosY * 8 - 0x44;
+        sRegionMap->unk_060 = sRegionMap->cursorPosX * 8 - ZOOM_CURSOR_OFFSET_X;
+        sRegionMap->unk_062 = sRegionMap->cursorPosY * 8 - ZOOM_CURSOR_OFFSET_Y;
         sRegionMap->unk_044 = (sRegionMap->unk_060 << 8) / 16;
         sRegionMap->unk_048 = (sRegionMap->unk_062 << 8) / 16;
         sRegionMap->zoomedCursorPosX = sRegionMap->cursorPosX;
@@ -939,6 +984,19 @@ void UpdateRegionMapVideoRegs(void)
         SetGpuReg(REG_OFFSET_BG2X_H, sRegionMap->bg2x >> 16);
         SetGpuReg(REG_OFFSET_BG2Y_L, sRegionMap->bg2y);
         SetGpuReg(REG_OFFSET_BG2Y_H, sRegionMap->bg2y >> 16);
+        // Drive the second affine BG with the exact same transform so the two
+        // halves stay locked together as one image while zooming/scrolling.
+        if (sRegionMap->bgNum2)
+        {
+            SetGpuReg(REG_OFFSET_BG3PA, sRegionMap->bg2pa);
+            SetGpuReg(REG_OFFSET_BG3PB, sRegionMap->bg2pb);
+            SetGpuReg(REG_OFFSET_BG3PC, sRegionMap->bg2pc);
+            SetGpuReg(REG_OFFSET_BG3PD, sRegionMap->bg2pd);
+            SetGpuReg(REG_OFFSET_BG3X_L, sRegionMap->bg2x);
+            SetGpuReg(REG_OFFSET_BG3X_H, sRegionMap->bg2x >> 16);
+            SetGpuReg(REG_OFFSET_BG3Y_L, sRegionMap->bg2y);
+            SetGpuReg(REG_OFFSET_BG3Y_H, sRegionMap->bg2y >> 16);
+        }
         sRegionMap->needUpdateVideoRegs = FALSE;
     }
 }
@@ -956,7 +1014,7 @@ void PokedexAreaScreen_UpdateRegionMapVariablesAndVideoRegs(s16 x, s16 y)
 
 static mapsec_u16_t GetMapSecIdAt(u16 x, u16 y)
 {
-    if (y < MAPCURSOR_Y_MIN || y > MAPCURSOR_Y_MAX || x < MAPCURSOR_X_MIN || x > MAPCURSOR_X_MAX)
+    if ((u16)(y - MAPCURSOR_Y_MIN) >= MAP_HEIGHT || (u16)(x - MAPCURSOR_X_MIN) >= MAP_WIDTH)
     {
         return MAPSEC_NONE;
     }
@@ -1675,7 +1733,9 @@ void CB2_OpenFlyMap(void)
         break;
     case 1:
         ResetBgsAndClearDma3BusyFlags(0);
-        InitBgsFromTemplates(1, sFlyMapBgTemplates, ARRAY_COUNT(sFlyMapBgTemplates));
+        // BG mode 0: BG2 is a regular text BG (not affine), so its 2-byte
+        // tilemap entries address the full >256-tile region map tileset.
+        InitBgsFromTemplates(0, sFlyMapBgTemplates, ARRAY_COUNT(sFlyMapBgTemplates));
         gMain.state++;
         break;
     case 2:
@@ -1699,7 +1759,7 @@ void CB2_OpenFlyMap(void)
         gMain.state++;
         break;
     case 5:
-        LZ77UnCompVram(sRegionMapFrameGfxLZ, (u16 *)BG_CHAR_ADDR(3));
+        LZ77UnCompVram(sRegionMapFrameGfxLZ, (u16 *)BG_CHAR_ADDR(1));
         gMain.state++;
         break;
     case 6:
@@ -1829,7 +1889,6 @@ static void LoadFlyDestIcons(void)
     LoadSpriteSheet(&sheet);
     LoadSpritePalette(&sFlyTargetIconsSpritePalette);
     CreateFlyDestIcons();
-    TryCreateRedOutlineFlyDestIcons();
 }
 
 // Sprite data for SpriteCB_FlyDestIcon
@@ -1875,38 +1934,6 @@ static void CreateFlyDestIcons(void)
             gSprites[spriteId].sIconMapSec = mapSecId;
         }
         canFlyFlag++;
-    }
-}
-
-// Draw a red outline box on the mapsec if its corresponding flag has been set
-// Only used for Battle Frontier, but set up to handle more
-static void TryCreateRedOutlineFlyDestIcons(void)
-{
-    u16 i;
-    u16 x;
-    u16 y;
-    u16 width;
-    u16 height;
-    mapsec_u16_t mapSecId;
-    u8 spriteId;
-
-    for (i = 0; sRedOutlineFlyDestinations[i][1] != MAPSEC_NONE; i++)
-    {
-        if (FlagGet(sRedOutlineFlyDestinations[i][0]))
-        {
-            mapSecId = sRedOutlineFlyDestinations[i][1];
-            GetMapSecDimensions(mapSecId, &x, &y, &width, &height);
-            x = (x + MAPCURSOR_X_MIN) * 8;
-            y = (y + MAPCURSOR_Y_MIN) * 8;
-            spriteId = CreateSprite(&sFlyDestIconSpriteTemplate, x, y, 10);
-            if (spriteId != MAX_SPRITES)
-            {
-                gSprites[spriteId].oam.size = SPRITE_SIZE(16x16);
-                gSprites[spriteId].callback = SpriteCB_FlyDestIcon;
-                StartSpriteAnim(&gSprites[spriteId], FLYDESTICON_RED_OUTLINE);
-                gSprites[spriteId].sIconMapSec = mapSecId;
-            }
-        }
     }
 }
 
