@@ -1444,7 +1444,28 @@ const u16 gTilesetPalettes_General[][16] =
     INCGFX_U16("data/tilesets/primary/general/palettes/15.pal", ".gbapal"),
 };
 
+const u16 gTilesetPalettes_Terrain[][16] =
+{
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/00.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/01.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/02.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/03.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/04.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/05.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/06.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/07.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/08.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/09.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/10.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/11.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/12.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/13.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/14.pal", ".gbapal"),
+    INCGFX_U16("data/tilesets/primary/terrain/palettes/15.pal", ".gbapal"),
+};
+
 const u32 gTilesetTiles_General[] = INCGFX_U32("data/tilesets/primary/general/tiles.png", ".4bpp.lz");
+const u32 gTilesetTiles_Terrain[] = INCGFX_U32("data/tilesets/primary/terrain/tiles.png", ".4bpp.lz");
 
 // trade/egg hatch
 

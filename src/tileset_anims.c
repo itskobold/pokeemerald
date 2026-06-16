@@ -24,6 +24,7 @@ static void (*sSecondaryTilesetAnimCallback)(u16);
 static void _InitPrimaryTilesetAnimation(void);
 static void _InitSecondaryTilesetAnimation(void);
 static void TilesetAnim_General(u16);
+static void TilesetAnim_Terrain(u16);
 static void TilesetAnim_Building(u16);
 static void TilesetAnim_Rustboro(u16);
 static void TilesetAnim_Dewford(u16);
@@ -622,6 +623,13 @@ void InitTilesetAnim_General(void)
     sPrimaryTilesetAnimCallback = TilesetAnim_General;
 }
 
+void InitTilesetAnim_Terrain(void)
+{
+    sPrimaryTilesetAnimCounter = 0;
+    sPrimaryTilesetAnimCounterMax = 256;
+    sPrimaryTilesetAnimCallback = TilesetAnim_Terrain;
+}
+
 void InitTilesetAnim_Building(void)
 {
     sPrimaryTilesetAnimCounter = 0;
@@ -641,6 +649,11 @@ static void TilesetAnim_General(u16 timer)
         QueueAnimTiles_General_Waterfall(timer / 16);
     if (timer % 16 == 4)
         QueueAnimTiles_General_LandWaterEdge(timer / 16);
+}
+
+static void TilesetAnim_Terrain(u16 timer)
+{
+    // TODO
 }
 
 static void TilesetAnim_Building(u16 timer)
