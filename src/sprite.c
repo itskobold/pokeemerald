@@ -298,7 +298,7 @@ void ResetSpriteData(void)
     ClearSpriteCopyRequests();
     ResetAffineAnimData();
     FreeSpriteTileRanges();
-    gOamLimit = 64;
+    gOamLimit = MAX_SPRITES;
     gReservedSpriteTileCount = 0;
     AllocSpriteTiles(0);
     gSpriteCoordOffsetX = 0;
