@@ -103,6 +103,7 @@ static void CB2_LoadMap2(void);
 static void VBlankCB_Field(void);
 static void SpriteCB_LinkPlayer(struct Sprite *);
 static void ChooseAmbientCrySpecies(void);
+static void Task_UpdateMapLocationGfx(u8);
 static void DoMapLoadLoop(u8 *);
 static bool32 LoadMapInStepsLocal(u8 *, bool32);
 static bool32 LoadMapInStepsLink(u8 *);
@@ -830,7 +831,7 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
 // location's secondary tileset graphics, update the music, and show its name.
 void TryUpdateMapLocation(s16 x, s16 y)
 {
-    s32 paletteIndex;
+    u8 taskId;
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
 
     if (newLocation == GetActiveMapLocation())
@@ -841,16 +842,54 @@ void TryUpdateMapLocation(s16 x, s16 y)
 
     SetActiveMapLocation(newLocation);
 
-    CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
-    LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
-    for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
-        ApplyWeatherColorMapToPal(paletteIndex);
-    InitSecondaryTilesetAnimation();
-
+    // Music and the map-name popup don't depend on the tileset transfer, so do
+    // them immediately as the player crosses the boundary.
     Overworld_ChangeMusicToDefault();
-
     if (GetActiveLocationData()->showMapName == TRUE)
         ShowMapNamePopup();
+
+    // Streaming the new secondary tileset into VRAM takes a frame to land, and
+    // the on-screen tilemap was authored against the previous location's
+    // tileset. Hand the graphics swap to a task so we can wait for the transfer
+    // to finish before redrawing the visible map (see Task_UpdateMapLocationGfx).
+    // Restart any switch already in flight so the newest location wins.
+    taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
+    if (taskId == TASK_NONE)
+        taskId = CreateTask(Task_UpdateMapLocationGfx, 80);
+    gTasks[taskId].data[0] = 0;
+}
+
+// Streams the active location's secondary tileset into VRAM, then redraws the
+// whole visible map once the transfer completes. Without the redraw the stale
+// on-screen tilemap keeps the previous location's tile indices, so the freshly
+// loaded graphics display as garbage; without the wait the redraw would point
+// at a half-copied tileset.
+static void Task_UpdateMapLocationGfx(u8 taskId)
+{
+    s16 *data = gTasks[taskId].data;
+    s32 paletteIndex;
+
+    switch (data[0])
+    {
+    case 0:
+        CopySecondaryTilesetToVram(gMapHeader.mapLayout);
+        LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
+        for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
+            ApplyWeatherColorMapToPal(paletteIndex);
+        data[0]++;
+        break;
+    case 1:
+        // FreeTempTileDataBuffersIfPossible() returns TRUE while the BG-copy DMA
+        // is still in flight and FALSE once it has finished (freeing the decomp
+        // buffers as a side effect).
+        if (FreeTempTileDataBuffersIfPossible() != TRUE)
+        {
+            DrawWholeMapView();
+            InitSecondaryTilesetAnimation();
+            DestroyTask(taskId);
+        }
+        break;
+    }
 }
 
 static void LoadMapFromWarp(bool32 a1)
