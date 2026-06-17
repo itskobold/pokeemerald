@@ -21,7 +21,7 @@ const u16 gCloudsWeatherPalette[] = INCGFX_U16("graphics/weather/cloud.png", ".g
 const u16 gSandstormWeatherPalette[] = INCGFX_U16("graphics/weather/sandstorm.png", ".gbapal");
 const u8 gWeatherFogDiagonalTiles[] = INCGFX_U8("graphics/weather/fog_diagonal.png", ".4bpp");
 const u8 gWeatherFogHorizontalTiles[] = INCGFX_U8("graphics/weather/fog_horizontal.png", ".4bpp");
-const u8 gWeatherCloudTiles[] = INCGFX_U8("graphics/weather/cloud.png", ".4bpp");
+const ALIGNED(2) u8 gWeatherCloudTiles[] = INCGFX_U8("graphics/weather/cloud.png", ".4bpp");
 const u8 gWeatherSnow1Tiles[] = INCGFX_U8("graphics/weather/snow0.png", ".4bpp");
 const u8 gWeatherSnow2Tiles[] = INCGFX_U8("graphics/weather/snow1.png", ".4bpp");
 const u8 gWeatherBubbleTiles[] = INCGFX_U8("graphics/weather/bubble.png", ".4bpp");
@@ -36,6 +36,16 @@ const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", 
 static void CreateCloudSprites(void);
 static void DestroyCloudSprites(void);
 static void UpdateCloudSprite(struct Sprite *);
+
+// Controls for blending the cloud/fog weather effects
+// Set to negative values for darkening, positive for lightening (suggested range [-2, 5])
+#define CLOUD_BRIGHTNESS 5
+#define FOG_BRIGHTNESS -2
+
+#define WEATHER_BLEND_EFFECT(brightness) ((brightness) < 0 ? BLDCNT_EFFECT_DARKEN : BLDCNT_EFFECT_LIGHTEN)
+#define WEATHER_BLEND_LEVEL(brightness)  ((brightness) < 0 ? -(brightness) : (brightness))
+
+static u8 sCloudBlendY;
 
 // The clouds are positioned on the map's grid.
 // These coordinates are for the lower half of Route 120.
@@ -57,7 +67,7 @@ static const struct OamData sCloudSpriteOamData =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_OFF,
-    .objMode = ST_OAM_OBJ_BLEND,
+    .objMode = ST_OAM_OBJ_WINDOW,
     .mosaic = FALSE,
     .bpp = ST_OAM_4BPP,
     .shape = SPRITE_SHAPE(64x64),
@@ -65,7 +75,7 @@ static const struct OamData sCloudSpriteOamData =
     .matrixNum = 0,
     .size = SPRITE_SIZE(64x64),
     .tileNum = 0,
-    .priority = 3,
+    .priority = 0,
     .paletteNum = 0,
     .affineParam = 0,
 };
@@ -98,8 +108,6 @@ void Clouds_InitVars(void)
     gWeatherPtr->colorMapStepDelay = 20;
     gWeatherPtr->weatherGfxLoaded = FALSE;
     gWeatherPtr->initStep = 0;
-    if (gWeatherPtr->cloudSpritesCreated == FALSE)
-        Weather_SetBlendCoeffs(0, 16);
 }
 
 void Clouds_InitAll(void)
@@ -115,14 +123,23 @@ void Clouds_Main(void)
     {
     case 0:
         CreateCloudSprites();
+        sCloudBlendY = 0;
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                                   | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(CLOUD_BRIGHTNESS));
+        SetGpuReg(REG_OFFSET_BLDY, 0);
+        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
+                                   | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
+        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
         gWeatherPtr->initStep++;
         break;
     case 1:
-        Weather_SetTargetBlendCoeffs(12, 8, 1);
-        gWeatherPtr->initStep++;
-        break;
-    case 2:
-        if (Weather_UpdateBlend())
+        if (sCloudBlendY < WEATHER_BLEND_LEVEL(CLOUD_BRIGHTNESS))
+        {
+            sCloudBlendY++;
+            SetGpuReg(REG_OFFSET_BLDY, sCloudBlendY);
+        }
+        else
         {
             gWeatherPtr->weatherGfxLoaded = TRUE;
             gWeatherPtr->initStep++;
@@ -136,15 +153,24 @@ bool8 Clouds_Finish(void)
     switch (gWeatherPtr->finishStep)
     {
     case 0:
-        Weather_SetTargetBlendCoeffs(0, 16, 1);
-        gWeatherPtr->finishStep++;
-        return TRUE;
-    case 1:
-        if (Weather_UpdateBlend())
+        if (sCloudBlendY != 0)
         {
-            DestroyCloudSprites();
-            gWeatherPtr->finishStep++;
+            sCloudBlendY--;
+            SetGpuReg(REG_OFFSET_BLDY, sCloudBlendY);
+            return TRUE;
         }
+        gWeatherPtr->finishStep++;
+        // fall through
+    case 1:
+        DestroyCloudSprites();
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
+                                   | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+        SetGpuReg(REG_OFFSET_BLDY, 0);
+        SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
+        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
+        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+        gWeatherPtr->finishStep++;
         return TRUE;
     }
     return FALSE;
@@ -180,7 +206,6 @@ static void CreateCloudSprites(void)
         return;
 
     LoadSpriteSheet(&sCloudSpriteSheet);
-    LoadCustomWeatherSpritePalette(gCloudsWeatherPalette);
     for (i = 0; i < NUM_CLOUD_SPRITES; i++)
     {
         spriteId = CreateSprite(&sCloudSpriteTemplate, 0, 0, 0xFF);
@@ -1277,6 +1302,8 @@ static void UpdateThunderSound(void)
 
 static const u16 sUnusedData[] = {0, 6, 6, 12, 18, 42, 300, 300};
 
+static u8 sFogBlendY;
+
 static const struct OamData sOamData_FogH =
 {
     .y = 0,
@@ -1289,7 +1316,7 @@ static const struct OamData sOamData_FogH =
     .matrixNum = 0,
     .size = SPRITE_SIZE(64x64),
     .tileNum = 0,
-    .priority = 2,
+    .priority = 1,
     .paletteNum = 0,
     .affineParam = 0,
 };
@@ -1402,13 +1429,37 @@ void FogHorizontal_Main(void)
     case 0:
         CreateFogHorizontalSprites();
         if (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
-            Weather_SetTargetBlendCoeffs(12, 8, 3);
+        {
+            sFogBlendY = 0;
+            SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                                       | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(FOG_BRIGHTNESS));
+            SetGpuReg(REG_OFFSET_BLDY, 0);
+            SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
+                                       | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
+            ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+            SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+        }
         else
-            Weather_SetTargetBlendCoeffs(4, 16, 0);
+        {
+            Weather_SetTargetBlendCoeffs(14, 8, 0);
+        }
         gWeatherPtr->initStep++;
         break;
     case 1:
-        if (Weather_UpdateBlend())
+        if (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
+        {
+            if (sFogBlendY < WEATHER_BLEND_LEVEL(FOG_BRIGHTNESS))
+            {
+                sFogBlendY++;
+                SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
+            }
+            else
+            {
+                gWeatherPtr->weatherGfxLoaded = TRUE;
+                gWeatherPtr->initStep++;
+            }
+        }
+        else if (Weather_UpdateBlend())
         {
             gWeatherPtr->weatherGfxLoaded = TRUE;
             gWeatherPtr->initStep++;
@@ -1424,6 +1475,34 @@ bool8 FogHorizontal_Finish(void)
     {
         gWeatherPtr->fogHScrollCounter = 0;
         gWeatherPtr->fogHScrollOffset++;
+    }
+
+    if (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
+    {
+        switch (gWeatherPtr->finishStep)
+        {
+        case 0:
+            if (sFogBlendY != 0)
+            {
+                sFogBlendY--;
+                SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
+                return TRUE;
+            }
+            gWeatherPtr->finishStep++;
+            // fall through
+        case 1:
+            DestroyFogHorizontalSprites();
+            SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
+                                       | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+            SetGpuReg(REG_OFFSET_BLDY, 0);
+            SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
+            SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
+            ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+            SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+            gWeatherPtr->finishStep++;
+            return TRUE;
+        }
+        return FALSE;
     }
 
     switch (gWeatherPtr->finishStep)
@@ -1467,6 +1546,8 @@ static void CreateFogHorizontalSprites(void)
 
     if (!gWeatherPtr->fogHSpritesCreated)
     {
+        u8 objMode = (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
+                   ? ST_OAM_OBJ_WINDOW : ST_OAM_OBJ_BLEND;
         struct SpriteSheet fogHorizontalSpriteSheet = {
             .data = gWeatherFogHorizontalTiles,
             .size = sizeof(gWeatherFogHorizontalTiles),
@@ -1479,6 +1560,7 @@ static void CreateFogHorizontalSprites(void)
             if (spriteId != MAX_SPRITES)
             {
                 sprite = &gSprites[spriteId];
+                sprite->oam.objMode = objMode;
                 sprite->tSpriteColumn = i % 5;
                 sprite->x = (i % 5) * 64 + 32;
                 sprite->y = (i / 5) * 64 + 32;
@@ -1766,17 +1848,27 @@ void FogDiagonal_Main(void)
     {
     case 0:
         CreateFogDiagonalSprites();
+        sFogBlendY = 0;
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                                   | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(FOG_BRIGHTNESS));
+        SetGpuReg(REG_OFFSET_BLDY, 0);
+        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
+                                   | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
+        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
         gWeatherPtr->initStep++;
         break;
     case 1:
-        Weather_SetTargetBlendCoeffs(12, 8, 8);
-        gWeatherPtr->initStep++;
-        break;
-    case 2:
-        if (!Weather_UpdateBlend())
-            break;
-        gWeatherPtr->weatherGfxLoaded = TRUE;
-        gWeatherPtr->initStep++;
+        if (sFogBlendY < WEATHER_BLEND_LEVEL(FOG_BRIGHTNESS))
+        {
+            sFogBlendY++;
+            SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
+        }
+        else
+        {
+            gWeatherPtr->weatherGfxLoaded = TRUE;
+            gWeatherPtr->initStep++;
+        }
         break;
     }
 }
@@ -1787,22 +1879,27 @@ bool8 FogDiagonal_Finish(void)
     switch (gWeatherPtr->finishStep)
     {
     case 0:
-        Weather_SetTargetBlendCoeffs(0, 16, 1);
+        if (sFogBlendY != 0)
+        {
+            sFogBlendY--;
+            SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
+            return TRUE;
+        }
         gWeatherPtr->finishStep++;
-        break;
+        // fall through
     case 1:
-        if (!Weather_UpdateBlend())
-            break;
-        gWeatherPtr->finishStep++;
-        break;
-    case 2:
         DestroyFogDiagonalSprites();
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
+                                   | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+        SetGpuReg(REG_OFFSET_BLDY, 0);
+        SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
+        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
+        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
         gWeatherPtr->finishStep++;
-        break;
-    default:
-        return FALSE;
+        return TRUE;
     }
-    return TRUE;
+    return FALSE;
 }
 
 static void UpdateFogDiagonalMovement(void)
@@ -1834,13 +1931,13 @@ static const struct OamData sFogDiagonalSpriteOamData =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_OFF,
-    .objMode = ST_OAM_OBJ_BLEND,
+    .objMode = ST_OAM_OBJ_WINDOW,
     .bpp = ST_OAM_4BPP,
     .shape = SPRITE_SHAPE(64x64),
     .x = 0,
     .size = SPRITE_SIZE(64x64),
     .tileNum = 0,
-    .priority = 2,
+    .priority = 0,
     .paletteNum = 0,
 };
 
