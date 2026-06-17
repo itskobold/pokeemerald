@@ -354,7 +354,7 @@ bool32 ShouldDoWallyCall(void)
 {
     if (FlagGet(FLAG_ENABLE_FIRST_WALLY_POKENAV_CALL))
     {
-        switch (gMapHeader.mapType)
+        switch (gMapHeader.location.mapType)
         {
         case MAP_TYPE_TOWN:
         case MAP_TYPE_CITY:
@@ -379,7 +379,7 @@ bool32 ShouldDoScottFortreeCall(void)
 {
     if (FlagGet(FLAG_SCOTT_CALL_FORTREE_GYM))
     {
-        switch (gMapHeader.mapType)
+        switch (gMapHeader.location.mapType)
         {
         case MAP_TYPE_TOWN:
         case MAP_TYPE_CITY:
@@ -404,7 +404,7 @@ bool32 ShouldDoScottBattleFrontierCall(void)
 {
     if (FlagGet(FLAG_SCOTT_CALL_BATTLE_FRONTIER))
     {
-        switch (gMapHeader.mapType)
+        switch (gMapHeader.location.mapType)
         {
         case MAP_TYPE_TOWN:
         case MAP_TYPE_CITY:
@@ -429,7 +429,7 @@ bool32 ShouldDoRoxanneCall(void)
 {
     if (FlagGet(FLAG_ENABLE_ROXANNE_FIRST_CALL))
     {
-        switch (gMapHeader.mapType)
+        switch (gMapHeader.location.mapType)
         {
         case MAP_TYPE_TOWN:
         case MAP_TYPE_CITY:
@@ -454,7 +454,7 @@ bool32 ShouldDoRivalRayquazaCall(void)
 {
     if (FlagGet(FLAG_DEFEATED_MAGMA_SPACE_CENTER))
     {
-        switch (gMapHeader.mapType)
+        switch (gMapHeader.location.mapType)
         {
         case MAP_TYPE_TOWN:
         case MAP_TYPE_CITY:

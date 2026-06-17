@@ -369,7 +369,7 @@ static bool32 AreAnyTrainerRematchesNearby(void)
 
     for (i = 0; i < REMATCH_TABLE_ENTRIES; i++)
     {
-        if (GetMatchTableMapSectionId(i) == gMapHeader.regionMapSectionId
+        if (GetMatchTableMapSectionId(i) == gMapHeader.location.regionMapSectionId
             && IsRematchEntryRegistered(i)
             && gSaveBlock1Ptr->trainerRematches[i])
             return TRUE;

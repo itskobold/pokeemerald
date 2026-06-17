@@ -95,7 +95,6 @@ struct MapLayout
     /*0x0C*/ const u16 *map;
     /*0x10*/ const u8 *mapAttributes;
     /*0x14*/ const struct Tileset *primaryTileset;
-    /*0x18*/ const struct Tileset *secondaryTileset;
 };
 
 struct BackupMapLayout
@@ -185,30 +184,37 @@ struct MapConnections
     const struct MapConnection *connections;
 };
 
+// Properties that apply per in-map location. A map's per-tile location attribute
+// (see MAPATTR_LOCATION_MASK) is intended to select which set of these properties
+// is active. Currently each map uses a single instance, but grouping the fields
+// here prepares for multiple locations per map.
+struct MapHeaderLocationData
+{
+    /* 0x00 */ const struct Tileset *secondaryTileset;
+    /* 0x04 */ u16 music;
+    /* 0x06 */ mapsec_u8_t regionMapSectionId;
+    /* 0x07 */ u8 mapType;
+    /* 0x08 */ u8 battleType;
+    /* 0x09 */ bool8 showMapName;
+};
+
 struct MapHeader
 {
     /* 0x00 */ const struct MapLayout *mapLayout;
     /* 0x04 */ const struct MapEvents *events;
     /* 0x08 */ const u8 *mapScripts;
     /* 0x0C */ const struct MapConnections *connections;
-    /* 0x10 */ u16 music;
-    /* 0x12 */ u16 mapLayoutId;
-    /* 0x14 */ mapsec_u8_t regionMapSectionId;
-    /* 0x15 */ u8 cave;
-    /* 0x16 */ u8 weather;
-    /* 0x17 */ u8 mapType;
-               // Number of distinct per-tile location values used by this map, minus 1
-               // (so 0 = 1 location ... 3 = 4 locations). See MAPATTR_LOCATION_MASK.
-    /* 0x18 */ u8 numLocations:2;
-               u8 filler_18:6;
-    /* 0x19 */ u8 filler_19;
+    /* 0x10 */ struct MapHeaderLocationData location;
+    /* 0x1C */ u16 mapLayoutId;
+    /* 0x1E */ u8 cave;
+    /* 0x1F */ u8 weather;
+    /* 0x20 */ u8 numLocations:2;
+               u8 filler_20:6;
                // fields correspond to the arguments in the map_header_flags macro
-    /* 0x1A */ bool8 allowCycling:1;
+    /* 0x21 */ bool8 allowCycling:1;
                bool8 allowEscaping:1; // Escape Rope and Dig
                bool8 allowRunning:1;
-               bool8 showMapName:5; // the last 4 bits are unused
-                                    // but the 5 bit sized bitfield is required to match
-    /* 0x1B */ u8 battleType;
+               // the remaining bits are unused
 };
 
 

@@ -612,8 +612,8 @@ static void _InitSecondaryTilesetAnimation(void)
     sSecondaryTilesetAnimCounter = 0;
     sSecondaryTilesetAnimCounterMax = 0;
     sSecondaryTilesetAnimCallback = NULL;
-    if (gMapHeader.mapLayout->secondaryTileset && gMapHeader.mapLayout->secondaryTileset->callback)
-        gMapHeader.mapLayout->secondaryTileset->callback();
+    if (gMapHeader.location.secondaryTileset && gMapHeader.location.secondaryTileset->callback)
+        gMapHeader.location.secondaryTileset->callback();
 }
 
 void InitTilesetAnim_General(void)

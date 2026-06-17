@@ -648,7 +648,7 @@ u8 BattleSetup_GetEnvironmentId(void)
     if (MetatileBehavior_IsSandOrDeepSand(tileBehavior))
         return BATTLE_ENVIRONMENT_SAND;
 
-    switch (gMapHeader.mapType)
+    switch (gMapHeader.location.mapType)
     {
     case MAP_TYPE_TOWN:
     case MAP_TYPE_CITY:
@@ -707,7 +707,7 @@ static u8 GetBattleTransitionTypeByMap(void)
     if (MetatileBehavior_IsSurfableWaterOrUnderwater(tileBehavior))
         return TRANSITION_TYPE_WATER;
 
-    switch (gMapHeader.mapType)
+    switch (gMapHeader.location.mapType)
     {
     case MAP_TYPE_UNDERGROUND:
         return TRANSITION_TYPE_CAVE;

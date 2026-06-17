@@ -61,7 +61,7 @@ static void Task_DoFieldMove_Init(u8 taskId)
     if (!ObjectEventIsMovementOverridden(&gObjectEvents[objEventId])
      || ObjectEventClearHeldMovementIfFinished(&gObjectEvents[objEventId]))
     {
-        if (gMapHeader.mapType == MAP_TYPE_UNDERWATER)
+        if (gMapHeader.location.mapType == MAP_TYPE_UNDERWATER)
         {
             // Skip field move pose underwater
             FieldEffectStart(FLDEFF_FIELD_MOVE_SHOW_MON_INIT);

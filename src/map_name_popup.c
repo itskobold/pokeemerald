@@ -356,7 +356,7 @@ static void ShowMapNamePopUpWindow(void)
     else
     {
         withoutPrefixPtr = &(mapDisplayHeader[3]);
-        GetMapName(withoutPrefixPtr, gMapHeader.regionMapSectionId, 0);
+        GetMapName(withoutPrefixPtr, gMapHeader.location.regionMapSectionId, 0);
     }
     AddMapNamePopUpWindow();
     LoadMapNamePopUpWindowBg();
@@ -404,7 +404,7 @@ static void LoadMapNamePopUpWindowBg(void)
 {
     u8 popUpThemeId;
     u8 popupWindowId = GetMapNamePopUpWindowId();
-    mapsec_u16_t regionMapSectionId = gMapHeader.regionMapSectionId;
+    mapsec_u16_t regionMapSectionId = gMapHeader.location.regionMapSectionId;
 
     if (regionMapSectionId >= KANTO_MAPSEC_START)
     {

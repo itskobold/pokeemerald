@@ -1675,7 +1675,7 @@ static void PlaceDecoration(u8 taskId)
     }
 
     gSprites[sDecor_CameraSpriteObjectIdx1].y += 2;
-    if (gMapHeader.regionMapSectionId == MAPSEC_SECRET_BASE)
+    if (gMapHeader.location.regionMapSectionId == MAPSEC_SECRET_BASE)
         TryPutSecretBaseVisitOnAir();
 
     CancelDecorating_(taskId);
@@ -2284,7 +2284,7 @@ static void Task_PutAwayDecoration(u8 taskId)
         {
             StringExpandPlaceholders(gStringVar4, gText_DecorationReturnedToPC);
             DisplayItemMessageOnField(taskId, gStringVar4, ContinuePuttingAwayDecorationsPrompt);
-            if (gMapHeader.regionMapSectionId == MAPSEC_SECRET_BASE)
+            if (gMapHeader.location.regionMapSectionId == MAPSEC_SECRET_BASE)
                 TryPutSecretBaseVisitOnAir();
         }
         break;

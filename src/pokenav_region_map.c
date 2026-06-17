@@ -159,7 +159,7 @@ u32 PokenavCallback_Init_RegionMap(void)
     if (!AllocSubstruct(POKENAV_SUBSTRUCT_REGION_MAP, sizeof(struct RegionMap)))
         return FALSE;
 
-    state->zoomDisabled = IsEventIslandMapSecId(gMapHeader.regionMapSectionId);
+    state->zoomDisabled = IsEventIslandMapSecId(gMapHeader.location.regionMapSectionId);
     if (!state->zoomDisabled)
         state->callback = HandleRegionMapInput;
     else

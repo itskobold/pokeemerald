@@ -139,7 +139,11 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
     string mapName = json_to_string(map_data, "name");
     text << get_generated_warning("data/maps/" + mapName + "/map.json", true);
 
-    text << mapName << ":\n"
+    // Map headers are referenced by pointer and read directly from ROM, so each
+    // must be 4-byte aligned (struct MapHeader contains pointers). The struct size
+    // is not necessarily a multiple of 4, so align explicitly before every header.
+    text << "\t.align 2\n"
+         << mapName << ":\n"
          << "\t.4byte " << json_to_string(layout, "name") << "\n";
 
     if (map_data.object_items().find("shared_events_map") != map_data.object_items().end())
@@ -158,39 +162,43 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
     else
         text << "\t.4byte NULL\n";
 
-    text << "\t.2byte " << json_to_string(map_data, "music") << "\n"
-         << "\t.2byte " << json_to_string(layout, "id") << "\n"
+    // struct MapHeaderLocationData (see include/global.fieldmap.h). The secondary
+    // tileset now lives here (per map/location) rather than in the layout, but it
+    // is still authored in layouts.json and copied in from the matched layout.
+    text << "\t.4byte " << json_to_string(layout, "secondary_tileset") << "\n"
+         << "\t.2byte " << json_to_string(map_data, "music") << "\n"
          << "\t.byte "  << json_to_string(map_data, "region_map_section") << "\n"
+         << "\t.byte "  << json_to_string(map_data, "map_type") << "\n"
+         << "\t.byte "  << json_to_string(map_data, "battle_scene") << "\n"
+         << "\t.byte "  << json_to_string(map_data, "show_map_name") << "\n"
+         << "\t.align 2\n"; // pad MapHeaderLocationData to a multiple of 4 bytes
+
+    text << "\t.2byte " << json_to_string(layout, "id") << "\n"
          << "\t.byte "  << json_to_string(map_data, "requires_flash") << "\n"
-         << "\t.byte "  << json_to_string(map_data, "weather") << "\n"
-         << "\t.byte "  << json_to_string(map_data, "map_type") << "\n";
+         << "\t.byte "  << json_to_string(map_data, "weather") << "\n";
 
     if (version != "firered") {
-        // 0x18: numLocations (low 2 bits), stored as the location count minus 1
-        // (default 1 location -> 0). 0x19: unused padding byte.
+        // numLocations (low 2 bits), stored as the location count minus 1
+        // (default 1 location -> 0).
         int num_locations = 1;
         auto it = map_data.object_items().find("num_locations");
         if (it != map_data.object_items().end())
             num_locations = it->second.int_value();
         if (num_locations < 1)
             num_locations = 1;
-        text << "\t.byte " << (num_locations - 1) << "\n"
-             << "\t.byte 0\n";
+        text << "\t.byte " << (num_locations - 1) << "\n";
     }
 
-    if (version == "ruby")
-        text << "\t.byte " << json_to_string(map_data, "show_map_name") << "\n";
-    else if (version == "emerald" || version == "firered")
+    if (version == "emerald" || version == "firered")
         text << "\tmap_header_flags "
              << "allow_cycling=" << json_to_string(map_data, "allow_cycling") << ", "
              << "allow_escaping=" << json_to_string(map_data, "allow_escaping") << ", "
-             << "allow_running=" << json_to_string(map_data, "allow_running") << ", "
-             << "show_map_name=" << json_to_string(map_data, "show_map_name") << "\n";
+             << "allow_running=" << json_to_string(map_data, "allow_running") << "\n";
 
     if (version == "firered")
         text << "\t.byte " << json_to_string(map_data, "floor_number") << "\n";
 
-     text << "\t.byte " << json_to_string(map_data, "battle_scene") << "\n\n";
+    text << "\n";
 
     return text.str();
 }
@@ -629,8 +637,7 @@ string generate_layout_headers_text(Json layouts_data) {
              << "\t.4byte " << border_label << "\n"
              << "\t.4byte " << blockdata_label << "\n"
              << "\t.4byte " << attributes_label << "\n"
-             << "\t.4byte " << json_to_string(layout, "primary_tileset") << "\n"
-             << "\t.4byte " << json_to_string(layout, "secondary_tileset") << "\n";
+             << "\t.4byte " << json_to_string(layout, "primary_tileset") << "\n";
         if (version == "firered") {
             text << "\t.byte " << json_to_string(layout, "border_width") << "\n"
                  << "\t.byte " << json_to_string(layout, "border_height") << "\n"

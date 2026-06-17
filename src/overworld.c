@@ -588,7 +588,7 @@ struct MapHeader const *const GetDestinationWarpMapHeader(void)
 
 static void LoadCurrentMapData(void)
 {
-    sLastMapSectionId = gMapHeader.regionMapSectionId;
+    sLastMapSectionId = gMapHeader.location.regionMapSectionId;
     gMapHeader = *Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
     gSaveBlock1Ptr->mapLayoutId = gMapHeader.mapLayoutId;
     gMapHeader.mapLayout = GetMapLayout();
@@ -788,7 +788,7 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     SetWarpDestination(mapGroup, mapNum, WARP_ID_NONE, -1, -1);
 
     // Dont transition map music between BF Outside West/East
-    if (gMapHeader.regionMapSectionId != MAPSEC_BATTLE_FRONTIER)
+    if (gMapHeader.location.regionMapSectionId != MAPSEC_BATTLE_FRONTIER)
         TransitionMapMusic();
 
     ApplyCurrentWarp();
@@ -819,8 +819,8 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     ResetFieldTasksArgs();
     RunOnResumeMapScript();
 
-    if (gMapHeader.regionMapSectionId != MAPSEC_BATTLE_FRONTIER
-     || gMapHeader.regionMapSectionId != sLastMapSectionId)
+    if (gMapHeader.location.regionMapSectionId != MAPSEC_BATTLE_FRONTIER
+     || gMapHeader.location.regionMapSectionId != sLastMapSectionId)
         ShowMapNamePopup();
 }
 
@@ -840,8 +840,8 @@ static void LoadMapFromWarp(bool32 a1)
             LoadObjEventTemplatesFromHeader();
     }
 
-    isOutdoors = IsMapTypeOutdoors(gMapHeader.mapType);
-    isIndoors = IsMapTypeIndoors(gMapHeader.mapType);
+    isOutdoors = IsMapTypeOutdoors(gMapHeader.location.mapType);
+    isIndoors = IsMapTypeIndoors(gMapHeader.location.mapType);
 
     CheckLeftFriendsSecretBase();
     TrySetMapSaveWarpStatus();
@@ -1090,7 +1090,7 @@ u16 GetLocationMusic(struct WarpData *warp)
     else if (IsInfiltratedWeatherInstitute(warp) == TRUE)
         return MUS_MT_CHIMNEY;
     else
-        return Overworld_GetMapHeaderByGroupAndId(warp->mapGroup, warp->mapNum)->music;
+        return Overworld_GetMapHeaderByGroupAndId(warp->mapGroup, warp->mapNum)->location.music;
 }
 
 u16 GetCurrLocationDefaultMusic(void)
@@ -1207,7 +1207,7 @@ void Overworld_ChangeMusicTo(u16 newMusic)
 u8 GetMapMusicFadeoutSpeed(void)
 {
     const struct MapHeader *mapHeader = GetDestinationWarpMapHeader();
-    if (IsMapTypeIndoors(mapHeader->mapType) == TRUE)
+    if (IsMapTypeIndoors(mapHeader->location.mapType) == TRUE)
         return 2;
     else
         return 4;
@@ -1333,7 +1333,7 @@ static void ChooseAmbientCrySpecies(void)
 
 u8 GetMapTypeByGroupAndId(s8 mapGroup, s8 mapNum)
 {
-    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->mapType;
+    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->location.mapType;
 }
 
 u8 GetMapTypeByWarpData(struct WarpData *warp)
@@ -1385,17 +1385,17 @@ bool8 IsMapTypeIndoors(u8 mapType)
 
 mapsec_u8_t GetSavedWarpRegionMapSectionId(void)
 {
-    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->dynamicWarp.mapGroup, gSaveBlock1Ptr->dynamicWarp.mapNum)->regionMapSectionId;
+    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->dynamicWarp.mapGroup, gSaveBlock1Ptr->dynamicWarp.mapNum)->location.regionMapSectionId;
 }
 
 mapsec_u8_t GetCurrentRegionMapSectionId(void)
 {
-    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->regionMapSectionId;
+    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->location.regionMapSectionId;
 }
 
 u8 GetCurrentMapBattleScene(void)
 {
-    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->battleType;
+    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->location.battleType;
 }
 
 static void InitOverworldBgs(void)
@@ -1697,7 +1697,7 @@ void CB2_ReturnToFieldFadeFromBlack(void)
 
 static void FieldCB_FadeTryShowMapPopup(void)
 {
-    if (gMapHeader.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
+    if (gMapHeader.location.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
         ShowMapNamePopup();
     FieldCB_WarpExitFadeFromBlack();
 }
@@ -1943,7 +1943,7 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
         (*state)++;
         break;
     case 11:
-        if (gMapHeader.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
+        if (gMapHeader.location.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
             ShowMapNamePopup();
         (*state)++;
         break;

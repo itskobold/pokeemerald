@@ -352,7 +352,7 @@ const u8 *GetMatchCallMessageText(int index, bool8 *newRematchRequest)
 {
     struct Pokenav_MatchCallMenu *state = GetSubstructPtr(POKENAV_SUBSTRUCT_MATCH_CALL_MAIN);
     *newRematchRequest = FALSE;
-    if (!Overworld_MapTypeAllowsTeleportAndFly(gMapHeader.mapType))
+    if (!Overworld_MapTypeAllowsTeleportAndFly(gMapHeader.location.mapType))
         return gText_CallCantBeMadeHere;
 
     if (!state->matchCallEntries[index].isSpecialTrainer)
@@ -428,7 +428,7 @@ mapsec_u8_t GetMatchTableMapSectionId(int rematchIndex)
 {
     int mapGroup = gRematchTable[rematchIndex].mapGroup;
     int mapNum = gRematchTable[rematchIndex].mapNum;
-    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->regionMapSectionId;
+    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->location.regionMapSectionId;
 }
 
 int GetIndexDeltaOfNextCheckPageDown(int index)
@@ -494,7 +494,7 @@ static bool32 ShouldDoNearbyMessage(void)
     int selection = PokenavList_GetSelectedIndex();
     if (!state->matchCallEntries[selection].isSpecialTrainer)
     {
-        if (GetMatchCallMapSec(selection) == gMapHeader.regionMapSectionId)
+        if (GetMatchCallMapSec(selection) == gMapHeader.location.regionMapSectionId)
         {
             if (!gSaveBlock1Ptr->trainerRematches[state->matchCallEntries[selection].headerId])
                 return TRUE;
@@ -504,7 +504,7 @@ static bool32 ShouldDoNearbyMessage(void)
     {
         if (state->matchCallEntries[selection].headerId == MC_HEADER_WATTSON)
         {
-            if (GetMatchCallMapSec(selection) == gMapHeader.regionMapSectionId
+            if (GetMatchCallMapSec(selection) == gMapHeader.location.regionMapSectionId
              && FlagGet(FLAG_BADGE05_GET) == TRUE)
             {
                 if (!FlagGet(FLAG_WATTSON_REMATCH_AVAILABLE))
