@@ -2,17 +2,46 @@
   "id": "MAP_BATTLE_COLOSSEUM_4P",
   "name": "BattleColosseum_4P",
   "layout": "LAYOUT_BATTLE_COLOSSEUM_4P",
-  "music": "MUS_EVER_GRANDE",
-  "region_map_section": "MAPSEC_DYNAMIC",
   "requires_flash": false,
   "weather": "WEATHER_NONE",
-  "map_type": "MAP_TYPE_INDOOR",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": false,
-  "show_map_name": false,
-  "battle_scene": "MAP_BATTLE_SCENE_FRONTIER",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_CableClub",
+      "music": "MUS_EVER_GRANDE",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_FRONTIER",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_CableClub",
+      "music": "MUS_EVER_GRANDE",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_FRONTIER",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_CableClub",
+      "music": "MUS_EVER_GRANDE",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_FRONTIER",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_CableClub",
+      "music": "MUS_EVER_GRANDE",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_FRONTIER",
+      "show_map_name": false
+    }
+  ],
   "connections": null,
   "object_events": [],
   "warp_events": [

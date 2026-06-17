@@ -2,17 +2,46 @@
   "id": "MAP_SEAFLOOR_CAVERN_ENTRANCE",
   "name": "SeafloorCavern_Entrance",
   "layout": "LAYOUT_SEAFLOOR_CAVERN_ENTRANCE",
-  "music": "MUS_MT_CHIMNEY",
-  "region_map_section": "MAPSEC_SEAFLOOR_CAVERN",
   "requires_flash": false,
   "weather": "WEATHER_NONE",
-  "map_type": "MAP_TYPE_UNDERGROUND",
   "allow_cycling": true,
   "allow_escaping": true,
   "allow_running": true,
-  "show_map_name": true,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_Cave",
+      "music": "MUS_MT_CHIMNEY",
+      "region_map_section": "MAPSEC_SEAFLOOR_CAVERN",
+      "map_type": "MAP_TYPE_UNDERGROUND",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Cave",
+      "music": "MUS_MT_CHIMNEY",
+      "region_map_section": "MAPSEC_SEAFLOOR_CAVERN",
+      "map_type": "MAP_TYPE_UNDERGROUND",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Cave",
+      "music": "MUS_MT_CHIMNEY",
+      "region_map_section": "MAPSEC_SEAFLOOR_CAVERN",
+      "map_type": "MAP_TYPE_UNDERGROUND",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Cave",
+      "music": "MUS_MT_CHIMNEY",
+      "region_map_section": "MAPSEC_SEAFLOOR_CAVERN",
+      "map_type": "MAP_TYPE_UNDERGROUND",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    }
+  ],
   "connections": null,
   "object_events": [
     {

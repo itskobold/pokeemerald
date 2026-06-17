@@ -1051,7 +1051,7 @@ static void InitMapBasedOnPlayerLocation(void)
     case MAP_TYPE_ROUTE:
     case MAP_TYPE_UNDERWATER:
     case MAP_TYPE_OCEAN_ROUTE:
-        sRegionMap->mapSecId = gMapHeader.location.regionMapSectionId;
+        sRegionMap->mapSecId = GetActiveLocationData()->regionMapSectionId;
         sRegionMap->playerIsInCave = FALSE;
         mapWidth = gMapHeader.mapLayout->width;
         mapHeight = gMapHeader.mapLayout->height;
@@ -1065,7 +1065,7 @@ static void InitMapBasedOnPlayerLocation(void)
         if (gMapHeader.allowEscaping)
         {
             mapHeader = Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->escapeWarp.mapGroup, gSaveBlock1Ptr->escapeWarp.mapNum);
-            sRegionMap->mapSecId = mapHeader->location.regionMapSectionId;
+            sRegionMap->mapSecId = mapHeader->locations[0]->regionMapSectionId;
             sRegionMap->playerIsInCave = TRUE;
             mapWidth = mapHeader->mapLayout->width;
             mapHeight = mapHeader->mapLayout->height;
@@ -1074,7 +1074,7 @@ static void InitMapBasedOnPlayerLocation(void)
         }
         else
         {
-            sRegionMap->mapSecId = gMapHeader.location.regionMapSectionId;
+            sRegionMap->mapSecId = GetActiveLocationData()->regionMapSectionId;
             sRegionMap->playerIsInCave = TRUE;
             mapWidth = 1;
             mapHeight = 1;
@@ -1084,7 +1084,7 @@ static void InitMapBasedOnPlayerLocation(void)
         break;
     case MAP_TYPE_SECRET_BASE:
         mapHeader = Overworld_GetMapHeaderByGroupAndId((u16)gSaveBlock1Ptr->dynamicWarp.mapGroup, (u16)gSaveBlock1Ptr->dynamicWarp.mapNum);
-        sRegionMap->mapSecId = mapHeader->location.regionMapSectionId;
+        sRegionMap->mapSecId = mapHeader->locations[0]->regionMapSectionId;
         sRegionMap->playerIsInCave = TRUE;
         mapWidth = mapHeader->mapLayout->width;
         mapHeight = mapHeader->mapLayout->height;
@@ -1092,7 +1092,7 @@ static void InitMapBasedOnPlayerLocation(void)
         y = gSaveBlock1Ptr->dynamicWarp.y;
         break;
     case MAP_TYPE_INDOOR:
-        sRegionMap->mapSecId = gMapHeader.location.regionMapSectionId;
+        sRegionMap->mapSecId = GetActiveLocationData()->regionMapSectionId;
         if (sRegionMap->mapSecId != MAPSEC_DYNAMIC)
         {
             warp = &gSaveBlock1Ptr->escapeWarp;
@@ -1102,7 +1102,7 @@ static void InitMapBasedOnPlayerLocation(void)
         {
             warp = &gSaveBlock1Ptr->dynamicWarp;
             mapHeader = Overworld_GetMapHeaderByGroupAndId(warp->mapGroup, warp->mapNum);
-            sRegionMap->mapSecId = mapHeader->location.regionMapSectionId;
+            sRegionMap->mapSecId = mapHeader->locations[0]->regionMapSectionId;
         }
 
         if (IsPlayerInAquaHideout(sRegionMap->mapSecId))
@@ -1209,7 +1209,7 @@ static void RegionMap_InitializeStateBasedOnSSTidalLocation(void)
     case SS_TIDAL_LOCATION_CURRENTS:
         mapHeader = Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum);
 
-        sRegionMap->mapSecId = mapHeader->location.regionMapSectionId;
+        sRegionMap->mapSecId = mapHeader->locations[0]->regionMapSectionId;
         dimensionScale = mapHeader->mapLayout->width / gRegionMapEntries[sRegionMap->mapSecId].width;
         if (dimensionScale == 0)
             dimensionScale = 1;
@@ -1509,7 +1509,7 @@ void CreateRegionMapPlayerIcon(u16 tileTag, u16 paletteTag)
     struct SpritePalette palette = {sRegionMapPlayerIcon_BrendanPal, paletteTag};
     struct SpriteTemplate template = {tileTag, paletteTag, &sRegionMapPlayerIconOam, sRegionMapPlayerIconAnimTable, NULL, gDummySpriteAffineAnimTable, SpriteCallbackDummy};
 
-    if (IsEventIslandMapSecId(gMapHeader.location.regionMapSectionId))
+    if (IsEventIslandMapSecId(GetActiveLocationData()->regionMapSectionId))
     {
         sRegionMap->playerIconSprite = NULL;
         return;

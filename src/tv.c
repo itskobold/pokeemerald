@@ -983,7 +983,7 @@ void GabbyAndTyAfterInterview(void)
     gSaveBlock1Ptr->gabbyAndTyData.playerUsedHealingItem2 = gSaveBlock1Ptr->gabbyAndTyData.playerUsedHealingItem;
     gSaveBlock1Ptr->gabbyAndTyData.playerThrewABall2 = gSaveBlock1Ptr->gabbyAndTyData.playerThrewABall;
     gSaveBlock1Ptr->gabbyAndTyData.onAir = TRUE;
-    gSaveBlock1Ptr->gabbyAndTyData.mapnum = gMapHeader.location.regionMapSectionId;
+    gSaveBlock1Ptr->gabbyAndTyData.mapnum = GetActiveLocationData()->regionMapSectionId;
     IncrementGameStat(GAME_STAT_GOT_INTERVIEWED);
 }
 
@@ -1179,7 +1179,7 @@ static void InitWorldOfMastersShowAttempt(void)
     show->worldOfMasters.numPokeCaught++;
     show->worldOfMasters.caughtPoke = gBattleResults.caughtMonSpecies;
     show->worldOfMasters.species = gBattleResults.playerMon1Species;
-    show->worldOfMasters.location = gMapHeader.location.regionMapSectionId;
+    show->worldOfMasters.location = GetActiveLocationData()->regionMapSectionId;
 }
 
 static void TryPutPokemonTodayFailedOnTheAir(void)
@@ -1207,7 +1207,7 @@ static void TryPutPokemonTodayFailedOnTheAir(void)
                 show->pokemonTodayFailed.species2 = gBattleResults.lastOpponentSpecies;
                 show->pokemonTodayFailed.nBallsUsed = ballsUsed;
                 show->pokemonTodayFailed.outcome = gBattleOutcome;
-                show->pokemonTodayFailed.location = gMapHeader.location.regionMapSectionId;
+                show->pokemonTodayFailed.location = GetActiveLocationData()->regionMapSectionId;
                 StringCopy(show->pokemonTodayFailed.playerName, gSaveBlock2Ptr->playerName);
                 StorePlayerIdInRecordMixShow(show);
                 show->pokemonTodayFailed.language = gGameLanguage;
@@ -1518,7 +1518,7 @@ void TryPutSmartShopperOnAir(void)
                 show = &gSaveBlock1Ptr->tvShows[sCurTVShowSlot];
                 show->smartshopperShow.kind = TVSHOW_SMART_SHOPPER;
                 show->smartshopperShow.active = FALSE; // NOTE: Show is not active until passed via Record Mix.
-                show->smartshopperShow.shopLocation = gMapHeader.location.regionMapSectionId;
+                show->smartshopperShow.shopLocation = GetActiveLocationData()->regionMapSectionId;
                 for (i = 0; i < SMARTSHOPPER_NUM_ITEMS; i++)
                 {
                     show->smartshopperShow.itemIds[i] = gMartPurchaseHistory[i].itemId;
@@ -1856,7 +1856,7 @@ void TryPutTodaysRivalTrainerOnAir(void)
             show->rivalTrainer.dexCount = GetNationalPokedexCount(FLAG_GET_CAUGHT);
         else
             show->rivalTrainer.dexCount = GetHoennPokedexCount(FLAG_GET_CAUGHT);
-        show->rivalTrainer.location = gMapHeader.location.regionMapSectionId;
+        show->rivalTrainer.location = GetActiveLocationData()->regionMapSectionId;
         show->rivalTrainer.mapLayoutId = gMapHeader.mapLayoutId;
         show->rivalTrainer.nSilverSymbols = 0;
         show->rivalTrainer.nGoldSymbols = 0;
@@ -1905,7 +1905,7 @@ void TryPutTreasureInvestigatorsOnAir(void)
         show->treasureInvestigators.kind = TVSHOW_TREASURE_INVESTIGATORS;
         show->treasureInvestigators.active = FALSE; // NOTE: Show is not active until passed via Record Mix.
         show->treasureInvestigators.item = gSpecialVar_0x8005;
-        show->treasureInvestigators.location = gMapHeader.location.regionMapSectionId;
+        show->treasureInvestigators.location = GetActiveLocationData()->regionMapSectionId;
         show->treasureInvestigators.mapLayoutId = gMapHeader.mapLayoutId;
         StringCopy(show->treasureInvestigators.playerName, gSaveBlock2Ptr->playerName);
         StorePlayerIdInRecordMixShow(show);
@@ -2136,7 +2136,7 @@ void TryPutBreakingNewsOnAir(void)
 
         if (gBattleResults.usedMasterBall)
             balls++;
-        show->breakingNews.location = gMapHeader.location.regionMapSectionId;
+        show->breakingNews.location = GetActiveLocationData()->regionMapSectionId;
         StringCopy(show->breakingNews.playerName, gSaveBlock2Ptr->playerName);
         show->breakingNews.poke1Species = gBattleResults.playerMon1Species;
         switch (gBattleOutcome)

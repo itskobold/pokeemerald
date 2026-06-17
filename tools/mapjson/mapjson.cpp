@@ -139,6 +139,43 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
     string mapName = json_to_string(map_data, "name");
     text << get_generated_warning("data/maps/" + mapName + "/map.json", true);
 
+    // The location attribute is 2 bits wide, so a map can have at most 4 location
+    // property sets (keep in sync with MAX_MAP_LOCATIONS in global.fieldmap.h).
+    const int MAX_MAP_LOCATIONS = 4;
+
+    // numLocations: how many of the location sets authored in the json are
+    // actually compiled (default 1). The json always carries MAX_MAP_LOCATIONS
+    // sets for editing, but only this many are emitted to ROM.
+    int num_locations = 1;
+    auto nl_it = map_data.object_items().find("num_locations");
+    if (nl_it != map_data.object_items().end())
+        num_locations = nl_it->second.int_value();
+    if (num_locations < 1)
+        num_locations = 1;
+    if (num_locations > MAX_MAP_LOCATIONS)
+        num_locations = MAX_MAP_LOCATIONS;
+
+    auto &locations = map_data["locations"].array_items();
+    if ((int)locations.size() < num_locations)
+        FATAL_ERROR("Map %s declares num_locations=%d but only has %d location set(s) in \"locations\".\n",
+                    mapName.c_str(), num_locations, (int)locations.size());
+
+    // Emit one const struct MapHeaderLocationData (see include/global.fieldmap.h)
+    // per compiled location, immediately before the header that points to them.
+    // The secondary tileset is authored per location in the map's json.
+    for (int i = 0; i < num_locations; i++) {
+        Json loc = locations[i];
+        text << "\t.align 2\n"
+             << mapName << "_MapHeaderLocationData_" << i << ":\n"
+             << "\t.4byte " << json_to_string(loc, "secondary_tileset") << "\n"
+             << "\t.2byte " << json_to_string(loc, "music") << "\n"
+             << "\t.byte "  << json_to_string(loc, "region_map_section") << "\n"
+             << "\t.byte "  << json_to_string(loc, "map_type") << "\n"
+             << "\t.byte "  << json_to_string(loc, "battle_scene") << "\n"
+             << "\t.byte "  << json_to_string(loc, "show_map_name") << "\n"
+             << "\t.align 2\n"; // pad MapHeaderLocationData to a multiple of 4 bytes
+    }
+
     // Map headers are referenced by pointer and read directly from ROM, so each
     // must be 4-byte aligned (struct MapHeader contains pointers). The struct size
     // is not necessarily a multiple of 4, so align explicitly before every header.
@@ -162,16 +199,14 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
     else
         text << "\t.4byte NULL\n";
 
-    // struct MapHeaderLocationData (see include/global.fieldmap.h). The secondary
-    // tileset now lives here (per map/location) rather than in the layout, but it
-    // is still authored in layouts.json and copied in from the matched layout.
-    text << "\t.4byte " << json_to_string(layout, "secondary_tileset") << "\n"
-         << "\t.2byte " << json_to_string(map_data, "music") << "\n"
-         << "\t.byte "  << json_to_string(map_data, "region_map_section") << "\n"
-         << "\t.byte "  << json_to_string(map_data, "map_type") << "\n"
-         << "\t.byte "  << json_to_string(map_data, "battle_scene") << "\n"
-         << "\t.byte "  << json_to_string(map_data, "show_map_name") << "\n"
-         << "\t.align 2\n"; // pad MapHeaderLocationData to a multiple of 4 bytes
+    // MapHeader.locations: one pointer per slot, the first num_locations pointing
+    // to the structs emitted above and the remaining slots left NULL.
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++) {
+        if (i < num_locations)
+            text << "\t.4byte " << mapName << "_MapHeaderLocationData_" << i << "\n";
+        else
+            text << "\t.4byte NULL\n";
+    }
 
     text << "\t.2byte " << json_to_string(layout, "id") << "\n"
          << "\t.byte "  << json_to_string(map_data, "requires_flash") << "\n"
@@ -180,12 +215,6 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
     if (version != "firered") {
         // numLocations (low 2 bits), stored as the location count minus 1
         // (default 1 location -> 0).
-        int num_locations = 1;
-        auto it = map_data.object_items().find("num_locations");
-        if (it != map_data.object_items().end())
-            num_locations = it->second.int_value();
-        if (num_locations < 1)
-            num_locations = 1;
         text << "\t.byte " << (num_locations - 1) << "\n";
     }
 

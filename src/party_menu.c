@@ -3737,14 +3737,14 @@ static void CursorCb_FieldMove(u8 taskId)
                 break;
             case FIELD_MOVE_TELEPORT:
                 mapHeader = Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->lastHealLocation.mapGroup, gSaveBlock1Ptr->lastHealLocation.mapNum);
-                GetMapNameGeneric(gStringVar1, mapHeader->location.regionMapSectionId);
+                GetMapNameGeneric(gStringVar1, mapHeader->locations[0]->regionMapSectionId);
                 StringExpandPlaceholders(gStringVar4, gText_ReturnToHealingSpot);
                 DisplayFieldMoveExitAreaMessage(taskId);
                 sPartyMenuInternal->data[0] = fieldMove;
                 break;
             case FIELD_MOVE_DIG:
                 mapHeader = Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->escapeWarp.mapGroup, gSaveBlock1Ptr->escapeWarp.mapNum);
-                GetMapNameGeneric(gStringVar1, mapHeader->location.regionMapSectionId);
+                GetMapNameGeneric(gStringVar1, mapHeader->locations[0]->regionMapSectionId);
                 StringExpandPlaceholders(gStringVar4, gText_EscapeFromHere);
                 DisplayFieldMoveExitAreaMessage(taskId);
                 sPartyMenuInternal->data[0] = fieldMove;
@@ -3876,7 +3876,7 @@ static void DisplayCantUseSurfMessage(void)
 
 static bool8 SetUpFieldMove_Fly(void)
 {
-    if (Overworld_MapTypeAllowsTeleportAndFly(gMapHeader.location.mapType) == TRUE)
+    if (Overworld_MapTypeAllowsTeleportAndFly(GetActiveLocationData()->mapType) == TRUE)
         return TRUE;
     else
         return FALSE;

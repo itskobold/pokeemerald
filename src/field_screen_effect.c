@@ -101,7 +101,7 @@ void FadeInFromBlack(void)
 void WarpFadeOutScreen(void)
 {
     u8 currentMapType = GetCurrentMapType();
-    switch (GetMapPairFadeToType(currentMapType, GetDestinationWarpMapHeader()->location.mapType))
+    switch (GetMapPairFadeToType(currentMapType, GetDestinationWarpMapHeader()->locations[0]->mapType))
     {
     case 0:
         FadeScreen(FADE_TO_BLACK, 0);

@@ -2,17 +2,46 @@
   "id": "MAP_ROUTE119",
   "name": "Route119",
   "layout": "LAYOUT_ROUTE119",
-  "music": "MUS_ROUTE119",
-  "region_map_section": "MAPSEC_ROUTE_119",
   "requires_flash": false,
   "weather": "WEATHER_SUNNY",
-  "map_type": "MAP_TYPE_ROUTE",
   "allow_cycling": true,
   "allow_escaping": false,
   "allow_running": true,
-  "show_map_name": true,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE119",
+      "region_map_section": "MAPSEC_ROUTE_119",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE119",
+      "region_map_section": "MAPSEC_ROUTE_119",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE119",
+      "region_map_section": "MAPSEC_ROUTE_119",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE119",
+      "region_map_section": "MAPSEC_ROUTE_119",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    }
+  ],
   "connections": [
     {
       "map": "MAP_ROUTE118",

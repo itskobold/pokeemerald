@@ -588,7 +588,7 @@ struct MapHeader const *const GetDestinationWarpMapHeader(void)
 
 static void LoadCurrentMapData(void)
 {
-    sLastMapSectionId = gMapHeader.location.regionMapSectionId;
+    sLastMapSectionId = GetActiveLocationData()->regionMapSectionId;
     gMapHeader = *Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
     gSaveBlock1Ptr->mapLayoutId = gMapHeader.mapLayoutId;
     gMapHeader.mapLayout = GetMapLayout();
@@ -788,7 +788,7 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     SetWarpDestination(mapGroup, mapNum, WARP_ID_NONE, -1, -1);
 
     // Dont transition map music between BF Outside West/East
-    if (gMapHeader.location.regionMapSectionId != MAPSEC_BATTLE_FRONTIER)
+    if (GetActiveLocationData()->regionMapSectionId != MAPSEC_BATTLE_FRONTIER)
         TransitionMapMusic();
 
     ApplyCurrentWarp();
@@ -819,9 +819,37 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     ResetFieldTasksArgs();
     RunOnResumeMapScript();
 
-    if (gMapHeader.location.showMapName == TRUE
-     && (gMapHeader.location.regionMapSectionId != MAPSEC_BATTLE_FRONTIER
-      || gMapHeader.location.regionMapSectionId != sLastMapSectionId))
+    if (GetActiveLocationData()->showMapName == TRUE
+     && (GetActiveLocationData()->regionMapSectionId != MAPSEC_BATTLE_FRONTIER
+      || GetActiveLocationData()->regionMapSectionId != sLastMapSectionId))
+        ShowMapNamePopup();
+}
+
+// Called when the player steps onto a tile. If that tile belongs to a different
+// map location than the one currently active, switch to it: reload the new
+// location's secondary tileset graphics, update the music, and show its name.
+void TryUpdateMapLocation(s16 x, s16 y)
+{
+    s32 paletteIndex;
+    u8 newLocation = MapGridGetMetatileLocationAt(x, y);
+
+    if (newLocation == GetActiveMapLocation())
+        return;
+    // Ignore tiles tagged with a location the map doesn't actually define.
+    if (newLocation >= MAX_MAP_LOCATIONS || gMapHeader.locations[newLocation] == NULL)
+        return;
+
+    SetActiveMapLocation(newLocation);
+
+    CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
+    LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
+    for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
+        ApplyWeatherColorMapToPal(paletteIndex);
+    InitSecondaryTilesetAnimation();
+
+    Overworld_ChangeMusicToDefault();
+
+    if (GetActiveLocationData()->showMapName == TRUE)
         ShowMapNamePopup();
 }
 
@@ -841,8 +869,8 @@ static void LoadMapFromWarp(bool32 a1)
             LoadObjEventTemplatesFromHeader();
     }
 
-    isOutdoors = IsMapTypeOutdoors(gMapHeader.location.mapType);
-    isIndoors = IsMapTypeIndoors(gMapHeader.location.mapType);
+    isOutdoors = IsMapTypeOutdoors(GetActiveLocationData()->mapType);
+    isIndoors = IsMapTypeIndoors(GetActiveLocationData()->mapType);
 
     CheckLeftFriendsSecretBase();
     TrySetMapSaveWarpStatus();
@@ -1090,8 +1118,12 @@ u16 GetLocationMusic(struct WarpData *warp)
         return MUS_ENCOUNTER_MAGMA;
     else if (IsInfiltratedWeatherInstitute(warp) == TRUE)
         return MUS_MT_CHIMNEY;
+    // For the currently loaded map, honor the player's active location; a warp
+    // destination map isn't loaded yet, so fall back to its default location 0.
+    else if (warp == &gSaveBlock1Ptr->location)
+        return GetActiveLocationData()->music;
     else
-        return Overworld_GetMapHeaderByGroupAndId(warp->mapGroup, warp->mapNum)->location.music;
+        return Overworld_GetMapHeaderByGroupAndId(warp->mapGroup, warp->mapNum)->locations[0]->music;
 }
 
 u16 GetCurrLocationDefaultMusic(void)
@@ -1208,7 +1240,7 @@ void Overworld_ChangeMusicTo(u16 newMusic)
 u8 GetMapMusicFadeoutSpeed(void)
 {
     const struct MapHeader *mapHeader = GetDestinationWarpMapHeader();
-    if (IsMapTypeIndoors(mapHeader->location.mapType) == TRUE)
+    if (IsMapTypeIndoors(mapHeader->locations[0]->mapType) == TRUE)
         return 2;
     else
         return 4;
@@ -1334,7 +1366,7 @@ static void ChooseAmbientCrySpecies(void)
 
 u8 GetMapTypeByGroupAndId(s8 mapGroup, s8 mapNum)
 {
-    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->location.mapType;
+    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->locations[0]->mapType;
 }
 
 u8 GetMapTypeByWarpData(struct WarpData *warp)
@@ -1386,17 +1418,17 @@ bool8 IsMapTypeIndoors(u8 mapType)
 
 mapsec_u8_t GetSavedWarpRegionMapSectionId(void)
 {
-    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->dynamicWarp.mapGroup, gSaveBlock1Ptr->dynamicWarp.mapNum)->location.regionMapSectionId;
+    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->dynamicWarp.mapGroup, gSaveBlock1Ptr->dynamicWarp.mapNum)->locations[0]->regionMapSectionId;
 }
 
 mapsec_u8_t GetCurrentRegionMapSectionId(void)
 {
-    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->location.regionMapSectionId;
+    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->locations[0]->regionMapSectionId;
 }
 
 u8 GetCurrentMapBattleScene(void)
 {
-    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->location.battleType;
+    return Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum)->locations[0]->battleType;
 }
 
 static void InitOverworldBgs(void)
@@ -1698,7 +1730,7 @@ void CB2_ReturnToFieldFadeFromBlack(void)
 
 static void FieldCB_FadeTryShowMapPopup(void)
 {
-    if (gMapHeader.location.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
+    if (GetActiveLocationData()->showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
         ShowMapNamePopup();
     FieldCB_WarpExitFadeFromBlack();
 }
@@ -1944,7 +1976,7 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
         (*state)++;
         break;
     case 11:
-        if (gMapHeader.location.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
+        if (GetActiveLocationData()->showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
             ShowMapNamePopup();
         (*state)++;
         break;

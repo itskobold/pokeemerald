@@ -2,17 +2,46 @@
   "id": "MAP_SOOTOPOLIS_CITY_HOUSE3",
   "name": "SootopolisCity_House3",
   "layout": "LAYOUT_SOOTOPOLIS_CITY_HOUSE3",
-  "music": "MUS_SOOTOPOLIS",
-  "region_map_section": "MAPSEC_SOOTOPOLIS_CITY",
   "requires_flash": false,
   "weather": "WEATHER_NONE",
-  "map_type": "MAP_TYPE_INDOOR",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": false,
-  "show_map_name": false,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_GenericBuilding",
+      "music": "MUS_SOOTOPOLIS",
+      "region_map_section": "MAPSEC_SOOTOPOLIS_CITY",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_GenericBuilding",
+      "music": "MUS_SOOTOPOLIS",
+      "region_map_section": "MAPSEC_SOOTOPOLIS_CITY",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_GenericBuilding",
+      "music": "MUS_SOOTOPOLIS",
+      "region_map_section": "MAPSEC_SOOTOPOLIS_CITY",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_GenericBuilding",
+      "music": "MUS_SOOTOPOLIS",
+      "region_map_section": "MAPSEC_SOOTOPOLIS_CITY",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    }
+  ],
   "connections": null,
   "object_events": [
     {

@@ -2,17 +2,46 @@
   "id": "MAP_SS_TIDAL_LOWER_DECK",
   "name": "SSTidalLowerDeck",
   "layout": "LAYOUT_SS_TIDAL_LOWER_DECK",
-  "music": "MUS_SAILING",
-  "region_map_section": "MAPSEC_DYNAMIC",
   "requires_flash": false,
   "weather": "WEATHER_NONE",
-  "map_type": "MAP_TYPE_INDOOR",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": false,
-  "show_map_name": false,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_InsideShip",
+      "music": "MUS_SAILING",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_InsideShip",
+      "music": "MUS_SAILING",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_InsideShip",
+      "music": "MUS_SAILING",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_InsideShip",
+      "music": "MUS_SAILING",
+      "region_map_section": "MAPSEC_DYNAMIC",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    }
+  ],
   "connections": null,
   "object_events": [
     {

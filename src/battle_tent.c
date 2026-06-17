@@ -282,7 +282,7 @@ static void SwapRentalMons(void)
 
 bool8 InSlateportBattleTent(void)
 {
-    return gMapHeader.location.regionMapSectionId == MAPSEC_SLATEPORT_CITY
+    return GetActiveLocationData()->regionMapSectionId == MAPSEC_SLATEPORT_CITY
            && (gMapHeader.mapLayoutId == LAYOUT_BATTLE_TENT_CORRIDOR || gMapHeader.mapLayoutId == LAYOUT_BATTLE_TENT_BATTLE_ROOM);
 }
 

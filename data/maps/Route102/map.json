@@ -2,17 +2,46 @@
   "id": "MAP_ROUTE102",
   "name": "Route102",
   "layout": "LAYOUT_ROUTE102",
-  "music": "MUS_ROUTE101",
-  "region_map_section": "MAPSEC_ROUTE_102",
   "requires_flash": false,
   "weather": "WEATHER_SUNNY",
-  "map_type": "MAP_TYPE_ROUTE",
   "allow_cycling": true,
   "allow_escaping": false,
   "allow_running": true,
-  "show_map_name": true,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_ROUTE101",
+      "region_map_section": "MAPSEC_ROUTE_102",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_ROUTE101",
+      "region_map_section": "MAPSEC_ROUTE_102",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_ROUTE101",
+      "region_map_section": "MAPSEC_ROUTE_102",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_ROUTE101",
+      "region_map_section": "MAPSEC_ROUTE_102",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    }
+  ],
   "connections": [
     {
       "map": "MAP_PETALBURG_CITY",

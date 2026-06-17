@@ -2,17 +2,46 @@
   "id": "MAP_BIRTH_ISLAND_HARBOR",
   "name": "BirthIsland_Harbor",
   "layout": "LAYOUT_ISLAND_HARBOR",
-  "music": "MUS_NONE",
-  "region_map_section": "MAPSEC_BIRTH_ISLAND",
   "requires_flash": false,
   "weather": "WEATHER_NONE",
-  "map_type": "MAP_TYPE_INDOOR",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": false,
-  "show_map_name": false,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_IslandHarbor",
+      "music": "MUS_NONE",
+      "region_map_section": "MAPSEC_BIRTH_ISLAND",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_IslandHarbor",
+      "music": "MUS_NONE",
+      "region_map_section": "MAPSEC_BIRTH_ISLAND",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_IslandHarbor",
+      "music": "MUS_NONE",
+      "region_map_section": "MAPSEC_BIRTH_ISLAND",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_IslandHarbor",
+      "music": "MUS_NONE",
+      "region_map_section": "MAPSEC_BIRTH_ISLAND",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    }
+  ],
   "connections": null,
   "object_events": [
     {

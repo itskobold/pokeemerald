@@ -1066,15 +1066,15 @@ static bool32 CheckMatchCallChance(void)
 
 static bool32 MapAllowsMatchCall(void)
 {
-    if (!Overworld_MapTypeAllowsTeleportAndFly(gMapHeader.location.mapType) || gMapHeader.location.regionMapSectionId == MAPSEC_SAFARI_ZONE)
+    if (!Overworld_MapTypeAllowsTeleportAndFly(GetActiveLocationData()->mapType) || GetActiveLocationData()->regionMapSectionId == MAPSEC_SAFARI_ZONE)
         return FALSE;
 
-    if (gMapHeader.location.regionMapSectionId == MAPSEC_SOOTOPOLIS_CITY
+    if (GetActiveLocationData()->regionMapSectionId == MAPSEC_SOOTOPOLIS_CITY
      && FlagGet(FLAG_HIDE_SOOTOPOLIS_CITY_RAYQUAZA) == TRUE
      && FlagGet(FLAG_NEVER_SET_0x0DC) == FALSE)
         return FALSE;
 
-    if (gMapHeader.location.regionMapSectionId == MAPSEC_MT_CHIMNEY
+    if (GetActiveLocationData()->regionMapSectionId == MAPSEC_MT_CHIMNEY
      && FlagGet(FLAG_MET_ARCHIE_METEOR_FALLS) == TRUE
      && FlagGet(FLAG_DEFEATED_EVIL_TEAM_MT_CHIMNEY) == FALSE)
         return FALSE;
@@ -1108,7 +1108,7 @@ static bool32 SelectMatchCallTrainer(void)
         return FALSE;
 
     matchCallId = GetTrainerMatchCallId(sMatchCallState.trainerId);
-    if (GetRematchTrainerLocation(matchCallId) == gMapHeader.location.regionMapSectionId && !TrainerIsEligibleForRematch(matchCallId))
+    if (GetRematchTrainerLocation(matchCallId) == GetActiveLocationData()->regionMapSectionId && !TrainerIsEligibleForRematch(matchCallId))
         return FALSE;
 
     return TRUE;
@@ -1466,7 +1466,7 @@ static bool32 TrainerIsEligibleForRematch(int matchCallId)
 static mapsec_u16_t GetRematchTrainerLocation(int matchCallId)
 {
     const struct MapHeader *mapHeader = Overworld_GetMapHeaderByGroupAndId(gRematchTable[matchCallId].mapGroup, gRematchTable[matchCallId].mapNum);
-    return mapHeader->location.regionMapSectionId;
+    return mapHeader->locations[0]->regionMapSectionId;
 }
 
 static u32 GetNumRematchTrainersFought(void)
@@ -1514,7 +1514,7 @@ bool32 SelectMatchCallMessage(int trainerId, u8 *str)
     // If the player is on the same route as the trainer
     // and they can be rematched, they will always request a battle
     if (TrainerIsEligibleForRematch(matchCallId)
-     && GetRematchTrainerLocation(matchCallId) == gMapHeader.location.regionMapSectionId)
+     && GetRematchTrainerLocation(matchCallId) == GetActiveLocationData()->regionMapSectionId)
     {
         matchCallText = GetSameRouteMatchCallText(matchCallId, str);
     }

@@ -17,6 +17,10 @@
 #define MAPATTR_ELEVATION_SHIFT 2
 #define MAPATTR_LOCATION_SHIFT  6
 
+// The location attribute is 2 bits, so a map can define up to 4 distinct
+// per-location property sets (see struct MapHeaderLocationData / MapHeader).
+#define MAX_MAP_LOCATIONS 4
+
 enum
 {
     ELEVATION_TRANSITION = 0,
@@ -186,8 +190,8 @@ struct MapConnections
 
 // Properties that apply per in-map location. A map's per-tile location attribute
 // (see MAPATTR_LOCATION_MASK) is intended to select which set of these properties
-// is active. Currently each map uses a single instance, but grouping the fields
-// here prepares for multiple locations per map.
+// is active. Each set is stored as its own const instance in ROM and referenced
+// by pointer from the map header (see MapHeader.locations).
 struct MapHeaderLocationData
 {
     /* 0x00 */ const struct Tileset *secondaryTileset;
@@ -204,14 +208,16 @@ struct MapHeader
     /* 0x04 */ const struct MapEvents *events;
     /* 0x08 */ const u8 *mapScripts;
     /* 0x0C */ const struct MapConnections *connections;
-    /* 0x10 */ struct MapHeaderLocationData location;
-    /* 0x1C */ u16 mapLayoutId;
-    /* 0x1E */ u8 cave;
-    /* 0x1F */ u8 weather;
-    /* 0x20 */ u8 numLocations:2;
+    // One pointer per location slot. The first numLocations entries point to
+    // const MapHeaderLocationData in ROM; unused trailing slots are NULL.
+    /* 0x10 */ const struct MapHeaderLocationData *locations[MAX_MAP_LOCATIONS];
+    /* 0x20 */ u16 mapLayoutId;
+    /* 0x22 */ u8 cave;
+    /* 0x23 */ u8 weather;
+    /* 0x24 */ u8 numLocations:2;
                u8 filler_20:6;
                // fields correspond to the arguments in the map_header_flags macro
-    /* 0x21 */ bool8 allowCycling:1;
+    /* 0x25 */ bool8 allowCycling:1;
                bool8 allowEscaping:1; // Escape Rope and Dig
                bool8 allowRunning:1;
                // the remaining bits are unused
@@ -399,6 +405,11 @@ extern struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT];
 extern u8 gSelectedObjectEvent;
 extern struct MapHeader gMapHeader;
 extern struct PlayerAvatar gPlayerAvatar;
+
+// Accessor for the current map's active location property set (selected by the
+// location attribute of the tile the player stands on). Defined in fieldmap.c.
+const struct MapHeaderLocationData *GetActiveLocationData(void);
+u8 GetActiveMapLocation(void);
 extern struct Camera gCamera;
 
 #endif // GUARD_GLOBAL_FIELDMAP_H

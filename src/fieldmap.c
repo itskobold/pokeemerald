@@ -32,6 +32,9 @@ struct ConnectionFlags
 EWRAM_DATA static u16 ALIGNED(4) sBackupMapData[MAX_MAP_DATA_SIZE] = {0};
 EWRAM_DATA static u8 ALIGNED(4) sBackupMapAttrData[MAX_MAP_DATA_SIZE] = {0};
 EWRAM_DATA struct MapHeader gMapHeader = {0};
+// Index (0..MAX_MAP_LOCATIONS-1) of the location property set currently active for
+// gMapHeader, selected by the location attribute of the tile the player stands on.
+EWRAM_DATA static u8 sActiveMapLocation = 0;
 EWRAM_DATA struct Camera gCamera = {0};
 EWRAM_DATA static struct ConnectionFlags sMapConnectionFlags = {0};
 EWRAM_DATA static u32 UNUSED sFiller = 0; // without this, the next file won't align properly
@@ -80,10 +83,41 @@ const struct MapHeader *const GetMapHeaderFromConnection(const struct MapConnect
     return Overworld_GetMapHeaderByGroupAndId(connection->mapGroup, connection->mapNum);
 }
 
+u8 GetActiveMapLocation(void)
+{
+    return sActiveMapLocation;
+}
+
+// Returns the location property set the rest of the game should read for the
+// current map. Falls back to slot 0 if the requested slot is undefined (NULL).
+const struct MapHeaderLocationData *GetActiveLocationData(void)
+{
+    const struct MapHeaderLocationData *data = gMapHeader.locations[sActiveMapLocation];
+    if (data == NULL)
+        data = gMapHeader.locations[0];
+    return data;
+}
+
+void SetActiveMapLocation(u8 location)
+{
+    if (location >= MAX_MAP_LOCATIONS || gMapHeader.locations[location] == NULL)
+        location = 0;
+    sActiveMapLocation = location;
+}
+
+// Selects the active location from the tile the player is standing on. Called on
+// map load so the initial tileset/music/map name reflect the spawn location.
+void SetActiveMapLocationFromPlayer(void)
+{
+    SetActiveMapLocation(MapGridGetMetatileLocationAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET,
+                                                      gSaveBlock1Ptr->pos.y + MAP_OFFSET));
+}
+
 void InitMap(void)
 {
     InitMapLayoutData(&gMapHeader);
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
+    SetActiveMapLocationFromPlayer();
     RunOnLoadMapScript();
 }
 
@@ -92,6 +126,7 @@ void InitMapFromSavedGame(void)
     InitMapLayoutData(&gMapHeader);
     InitSecretBaseAppearance(FALSE);
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
+    SetActiveMapLocationFromPlayer();
     LoadSavedMapView();
     RunOnLoadMapScript();
     UpdateTVScreensOnMap(gBackupMapLayout.width, gBackupMapLayout.height);
@@ -534,7 +569,7 @@ u16 GetMetatileAttributesById(u16 metatile)
     }
     else if (metatile < NUM_METATILES_TOTAL)
     {
-        attributes = gMapHeader.location.secondaryTileset->metatileAttributes;
+        attributes = GetActiveLocationData()->secondaryTileset->metatileAttributes;
         return attributes[metatile - NUM_METATILES_IN_PRIMARY];
     }
     else
@@ -1040,12 +1075,12 @@ void CopyPrimaryTilesetToVram(struct MapLayout const *mapLayout)
 
 void CopySecondaryTilesetToVram(struct MapLayout const *mapLayout)
 {
-    CopyTilesetToVram(gMapHeader.location.secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
+    CopyTilesetToVram(GetActiveLocationData()->secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
 }
 
 void CopySecondaryTilesetToVramUsingHeap(struct MapLayout const *mapLayout)
 {
-    CopyTilesetToVramUsingHeap(gMapHeader.location.secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
+    CopyTilesetToVramUsingHeap(GetActiveLocationData()->secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
 }
 
 static void LoadPrimaryTilesetPalette(struct MapLayout const *mapLayout)
@@ -1055,7 +1090,7 @@ static void LoadPrimaryTilesetPalette(struct MapLayout const *mapLayout)
 
 void LoadSecondaryTilesetPalette(struct MapLayout const *mapLayout)
 {
-    LoadTilesetPalette(gMapHeader.location.secondaryTileset, BG_PLTT_ID(NUM_PALS_IN_PRIMARY), (NUM_PALS_TOTAL - NUM_PALS_IN_PRIMARY) * PLTT_SIZE_4BPP);
+    LoadTilesetPalette(GetActiveLocationData()->secondaryTileset, BG_PLTT_ID(NUM_PALS_IN_PRIMARY), (NUM_PALS_TOTAL - NUM_PALS_IN_PRIMARY) * PLTT_SIZE_4BPP);
 }
 
 void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
@@ -1063,7 +1098,7 @@ void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
     if (mapLayout)
     {
         CopyTilesetToVramUsingHeap(mapLayout->primaryTileset, NUM_TILES_IN_PRIMARY, 0);
-        CopyTilesetToVramUsingHeap(gMapHeader.location.secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
+        CopyTilesetToVramUsingHeap(GetActiveLocationData()->secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
     }
 }
 

@@ -156,6 +156,7 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
     {
         IncrementGameStat(GAME_STAT_STEPS);
         IncrementBirthIslandRockStepCount();
+        TryUpdateMapLocation(position.x, position.y);
         if (TryStartStepBasedScript(&position, metatileBehavior, playerDirection) == TRUE)
             return TRUE;
     }
@@ -472,7 +473,7 @@ static bool32 TrySetupDiveDownScript(void)
 
 static bool32 TrySetupDiveEmergeScript(void)
 {
-    if (FlagGet(FLAG_BADGE07_GET) && gMapHeader.location.mapType == MAP_TYPE_UNDERWATER && TrySetDiveWarp() == 1)
+    if (FlagGet(FLAG_BADGE07_GET) && GetActiveLocationData()->mapType == MAP_TYPE_UNDERWATER && TrySetDiveWarp() == 1)
     {
         ScriptContext_SetupScript(EventScript_UseDiveUnderwater);
         return TRUE;
@@ -638,7 +639,7 @@ static bool8 UpdatePoisonStepCounter(void)
 {
     u16 *ptr;
 
-    if (gMapHeader.location.mapType != MAP_TYPE_SECRET_BASE)
+    if (GetActiveLocationData()->mapType != MAP_TYPE_SECRET_BASE)
     {
         ptr = GetVarPointer(VAR_POISON_STEP_COUNTER);
         (*ptr)++;
@@ -939,7 +940,7 @@ static const struct BgEvent *GetBackgroundEventAtPosition(struct MapHeader *mapH
 
 bool8 TryDoDiveWarp(struct MapPosition *position, u16 metatileBehavior)
 {
-    if (gMapHeader.location.mapType == MAP_TYPE_UNDERWATER && !MetatileBehavior_IsUnableToEmerge(metatileBehavior))
+    if (GetActiveLocationData()->mapType == MAP_TYPE_UNDERWATER && !MetatileBehavior_IsUnableToEmerge(metatileBehavior))
     {
         if (SetDiveWarpEmerge(position->x - MAP_OFFSET, position->y - MAP_OFFSET))
         {
@@ -969,7 +970,7 @@ u8 TrySetDiveWarp(void)
 
     PlayerGetDestCoords(&x, &y);
     metatileBehavior = MapGridGetMetatileBehaviorAt(x, y);
-    if (gMapHeader.location.mapType == MAP_TYPE_UNDERWATER && !MetatileBehavior_IsUnableToEmerge(metatileBehavior))
+    if (GetActiveLocationData()->mapType == MAP_TYPE_UNDERWATER && !MetatileBehavior_IsUnableToEmerge(metatileBehavior))
     {
         if (SetDiveWarpEmerge(x - MAP_OFFSET, y - MAP_OFFSET) == TRUE)
             return 1;

@@ -236,7 +236,7 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
     }
     else
     {
-        metatiles = gMapHeader.location.secondaryTileset->metatiles;
+        metatiles = GetActiveLocationData()->secondaryTileset->metatiles;
         metatileId -= NUM_METATILES_IN_PRIMARY;
     }
     DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y), metatiles + metatileId * NUM_TILES_PER_METATILE, offset);

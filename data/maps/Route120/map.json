@@ -2,17 +2,46 @@
   "id": "MAP_ROUTE120",
   "name": "Route120",
   "layout": "LAYOUT_ROUTE120",
-  "music": "MUS_ROUTE120",
-  "region_map_section": "MAPSEC_ROUTE_120",
   "requires_flash": false,
   "weather": "WEATHER_SUNNY",
-  "map_type": "MAP_TYPE_ROUTE",
   "allow_cycling": true,
   "allow_escaping": false,
   "allow_running": true,
-  "show_map_name": true,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE120",
+      "region_map_section": "MAPSEC_ROUTE_120",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE120",
+      "region_map_section": "MAPSEC_ROUTE_120",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE120",
+      "region_map_section": "MAPSEC_ROUTE_120",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Fortree",
+      "music": "MUS_ROUTE120",
+      "region_map_section": "MAPSEC_ROUTE_120",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    }
+  ],
   "connections": [
     {
       "map": "MAP_FORTREE_CITY",
@@ -263,7 +292,7 @@
       "flag": "FLAG_HIDE_ROUTE_120_GABBY_AND_TY_1"
     },
     {
-       "local_id": "LOCALID_ROUTE120_GABBY_2",
+      "local_id": "LOCALID_ROUTE120_GABBY_2",
       "graphics_id": "OBJ_EVENT_GFX_REPORTER_F",
       "x": 36,
       "y": 5,

@@ -2,17 +2,46 @@
   "id": "MAP_TRAINER_HILL_ROOF",
   "name": "TrainerHill_Roof",
   "layout": "LAYOUT_TRAINER_HILL_ROOF",
-  "music": "MUS_B_TOWER_RS",
-  "region_map_section": "MAPSEC_TRAINER_HILL",
   "requires_flash": false,
   "weather": "WEATHER_NONE",
-  "map_type": "MAP_TYPE_INDOOR",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": true,
-  "show_map_name": false,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_TrainerHill",
+      "music": "MUS_B_TOWER_RS",
+      "region_map_section": "MAPSEC_TRAINER_HILL",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_TrainerHill",
+      "music": "MUS_B_TOWER_RS",
+      "region_map_section": "MAPSEC_TRAINER_HILL",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_TrainerHill",
+      "music": "MUS_B_TOWER_RS",
+      "region_map_section": "MAPSEC_TRAINER_HILL",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_TrainerHill",
+      "music": "MUS_B_TOWER_RS",
+      "region_map_section": "MAPSEC_TRAINER_HILL",
+      "map_type": "MAP_TYPE_INDOOR",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    }
+  ],
   "connections": null,
   "object_events": [
     {

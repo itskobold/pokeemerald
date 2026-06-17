@@ -309,7 +309,7 @@ static void FindMapsWithMon(u16 species)
         if (roamer->active)
         {
             GetRoamerLocation(&sPokedexAreaScreen->overworldAreasWithMons[0].mapGroup, &sPokedexAreaScreen->overworldAreasWithMons[0].mapNum);
-            sPokedexAreaScreen->overworldAreasWithMons[0].regionMapSectionId = Overworld_GetMapHeaderByGroupAndId(sPokedexAreaScreen->overworldAreasWithMons[0].mapGroup, sPokedexAreaScreen->overworldAreasWithMons[0].mapNum)->location.regionMapSectionId;
+            sPokedexAreaScreen->overworldAreasWithMons[0].regionMapSectionId = Overworld_GetMapHeaderByGroupAndId(sPokedexAreaScreen->overworldAreasWithMons[0].mapGroup, sPokedexAreaScreen->overworldAreasWithMons[0].mapNum)->locations[0]->regionMapSectionId;
             sPokedexAreaScreen->numOverworldAreas = 1;
         }
         else
@@ -325,7 +325,7 @@ static void SetAreaHasMon(u16 mapGroup, u16 mapNum)
     {
         sPokedexAreaScreen->overworldAreasWithMons[sPokedexAreaScreen->numOverworldAreas].mapGroup = mapGroup;
         sPokedexAreaScreen->overworldAreasWithMons[sPokedexAreaScreen->numOverworldAreas].mapNum = mapNum;
-        sPokedexAreaScreen->overworldAreasWithMons[sPokedexAreaScreen->numOverworldAreas].regionMapSectionId = CorrectSpecialMapSecId(Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->location.regionMapSectionId);
+        sPokedexAreaScreen->overworldAreasWithMons[sPokedexAreaScreen->numOverworldAreas].regionMapSectionId = CorrectSpecialMapSecId(Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->locations[0]->regionMapSectionId);
         sPokedexAreaScreen->numOverworldAreas++;
     }
 }
@@ -372,7 +372,7 @@ static void SetSpecialMapHasMon(u16 mapGroup, u16 mapNum)
 
 static mapsec_u16_t GetRegionMapSectionId(u8 mapGroup, u8 mapNum)
 {
-    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->location.regionMapSectionId;
+    return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->locations[0]->regionMapSectionId;
 }
 
 static bool8 MapHasSpecies(const struct WildPokemonHeader *info, u16 species)

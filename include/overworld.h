@@ -101,6 +101,7 @@ u8 GetFlashLevel(void);
 void SetCurrentMapLayout(u16 mapLayoutId);
 void SetObjectEventLoadFlag(u8 flag);
 u16 GetLocationMusic(struct WarpData *warp);
+void TryUpdateMapLocation(s16 x, s16 y);
 u16 GetCurrLocationDefaultMusic(void);
 u16 GetWarpDestinationMusic(void);
 void Overworld_ResetMapMusic(void);

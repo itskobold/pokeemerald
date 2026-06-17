@@ -2,17 +2,46 @@
   "id": "MAP_PACIFIDLOG_TOWN",
   "name": "PacifidlogTown",
   "layout": "LAYOUT_PACIFIDLOG_TOWN",
-  "music": "MUS_LILYCOVE",
-  "region_map_section": "MAPSEC_PACIFIDLOG_TOWN",
   "requires_flash": false,
   "weather": "WEATHER_SUNNY",
-  "map_type": "MAP_TYPE_TOWN",
   "allow_cycling": true,
   "allow_escaping": false,
   "allow_running": true,
-  "show_map_name": true,
-  "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
   "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_Pacifidlog",
+      "music": "MUS_LILYCOVE",
+      "region_map_section": "MAPSEC_PACIFIDLOG_TOWN",
+      "map_type": "MAP_TYPE_TOWN",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Pacifidlog",
+      "music": "MUS_LILYCOVE",
+      "region_map_section": "MAPSEC_PACIFIDLOG_TOWN",
+      "map_type": "MAP_TYPE_TOWN",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Pacifidlog",
+      "music": "MUS_LILYCOVE",
+      "region_map_section": "MAPSEC_PACIFIDLOG_TOWN",
+      "map_type": "MAP_TYPE_TOWN",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    },
+    {
+      "secondary_tileset": "gTileset_Pacifidlog",
+      "music": "MUS_LILYCOVE",
+      "region_map_section": "MAPSEC_PACIFIDLOG_TOWN",
+      "map_type": "MAP_TYPE_TOWN",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": true
+    }
+  ],
   "connections": [
     {
       "map": "MAP_ROUTE132",

@@ -374,7 +374,7 @@ void SetPlayerSecretBase(void)
     StringCopyN(gSaveBlock1Ptr->secretBases[0].trainerName, gSaveBlock2Ptr->playerName, GetNameLength(gSaveBlock2Ptr->playerName));
     gSaveBlock1Ptr->secretBases[0].gender = gSaveBlock2Ptr->playerGender;
     gSaveBlock1Ptr->secretBases[0].language = GAME_LANGUAGE;
-    VarSet(VAR_SECRET_BASE_MAP, gMapHeader.location.regionMapSectionId);
+    VarSet(VAR_SECRET_BASE_MAP, GetActiveLocationData()->regionMapSectionId);
 }
 
 // Set the 'open' entrance metatile for any occupied secret base on this map
@@ -452,7 +452,7 @@ void EnterSecretBase(void)
 
 bool8 SecretBaseMapPopupEnabled(void)
 {
-    if (gMapHeader.location.mapType == MAP_TYPE_SECRET_BASE && VarGet(VAR_INIT_SECRET_BASE) == 0)
+    if (GetActiveLocationData()->mapType == MAP_TYPE_SECRET_BASE && VarGet(VAR_INIT_SECRET_BASE) == 0)
         return FALSE;
 
     return TRUE;
