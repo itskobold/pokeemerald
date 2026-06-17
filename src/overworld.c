@@ -848,48 +848,38 @@ void TryUpdateMapLocation(s16 x, s16 y)
     if (GetActiveLocationData()->showMapName == TRUE)
         ShowMapNamePopup();
 
-    // Streaming the new secondary tileset into VRAM takes a frame to land, and
-    // the on-screen tilemap was authored against the previous location's
-    // tileset. Hand the graphics swap to a task so we can wait for the transfer
-    // to finish before redrawing the visible map (see Task_UpdateMapLocationGfx).
-    // Restart any switch already in flight so the newest location wins.
+    // Hand the graphics swap to a task. It can't run now: the player only
+    // reaches T_TILE_CENTER for the boundary tile as the next step begins, so
+    // the camera is still scrolling toward the destination tile. Reloading the
+    // tileset and redrawing while the BG sits at a sub-tile scroll offset
+    // corrupts the tiles at the screen edges. The task waits for the camera to
+    // settle on the tile first (see Task_UpdateMapLocationGfx).
+    // Reuse any switch already in flight so the newest location wins.
     taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     if (taskId == TASK_NONE)
-        taskId = CreateTask(Task_UpdateMapLocationGfx, 80);
-    gTasks[taskId].data[0] = 0;
+        CreateTask(Task_UpdateMapLocationGfx, 80);
 }
 
-// Streams the active location's secondary tileset into VRAM, then redraws the
-// whole visible map once the transfer completes. Without the redraw the stale
-// on-screen tilemap keeps the previous location's tile indices, so the freshly
-// loaded graphics display as garbage; without the wait the redraw would point
-// at a half-copied tileset.
+// Reloads the active location's secondary tileset and redraws the visible map,
+// but only once the camera has finished scrolling onto the destination tile
+// (the player is centered, not mid-step). The graphics swap and the redraw run
+// together in the same frame so the on-screen tile indices and the loaded
+// graphics never disagree, which would otherwise show as garbage.
 static void Task_UpdateMapLocationGfx(u8 taskId)
 {
-    s16 *data = gTasks[taskId].data;
     s32 paletteIndex;
 
-    switch (data[0])
-    {
-    case 0:
-        CopySecondaryTilesetToVram(gMapHeader.mapLayout);
-        LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
-        for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
-            ApplyWeatherColorMapToPal(paletteIndex);
-        data[0]++;
-        break;
-    case 1:
-        // FreeTempTileDataBuffersIfPossible() returns TRUE while the BG-copy DMA
-        // is still in flight and FALSE once it has finished (freeing the decomp
-        // buffers as a side effect).
-        if (FreeTempTileDataBuffersIfPossible() != TRUE)
-        {
-            DrawWholeMapView();
-            InitSecondaryTilesetAnimation();
-            DestroyTask(taskId);
-        }
-        break;
-    }
+    // Wait until the camera has reached the destination tile.
+    if (gPlayerAvatar.tileTransitionState == T_TILE_TRANSITION)
+        return;
+
+    CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
+    LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
+    for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
+        ApplyWeatherColorMapToPal(paletteIndex);
+    DrawWholeMapView();
+    InitSecondaryTilesetAnimation();
+    DestroyTask(taskId);
 }
 
 static void LoadMapFromWarp(bool32 a1)

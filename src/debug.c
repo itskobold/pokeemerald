@@ -66,4 +66,6 @@ void SetDebugNewGameFlags()
     AddBagItem(ITEM_MAX_ETHER, 99);
     AddBagItem(ITEM_ETHER, 99);
     AddBagItem(ITEM_MAX_REPEL, 99);
+    AddBagItem(ITEM_ACRO_BIKE, 1);
+    AddBagItem(ITEM_MACH_BIKE, 1);
 }
