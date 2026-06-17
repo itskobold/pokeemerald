@@ -1531,9 +1531,11 @@ void GenerateBattlePyramidFloorLayout(u16 *backupMapData, bool8 setPlayerPositio
     for (i = 0; i < NUM_PYRAMID_FLOOR_SQUARES; i++)
     {
         u16 *map;
+        u8 *attrMap;
         int yOffset, xOffset;
         const struct MapLayout *mapLayout = gMapLayouts[floorLayoutOffsets[i] + LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR];
         const u16 *layoutMap = mapLayout->map;
+        const u8 *layoutAttr = mapLayout->mapAttributes;
 
         gBackupMapLayout.map = backupMapData;
         gBackupMapLayout.width = mapLayout->width * PYRAMID_FLOOR_SQUARES_WIDE + MAP_OFFSET_W;
@@ -1542,10 +1544,13 @@ void GenerateBattlePyramidFloorLayout(u16 *backupMapData, bool8 setPlayerPositio
         yOffset = ((i / PYRAMID_FLOOR_SQUARES_WIDE * mapLayout->height) + MAP_OFFSET) * gBackupMapLayout.width;
         xOffset = (i % PYRAMID_FLOOR_SQUARES_WIDE * mapLayout->width) + MAP_OFFSET;
         map += yOffset + xOffset;
+        attrMap = gBackupMapLayout.attributes + yOffset + xOffset;
         for (y = 0; y < mapLayout->height; y++)
         {
             for (x = 0; x < mapLayout->width; x++)
             {
+                // Attributes (elevation/collision/location) always come from the floor layout
+                attrMap[x] = layoutAttr[x];
                 if ((layoutMap[x] & MAPGRID_METATILE_ID_MASK) != METATILE_BattlePyramid_Exit)
                 {
                     map[x] = layoutMap[x];
@@ -1557,8 +1562,8 @@ void GenerateBattlePyramidFloorLayout(u16 *backupMapData, bool8 setPlayerPositio
                         gSaveBlock1Ptr->pos.x = (mapLayout->width * (i % PYRAMID_FLOOR_SQUARES_WIDE)) + x;
                         gSaveBlock1Ptr->pos.y = (mapLayout->height * (i / PYRAMID_FLOOR_SQUARES_WIDE)) + y;
                     }
-                    // Copy the elevation and collision, but overwrite the metatile ID
-                    map[x] = (layoutMap[x] & (MAPGRID_ELEVATION_MASK | MAPGRID_COLLISION_MASK)) | METATILE_BattlePyramid_Floor;
+                    // Keep the layout's elevation and collision, but overwrite the metatile ID
+                    map[x] = METATILE_BattlePyramid_Floor;
                 }
                 else
                 {
@@ -1567,6 +1572,8 @@ void GenerateBattlePyramidFloorLayout(u16 *backupMapData, bool8 setPlayerPositio
             }
             map += MAP_OFFSET_W + (mapLayout->width * PYRAMID_FLOOR_SQUARES_WIDE);
             layoutMap += mapLayout->width;
+            attrMap += MAP_OFFSET_W + (mapLayout->width * PYRAMID_FLOOR_SQUARES_WIDE);
+            layoutAttr += mapLayout->width;
         }
     }
     RunOnLoadMapScript();

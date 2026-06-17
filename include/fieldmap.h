@@ -7,7 +7,9 @@
 #define NUM_METATILES_TOTAL 1024
 #define NUM_PALS_IN_PRIMARY 6
 #define NUM_PALS_TOTAL 13
-#define MAX_MAP_DATA_SIZE 10240
+// Sized to the largest map (the 80x80 routes need (80+15)*(80+14) = 8930 tiles).
+// Both the metatile backup (u16) and the parallel attribute backup (u8) use this.
+#define MAX_MAP_DATA_SIZE 9088
 
 #define NUM_TILES_PER_METATILE 12
 
@@ -35,6 +37,9 @@ u16 GetMetatileAttributesById(u16 metatile);
 void GetCameraFocusCoords(u16 *x, u16 *y);
 u8 MapGridGetMetatileLayerTypeAt(int x, int y);
 u8 MapGridGetElevationAt(int x, int y);
+u8 MapGridGetMetatileLocationAt(int x, int y);
+void MapGridSetMetatileElevationAt(int x, int y, u8 elevation);
+void MapGridSetMetatileLocationAt(int x, int y, u8 location);
 bool8 CameraMove(int x, int y);
 void SaveMapView(void);
 void SetCameraFocusCoords(u16 x, u16 y);

@@ -1195,10 +1195,10 @@ static u16 GetDecorationElevation(u8 decoration, u8 tileIndex)
     switch (decoration)
     {
     case DECOR_STAND:
-        elevation = sDecorationStandElevations[tileIndex] << MAPGRID_ELEVATION_SHIFT;
+        elevation = sDecorationStandElevations[tileIndex];
         return elevation;
     case DECOR_SLIDE:
-        elevation = sDecorationSlideElevation[tileIndex] << MAPGRID_ELEVATION_SHIFT;
+        elevation = sDecorationSlideElevation[tileIndex];
         return elevation;
     default:
         return elevation;
@@ -1234,10 +1234,9 @@ static void ShowDecorationOnMap_(u16 mapX, u16 mapY, u8 decWidth, u8 decHeight, 
                 overlapsWall = 0;
 
             elevation = GetDecorationElevation(gDecorations[decoration].id, j * decWidth + i);
+            MapGridSetMetatileIdAt(x, y, (gDecorations[decoration].tiles[j * decWidth + i] + (NUM_TILES_IN_PRIMARY | overlapsWall)) | impassableFlag);
             if (elevation != ELEVATION_INVALID)
-                MapGridSetMetatileEntryAt(x, y, (gDecorations[decoration].tiles[j * decWidth + i] + (NUM_TILES_IN_PRIMARY | overlapsWall)) | impassableFlag | elevation);
-            else
-                MapGridSetMetatileIdAt(x, y, (gDecorations[decoration].tiles[j * decWidth + i] + (NUM_TILES_IN_PRIMARY | overlapsWall)) | impassableFlag);
+                MapGridSetMetatileElevationAt(x, y, elevation);
         }
     }
 }

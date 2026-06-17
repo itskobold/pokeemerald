@@ -30,6 +30,7 @@ struct ConnectionFlags
 };
 
 EWRAM_DATA static u16 ALIGNED(4) sBackupMapData[MAX_MAP_DATA_SIZE] = {0};
+EWRAM_DATA static u8 ALIGNED(4) sBackupMapAttrData[MAX_MAP_DATA_SIZE] = {0};
 EWRAM_DATA struct MapHeader gMapHeader = {0};
 EWRAM_DATA struct Camera gCamera = {0};
 EWRAM_DATA static struct ConnectionFlags sMapConnectionFlags = {0};
@@ -40,7 +41,7 @@ COMMON_DATA struct BackupMapLayout gBackupMapLayout = {0};
 static const struct ConnectionFlags sDummyConnectionFlags = {0};
 
 static void InitMapLayoutData(struct MapHeader *mapHeader);
-static void InitBackupMapLayoutData(const u16 *map, u16 width, u16 height);
+static void InitBackupMapLayoutData(const u16 *map, const u8 *attributes, u16 width, u16 height);
 static void FillSouthConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void FillNorthConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void FillWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
@@ -64,12 +65,15 @@ static bool8 IsCoordInIncomingConnectingMap(int coord, int srcMax, int destMax, 
     i = (x + 1) & 1;                                                                               \
     i += ((y + 1) & 1) * 2;                                                                        \
                                                                                                    \
-    block = gMapHeader.mapLayout->border[i] | MAPGRID_IMPASSABLE;                                  \
+    block = gMapHeader.mapLayout->border[i];                                                       \
 })
 
 #define AreCoordsWithinMapGridBounds(x, y) (x >= 0 && x < gBackupMapLayout.width && y >= 0 && y < gBackupMapLayout.height)
 
 #define GetMapGridBlockAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.map[x + gBackupMapLayout.width * y] : GetBorderBlockAt(x, y))
+
+// Out-of-bounds (border) tiles have no attributes; treat them as impassable.
+#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] : MAPATTR_IMPASSABLE)
 
 const struct MapHeader *const GetMapHeaderFromConnection(const struct MapConnection *connection)
 {
@@ -96,12 +100,16 @@ void InitMapFromSavedGame(void)
 void InitBattlePyramidMap(bool8 setPlayerPosition)
 {
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
+    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    gBackupMapLayout.attributes = sBackupMapAttrData;
     GenerateBattlePyramidFloorLayout(sBackupMapData, setPlayerPosition);
 }
 
 void InitTrainerHillMap(void)
 {
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
+    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    gBackupMapLayout.attributes = sBackupMapAttrData;
     GenerateTrainerHillFloorLayout(sBackupMapData);
 }
 
@@ -112,29 +120,37 @@ static void InitMapLayoutData(struct MapHeader *mapHeader)
     int height;
     mapLayout = mapHeader->mapLayout;
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
+    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
     gBackupMapLayout.map = sBackupMapData;
+    gBackupMapLayout.attributes = sBackupMapAttrData;
     width = mapLayout->width + MAP_OFFSET_W;
     gBackupMapLayout.width = width;
     height = mapLayout->height + MAP_OFFSET_H;
     gBackupMapLayout.height = height;
     if (width * height <= MAX_MAP_DATA_SIZE)
     {
-        InitBackupMapLayoutData(mapLayout->map, mapLayout->width, mapLayout->height);
+        InitBackupMapLayoutData(mapLayout->map, mapLayout->mapAttributes, mapLayout->width, mapLayout->height);
         InitBackupMapLayoutConnections(mapHeader);
     }
 }
 
-static void InitBackupMapLayoutData(const u16 *map, u16 width, u16 height)
+static void InitBackupMapLayoutData(const u16 *map, const u8 *attributes, u16 width, u16 height)
 {
     u16 *dest;
+    u8 *attrDest;
     int y;
     dest = gBackupMapLayout.map;
     dest += gBackupMapLayout.width * 7 + MAP_OFFSET;
+    attrDest = gBackupMapLayout.attributes;
+    attrDest += gBackupMapLayout.width * 7 + MAP_OFFSET;
     for (y = 0; y < height; y++)
     {
         CpuCopy16(map, dest, width * 2);
+        memcpy(attrDest, attributes, width);
         dest += width + MAP_OFFSET_W;
+        attrDest += width + MAP_OFFSET_W;
         map += width;
+        attributes += width;
     }
 }
 
@@ -197,17 +213,24 @@ static void FillConnection(int x, int y, struct MapHeader const *connectedMapHea
     int i;
     const u16 *src;
     u16 *dest;
+    const u8 *attrSrc;
+    u8 *attrDest;
     int mapWidth;
 
     mapWidth = connectedMapHeader->mapLayout->width;
     src = &connectedMapHeader->mapLayout->map[mapWidth * y2 + x2];
     dest = &gBackupMapLayout.map[gBackupMapLayout.width * y + x];
+    attrSrc = &connectedMapHeader->mapLayout->mapAttributes[mapWidth * y2 + x2];
+    attrDest = &gBackupMapLayout.attributes[gBackupMapLayout.width * y + x];
 
     for (i = 0; i < height; i++)
     {
         CpuCopy16(src, dest, width * 2);
+        memcpy(attrDest, attrSrc, width);
         dest += gBackupMapLayout.width;
         src += mapWidth;
+        attrDest += gBackupMapLayout.width;
+        attrSrc += mapWidth;
     }
 }
 
@@ -438,22 +461,17 @@ static void FillNorthEastConnection(struct MapHeader const *mapHeader, struct Ma
 
 u8 MapGridGetElevationAt(int x, int y)
 {
-    u16 block = GetMapGridBlockAt(x, y);
-
-    if (block == MAPGRID_UNDEFINED)
-        return 0;
-
-    return UNPACK_ELEVATION(block);
+    return UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
 }
 
 u8 MapGridGetCollisionAt(int x, int y)
 {
-    u16 block = GetMapGridBlockAt(x, y);
+    return UNPACK_COLLISION(GetMapGridAttrAt(x, y));
+}
 
-    if (block == MAPGRID_UNDEFINED)
-        return TRUE;
-
-    return UNPACK_COLLISION(block);
+u8 MapGridGetMetatileLocationAt(int x, int y)
+{
+    return UNPACK_LOCATION(GetMapGridAttrAt(x, y));
 }
 
 u32 MapGridGetMetatileIdAt(int x, int y)
@@ -485,8 +503,14 @@ void MapGridSetMetatileIdAt(int x, int y, u16 metatile)
     {
         i = x + y * gBackupMapLayout.width;
 
-        // Elevation is ignored in the argument, but copy metatile ID and collision
-        gBackupMapLayout.map[i] = (gBackupMapLayout.map[i] & MAPGRID_ELEVATION_MASK) | (metatile & ~MAPGRID_ELEVATION_MASK);
+        // The MAPGRID_IMPASSABLE sentinel in the argument marks the tile impassable;
+        // otherwise the tile is made passable. Elevation and location are preserved.
+        if (metatile & MAPGRID_IMPASSABLE)
+            gBackupMapLayout.attributes[i] = (gBackupMapLayout.attributes[i] & ~MAPATTR_COLLISION_MASK) | MAPATTR_IMPASSABLE;
+        else
+            gBackupMapLayout.attributes[i] &= ~MAPATTR_COLLISION_MASK;
+
+        gBackupMapLayout.map[i] = metatile & ~MAPGRID_IMPASSABLE;
     }
 }
 
@@ -912,9 +936,27 @@ void MapGridSetMetatileImpassabilityAt(int x, int y, bool32 impassable)
     if (AreCoordsWithinMapGridBounds(x, y))
     {
         if (impassable)
-            gBackupMapLayout.map[x + gBackupMapLayout.width * y] |= MAPGRID_COLLISION_MASK;
+            gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] |= MAPATTR_IMPASSABLE;
         else
-            gBackupMapLayout.map[x + gBackupMapLayout.width * y] &= ~MAPGRID_COLLISION_MASK;
+            gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] &= ~MAPATTR_COLLISION_MASK;
+    }
+}
+
+void MapGridSetMetatileElevationAt(int x, int y, u8 elevation)
+{
+    if (AreCoordsWithinMapGridBounds(x, y))
+    {
+        u8 *attr = &gBackupMapLayout.attributes[x + gBackupMapLayout.width * y];
+        *attr = (*attr & ~MAPATTR_ELEVATION_MASK) | PACK_ELEVATION(elevation);
+    }
+}
+
+void MapGridSetMetatileLocationAt(int x, int y, u8 location)
+{
+    if (AreCoordsWithinMapGridBounds(x, y))
+    {
+        u8 *attr = &gBackupMapLayout.attributes[x + gBackupMapLayout.width * y];
+        *attr = (*attr & ~MAPATTR_LOCATION_MASK) | PACK_LOCATION(location);
     }
 }
 

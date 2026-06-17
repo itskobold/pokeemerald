@@ -2,14 +2,20 @@
 #define GUARD_GLOBAL_FIELDMAP_H
 
 // Masks/shifts for blocks in the map grid
-// Map grid blocks consist of a 10 bit metatile id, a 2 bit collision value, and a 4 bit elevation value
+// A map grid block is now a full 16 bit metatile id.
 // This is the data stored in each data/layouts/*/map.bin file
-#define MAPGRID_METATILE_ID_MASK 0x03FF // Bits 0-9
-#define MAPGRID_COLLISION_MASK   0x0C00 // Bits 10-11
-#define MAPGRID_ELEVATION_MASK   0xF000 // Bits 12-15
+#define MAPGRID_METATILE_ID_MASK 0xFFFF // Bits 0-15
 #define MAPGRID_METATILE_ID_SHIFT 0
-#define MAPGRID_COLLISION_SHIFT  10
-#define MAPGRID_ELEVATION_SHIFT  12
+
+// Per-tile attributes are stored separately, one u8 per tile, in each
+// data/layouts/*/attributes.bin file (loaded parallel to map.bin):
+//   bits 0-1 collision, bits 2-5 elevation, bits 6-7 location
+#define MAPATTR_COLLISION_MASK 0x03 // Bits 0-1
+#define MAPATTR_ELEVATION_MASK 0x3C // Bits 2-5
+#define MAPATTR_LOCATION_MASK  0xC0 // Bits 6-7
+#define MAPATTR_COLLISION_SHIFT 0
+#define MAPATTR_ELEVATION_SHIFT 2
+#define MAPATTR_LOCATION_SHIFT  6
 
 enum
 {
@@ -21,17 +27,26 @@ enum
 };
 
 #define PACK_METATILE(metatileId) PACK(metatileId, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
-#define PACK_COLLISION(collision) PACK(collision, MAPGRID_COLLISION_SHIFT, MAPGRID_COLLISION_MASK)
-#define PACK_ELEVATION(elevation) PACK(elevation, MAPGRID_ELEVATION_SHIFT, MAPGRID_ELEVATION_MASK)
+#define PACK_COLLISION(collision) PACK(collision, MAPATTR_COLLISION_SHIFT, MAPATTR_COLLISION_MASK)
+#define PACK_ELEVATION(elevation) PACK(elevation, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
+#define PACK_LOCATION(location)   PACK(location, MAPATTR_LOCATION_SHIFT, MAPATTR_LOCATION_MASK)
 #define UNPACK_METATILE(data)  UNPACK(data, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
-#define UNPACK_COLLISION(data) UNPACK(data, MAPGRID_COLLISION_SHIFT, MAPGRID_COLLISION_MASK)
-#define UNPACK_ELEVATION(data) UNPACK(data, MAPGRID_ELEVATION_SHIFT, MAPGRID_ELEVATION_MASK)
+#define UNPACK_COLLISION(attr) UNPACK(attr, MAPATTR_COLLISION_SHIFT, MAPATTR_COLLISION_MASK)
+#define UNPACK_ELEVATION(attr) UNPACK(attr, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
+#define UNPACK_LOCATION(attr)  UNPACK(attr, MAPATTR_LOCATION_SHIFT, MAPATTR_LOCATION_MASK)
 
-// An undefined map grid block has all metatile id bits set and nothing else
+// An undefined map grid block has all metatile id bits set
 #define MAPGRID_UNDEFINED   MAPGRID_METATILE_ID_MASK
 
-// When setting impassability manually GF sets all the collision bits
-#define MAPGRID_IMPASSABLE  MAPGRID_COLLISION_MASK
+// Both collision bits set in an attribute byte = impassable
+#define MAPATTR_IMPASSABLE  MAPATTR_COLLISION_MASK
+// Fill value for attribute tiles not yet loaded from a map (treated as impassable)
+#define MAPATTR_UNDEFINED   MAPATTR_IMPASSABLE
+
+// Sentinel flag, only valid as an argument to MapGridSetMetatileIdAt. It is not
+// stored in the grid; the setter strips it and marks the tile's collision impassable.
+// Uses bit 15 so it never collides with a real (<= 0x7FFF) metatile id.
+#define MAPGRID_IMPASSABLE  0x8000
 
 // Masks/shifts for metatile attributes
 // Metatile attributes consist of an 8 bit behavior value, 4 unused bits, and a 4 bit layer type value
@@ -78,8 +93,9 @@ struct MapLayout
     /*0x04*/ s32 height;
     /*0x08*/ const u16 *border;
     /*0x0C*/ const u16 *map;
-    /*0x10*/ const struct Tileset *primaryTileset;
-    /*0x14*/ const struct Tileset *secondaryTileset;
+    /*0x10*/ const u8 *mapAttributes;
+    /*0x14*/ const struct Tileset *primaryTileset;
+    /*0x18*/ const struct Tileset *secondaryTileset;
 };
 
 struct BackupMapLayout
@@ -87,6 +103,7 @@ struct BackupMapLayout
     s32 width;
     s32 height;
     u16 *map;
+    u8 *attributes;
 };
 
 struct ObjectEventTemplate

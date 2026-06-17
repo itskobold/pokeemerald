@@ -671,15 +671,13 @@ bool32 LoadTrainerHillFloorObjectEventScripts(void)
 
 static u16 GetMapDataForFloor(u8 floorId, u32 x, u32 y, u32 floorWidth) // floorWidth is always 16
 {
-    bool8 impassable;
-    u16 metatileId;
-    u16 elevation;
+    return sHillData->floors[floorId].map.metatileData[floorWidth * y + x] + NUM_METATILES_IN_PRIMARY;
+}
 
-    impassable = (sHillData->floors[floorId].map.collisionData[y] >> (15 - x) & 1);
-    metatileId = sHillData->floors[floorId].map.metatileData[floorWidth * y + x] + NUM_METATILES_IN_PRIMARY;
-    elevation = PACK_ELEVATION(ELEVATION_DEFAULT);
-
-    return PACK_COLLISION(impassable) | elevation | PACK_METATILE(metatileId);
+static u8 GetMapAttrForFloor(u8 floorId, u32 x, u32 y)
+{
+    bool8 impassable = (sHillData->floors[floorId].map.collisionData[y] >> (15 - x) & 1);
+    return PACK_COLLISION(impassable) | PACK_ELEVATION(ELEVATION_DEFAULT);
 }
 
 void GenerateTrainerHillFloorLayout(u16 *mapArg)
@@ -687,6 +685,8 @@ void GenerateTrainerHillFloorLayout(u16 *mapArg)
     s32 y, x;
     const u16 *src;
     u16 *dst;
+    const u8 *attrSrc;
+    u8 *attrDst;
     u8 mapId = GetCurrentTrainerHillMapId();
 
     if (mapId == TRAINER_HILL_ENTRANCE)
@@ -705,27 +705,38 @@ void GenerateTrainerHillFloorLayout(u16 *mapArg)
 
     mapId = GetFloorId();
     src = gMapHeader.mapLayout->map;
+    attrSrc = gMapHeader.mapLayout->mapAttributes;
     gBackupMapLayout.map = mapArg;
     // Dimensions include border area loaded beyond map
     gBackupMapLayout.width = HILL_FLOOR_WIDTH + 15;
     gBackupMapLayout.height = HILL_FLOOR_HEIGHT + 14;
     dst = mapArg + 224;
+    attrDst = gBackupMapLayout.attributes + 224;
 
     // First 5 rows of the map (Entrance / Exit) are always the same
     for (y = 0; y < HILL_FLOOR_HEIGHT_MARGIN; y++)
     {
         for (x = 0; x < HILL_FLOOR_WIDTH; x++)
+        {
             dst[x] = src[x];
+            attrDst[x] = attrSrc[x];
+        }
         dst += 31;
         src += 16;
+        attrDst += 31;
+        attrSrc += 16;
     }
 
     // Load the 16x16 floor-specific layout
     for (y = 0; y < HILL_FLOOR_HEIGHT_MAIN; y++)
     {
         for (x = 0; x < HILL_FLOOR_WIDTH; x++)
+        {
             dst[x] = GetMapDataForFloor(mapId, x, y, HILL_FLOOR_WIDTH);
+            attrDst[x] = GetMapAttrForFloor(mapId, x, y);
+        }
         dst += 31;
+        attrDst += 31;
     }
 
     RunOnLoadMapScript();

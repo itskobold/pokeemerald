@@ -600,16 +600,25 @@ string generate_layout_headers_text(Json layouts_data) {
         string layoutName = json_to_string(layout, "name");
         string border_label = layoutName + "_Border";
         string blockdata_label = layoutName + "_Blockdata";
+        string attributes_label = layoutName + "_Attributes";
+        // The per-tile attributes file lives alongside the blockdata file (map.bin -> attributes.bin).
+        string blockdata_path = json_to_string(layout, "blockdata_filepath");
+        string attributes_path;
+        size_t slash = blockdata_path.find_last_of('/');
+        attributes_path = (slash == string::npos ? "" : blockdata_path.substr(0, slash + 1)) + "attributes.bin";
         text << border_label << "::\n"
              << "\t.incbin \"" << json_to_string(layout, "border_filepath") << "\"\n\n"
              << blockdata_label << "::\n"
-             << "\t.incbin \"" << json_to_string(layout, "blockdata_filepath") << "\"\n\n"
+             << "\t.incbin \"" << blockdata_path << "\"\n\n"
+             << attributes_label << "::\n"
+             << "\t.incbin \"" << attributes_path << "\"\n\n"
              << "\t.align 2\n"
              << layoutName << "::\n"
              << "\t.4byte " << json_to_string(layout, "width") << "\n"
              << "\t.4byte " << json_to_string(layout, "height") << "\n"
              << "\t.4byte " << border_label << "\n"
              << "\t.4byte " << blockdata_label << "\n"
+             << "\t.4byte " << attributes_label << "\n"
              << "\t.4byte " << json_to_string(layout, "primary_tileset") << "\n"
              << "\t.4byte " << json_to_string(layout, "secondary_tileset") << "\n";
         if (version == "firered") {
