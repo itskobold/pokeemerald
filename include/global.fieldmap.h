@@ -15,13 +15,19 @@
 #define MAPGRID_BIOME_SHIFT       12
 
 // Per-tile attributes are stored separately, one u8 per tile, in each
-// data/layouts/*/attributes.bin file (loaded parallel to map.bin):
-//   bit 0    collision
-//   bits 1-7 elevation
-#define MAPATTR_COLLISION_MASK  0x01 // Bit 0
-#define MAPATTR_ELEVATION_MASK  0xFE // Bits 1-7
-#define MAPATTR_COLLISION_SHIFT 0
-#define MAPATTR_ELEVATION_SHIFT 1
+// data/layouts/*/attributes.bin file (loaded parallel to map.bin). The byte
+// holds the tile's elevation value; there is no separate collision bit. Special
+// elevation values give a tile its movement semantics (see the ELEVATION_ enum):
+//   0   elevation transition   1   collision (impassable)
+//   2   surfable water         3   multi-level (matches every elevation)
+//   4+  ordinary elevation levels
+// Committed map data only ever uses elevation values 0-127 (bits 0-6). Bit 7 is
+// reserved as a runtime-only collision override (MAPATTR_COLLISION), set/cleared
+// by scripts (e.g. MapGridSetMetatileImpassabilityAt) without disturbing the
+// tile's painted elevation. It is never present in attributes.bin on disk.
+#define MAPATTR_ELEVATION_MASK  0x7F // Bits 0-6
+#define MAPATTR_ELEVATION_SHIFT 0
+#define MAPATTR_COLLISION       0x80 // Bit 7, runtime-only collision override
 
 // The location attribute is 2 bits, so a map can define up to 4 distinct
 // per-location property sets (see struct MapHeaderLocationData / MapHeader).
@@ -29,34 +35,32 @@
 
 enum
 {
-    ELEVATION_TRANSITION = 0,
-    ELEVATION_SURF = 1,
-    ELEVATION_DEFAULT = 3,
-    ELEVATION_MULTI_LEVEL = 15,
+    ELEVATION_TRANSITION = 0,  // Allows movement transitions between elevations
+    ELEVATION_COLLISION = 1,   // Impassable at any elevation
+    ELEVATION_SURF = 2,        // Surfable water
+    ELEVATION_MULTI_LEVEL = 3, // Shared by every elevation (e.g. bridges)
+    ELEVATION_DEFAULT = 5,     // Default ground level
     ELEVATION_INVALID = 0xFFFF
 };
 
 // PACK_METATILE/PACK_LOCATION/PACK_BIOME operate on a map grid block (map.bin u16);
-// PACK_COLLISION/PACK_ELEVATION operate on an attribute byte (attributes.bin u8).
+// PACK_ELEVATION operates on an attribute byte (attributes.bin u8).
 #define PACK_METATILE(metatileId) PACK(metatileId, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
 #define PACK_LOCATION(location)   PACK(location, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
 #define PACK_BIOME(biome)         PACK(biome, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
-#define PACK_COLLISION(collision) PACK(collision, MAPATTR_COLLISION_SHIFT, MAPATTR_COLLISION_MASK)
 #define PACK_ELEVATION(elevation) PACK(elevation, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
 #define UNPACK_METATILE(data)  UNPACK(data, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
 #define UNPACK_LOCATION(data)  UNPACK(data, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
 #define UNPACK_BIOME(data)     UNPACK(data, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
-#define UNPACK_COLLISION(attr) UNPACK(attr, MAPATTR_COLLISION_SHIFT, MAPATTR_COLLISION_MASK)
 #define UNPACK_ELEVATION(attr) UNPACK(attr, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
 
 // An undefined map grid block has every bit set (no real block, with metatile id
 // <= 0x3FF and biome 0, matches it).
 #define MAPGRID_UNDEFINED   0xFFFF
 
-// The collision bit set in an attribute byte = impassable
-#define MAPATTR_IMPASSABLE  MAPATTR_COLLISION_MASK
-// Fill value for attribute tiles not yet loaded from a map (treated as impassable)
-#define MAPATTR_UNDEFINED   MAPATTR_IMPASSABLE
+// Fill value for attribute tiles not yet loaded from a map (treated as impassable
+// via the runtime collision override).
+#define MAPATTR_UNDEFINED   MAPATTR_COLLISION
 
 // Sentinel flag, only valid as an argument to MapGridSetMetatileIdAt. It is not
 // stored in the grid; the setter strips it and marks the tile's collision impassable.

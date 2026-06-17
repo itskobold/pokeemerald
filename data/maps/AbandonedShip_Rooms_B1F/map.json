@@ -48,7 +48,7 @@
       "graphics_id": "OBJ_EVENT_GFX_FAT_MAN",
       "x": 25,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_LEFT",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -61,7 +61,7 @@
       "graphics_id": "OBJ_EVENT_GFX_ITEM_BALL",
       "x": 6,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -75,21 +75,21 @@
     {
       "x": 4,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ABANDONED_SHIP_CORRIDORS_B1F",
       "dest_warp_id": "2"
     },
     {
       "x": 13,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ABANDONED_SHIP_CORRIDORS_B1F",
       "dest_warp_id": "3"
     },
     {
       "x": 22,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ABANDONED_SHIP_CORRIDORS_B1F",
       "dest_warp_id": "4"
     }

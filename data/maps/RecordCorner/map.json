@@ -48,7 +48,7 @@
       "graphics_id": "OBJ_EVENT_GFX_LINK_RECEPTIONIST",
       "x": 10,
       "y": 5,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -62,28 +62,28 @@
     {
       "x": 8,
       "y": 9,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 9,
       "y": 9,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 11,
       "y": 9,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 10,
       "y": 9,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     }
@@ -93,7 +93,7 @@
       "type": "trigger",
       "x": 6,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_RecordCenter_Spot0"
@@ -102,7 +102,7 @@
       "type": "trigger",
       "x": 6,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_RecordCenter_Spot2"
@@ -111,7 +111,7 @@
       "type": "trigger",
       "x": 13,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_RecordCenter_Spot1"
@@ -120,7 +120,7 @@
       "type": "trigger",
       "x": 13,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_RecordCenter_Spot3"

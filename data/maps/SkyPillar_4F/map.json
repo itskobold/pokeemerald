@@ -48,21 +48,21 @@
     {
       "x": 11,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_SKY_PILLAR_3F",
       "dest_warp_id": "1"
     },
     {
       "x": 7,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_SKY_PILLAR_3F",
       "dest_warp_id": "2"
     },
     {
       "x": 3,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_SKY_PILLAR_5F",
       "dest_warp_id": "0"
     }

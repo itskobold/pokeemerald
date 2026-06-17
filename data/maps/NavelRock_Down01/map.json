@@ -48,14 +48,14 @@
     {
       "x": 3,
       "y": 3,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_NAVEL_ROCK_FORK",
       "dest_warp_id": "2"
     },
     {
       "x": 5,
       "y": 5,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_NAVEL_ROCK_DOWN02",
       "dest_warp_id": "0"
     }

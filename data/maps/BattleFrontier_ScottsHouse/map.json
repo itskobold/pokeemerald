@@ -49,7 +49,7 @@
       "graphics_id": "OBJ_EVENT_GFX_SCOTT",
       "x": 2,
       "y": 3,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -63,14 +63,14 @@
     {
       "x": 2,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_BATTLE_FRONTIER_OUTSIDE_WEST",
       "dest_warp_id": "5"
     },
     {
       "x": 3,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_BATTLE_FRONTIER_OUTSIDE_WEST",
       "dest_warp_id": "5"
     }

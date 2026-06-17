@@ -48,7 +48,7 @@
       "graphics_id": "OBJ_EVENT_GFX_PICNICKER",
       "x": 7,
       "y": 9,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_RIGHT",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -61,7 +61,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MAN_5",
       "x": 11,
       "y": 10,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_RIGHT",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -74,7 +74,7 @@
       "graphics_id": "OBJ_EVENT_GFX_CAMPER",
       "x": 4,
       "y": 5,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_UP",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -87,7 +87,7 @@
       "graphics_id": "OBJ_EVENT_GFX_ITEM_BALL",
       "x": 11,
       "y": 21,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -101,21 +101,21 @@
     {
       "x": 0,
       "y": 21,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_TRICK_HOUSE_ENTRANCE",
       "dest_warp_id": "2"
     },
     {
       "x": 1,
       "y": 21,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_TRICK_HOUSE_ENTRANCE",
       "dest_warp_id": "2"
     },
     {
       "x": 13,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_TRICK_HOUSE_END",
       "dest_warp_id": "0"
     }
@@ -126,7 +126,7 @@
       "type": "sign",
       "x": 0,
       "y": 10,
-      "elevation": 3,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_TrickHousePuzzle6_EventScript_Scroll"
     }

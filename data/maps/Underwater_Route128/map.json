@@ -59,7 +59,7 @@
     {
       "x": 38,
       "y": 26,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_UNDERWATER_SEAFLOOR_CAVERN",
       "dest_warp_id": "0"
     }
@@ -70,7 +70,7 @@
       "type": "hidden_item",
       "x": 38,
       "y": 19,
-      "elevation": 3,
+      "elevation": 5,
       "item": "ITEM_PROTEIN",
       "flag": "FLAG_HIDDEN_ITEM_UNDERWATER_128_PROTEIN"
     },
@@ -78,7 +78,7 @@
       "type": "hidden_item",
       "x": 69,
       "y": 18,
-      "elevation": 3,
+      "elevation": 5,
       "item": "ITEM_PEARL",
       "flag": "FLAG_HIDDEN_ITEM_UNDERWATER_128_PEARL"
     }

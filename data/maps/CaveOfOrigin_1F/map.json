@@ -48,14 +48,14 @@
     {
       "x": 11,
       "y": 17,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_CAVE_OF_ORIGIN_ENTRANCE",
       "dest_warp_id": "1"
     },
     {
       "x": 14,
       "y": 5,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_CAVE_OF_ORIGIN_B1F",
       "dest_warp_id": "0"
     }

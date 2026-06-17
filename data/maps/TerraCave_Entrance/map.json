@@ -55,7 +55,7 @@
     {
       "x": 14,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_TERRA_CAVE_END",
       "dest_warp_id": "0"
     }

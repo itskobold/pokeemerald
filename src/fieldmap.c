@@ -76,7 +76,7 @@ static bool8 IsCoordInIncomingConnectingMap(int coord, int srcMax, int destMax, 
 #define GetMapGridBlockAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.map[x + gBackupMapLayout.width * y] : GetBorderBlockAt(x, y))
 
 // Out-of-bounds (border) tiles have no attributes; treat them as impassable.
-#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] : MAPATTR_IMPASSABLE)
+#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] : MAPATTR_COLLISION)
 
 const struct MapHeader *const GetMapHeaderFromConnection(const struct MapConnection *connection)
 {
@@ -501,7 +501,13 @@ u8 MapGridGetElevationAt(int x, int y)
 
 u8 MapGridGetCollisionAt(int x, int y)
 {
-    return UNPACK_COLLISION(GetMapGridAttrAt(x, y));
+    u8 attr = GetMapGridAttrAt(x, y);
+
+    // Impassable if a script has set the runtime collision override, or the tile's
+    // painted elevation is the dedicated collision value.
+    if (attr & MAPATTR_COLLISION)
+        return TRUE;
+    return UNPACK_ELEVATION(attr) == ELEVATION_COLLISION;
 }
 
 u8 MapGridGetMetatileLocationAt(int x, int y)
@@ -539,12 +545,13 @@ void MapGridSetMetatileIdAt(int x, int y, u16 metatile)
         i = x + y * gBackupMapLayout.width;
 
         // The MAPGRID_IMPASSABLE sentinel in the argument marks the tile impassable;
-        // otherwise the tile is made passable. Elevation is preserved in the attribute
+        // otherwise the tile is made passable. This toggles the runtime collision
+        // override only, so the tile's painted elevation is preserved in the attribute
         // byte; location and biome are preserved in the block.
         if (metatile & MAPGRID_IMPASSABLE)
-            gBackupMapLayout.attributes[i] = (gBackupMapLayout.attributes[i] & ~MAPATTR_COLLISION_MASK) | MAPATTR_IMPASSABLE;
+            gBackupMapLayout.attributes[i] |= MAPATTR_COLLISION;
         else
-            gBackupMapLayout.attributes[i] &= ~MAPATTR_COLLISION_MASK;
+            gBackupMapLayout.attributes[i] &= ~MAPATTR_COLLISION;
 
         gBackupMapLayout.map[i] = (gBackupMapLayout.map[i] & ~MAPGRID_METATILE_ID_MASK) | (metatile & MAPGRID_METATILE_ID_MASK);
     }
@@ -972,9 +979,9 @@ void MapGridSetMetatileImpassabilityAt(int x, int y, bool32 impassable)
     if (AreCoordsWithinMapGridBounds(x, y))
     {
         if (impassable)
-            gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] |= MAPATTR_IMPASSABLE;
+            gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] |= MAPATTR_COLLISION;
         else
-            gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] &= ~MAPATTR_COLLISION_MASK;
+            gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] &= ~MAPATTR_COLLISION;
     }
 }
 

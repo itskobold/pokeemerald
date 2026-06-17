@@ -7722,16 +7722,23 @@ static bool8 IsElevationMismatchAt(u8 elevation, s16 x, s16 y)
     return FALSE;
 }
 
+// Indexed by elevation value. Values 0-3 are the special elevations (transition,
+// collision, surf, multi-level); 4+ are ordinary levels which alternate draw
+// priority to layer over one another (e.g. bridges), with odd levels drawn behind
+// (priority 2) and even levels drawn in front (priority 1).
 static const u8 sElevationToSubpriority[] = {
-    115, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 0, 0, 115
+    115, 115, 115, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115,
+    83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115,
 };
 
 static const u8 sElevationToPriority[] = {
-    2, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0, 0, 2
+    2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
+    1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
 };
 
 static const u8 sElevationToSubspriteTableNum[] = {
-    1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 0, 0, 1,
+    1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
+    2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
 };
 
 static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)

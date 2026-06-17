@@ -48,14 +48,14 @@
     {
       "x": 6,
       "y": 16,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE131",
       "dest_warp_id": "0"
     },
     {
       "x": 14,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_SKY_PILLAR_OUTSIDE",
       "dest_warp_id": "0"
     }

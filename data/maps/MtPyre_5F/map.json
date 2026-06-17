@@ -48,7 +48,7 @@
       "graphics_id": "OBJ_EVENT_GFX_BLACK_BELT",
       "x": 3,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN_AND_LEFT",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -61,7 +61,7 @@
       "graphics_id": "OBJ_EVENT_GFX_ITEM_BALL",
       "x": 6,
       "y": 11,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -75,35 +75,35 @@
     {
       "x": 2,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_MT_PYRE_6F",
       "dest_warp_id": "0"
     },
     {
       "x": 10,
       "y": 5,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_MT_PYRE_4F",
       "dest_warp_id": "0"
     },
     {
       "x": 1,
       "y": 10,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_MT_PYRE_6F",
       "dest_warp_id": "1"
     },
     {
       "x": 12,
       "y": 10,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_MT_PYRE_4F",
       "dest_warp_id": "2"
     },
     {
       "x": 12,
       "y": 12,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_MT_PYRE_4F",
       "dest_warp_id": "3"
     }

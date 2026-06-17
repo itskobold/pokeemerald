@@ -677,7 +677,7 @@ static u16 GetMapDataForFloor(u8 floorId, u32 x, u32 y, u32 floorWidth) // floor
 static u8 GetMapAttrForFloor(u8 floorId, u32 x, u32 y)
 {
     bool8 impassable = (sHillData->floors[floorId].map.collisionData[y] >> (15 - x) & 1);
-    return PACK_COLLISION(impassable) | PACK_ELEVATION(ELEVATION_DEFAULT);
+    return (impassable ? MAPATTR_COLLISION : 0) | PACK_ELEVATION(ELEVATION_DEFAULT);
 }
 
 void GenerateTrainerHillFloorLayout(u16 *mapArg)

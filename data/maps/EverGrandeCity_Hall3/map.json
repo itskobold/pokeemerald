@@ -48,7 +48,7 @@
     {
       "x": 5,
       "y": 12,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_EVER_GRANDE_CITY_GLACIAS_ROOM",
       "dest_warp_id": "1"
     },
@@ -62,14 +62,14 @@
     {
       "x": 4,
       "y": 12,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_EVER_GRANDE_CITY_GLACIAS_ROOM",
       "dest_warp_id": "1"
     },
     {
       "x": 6,
       "y": 12,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_EVER_GRANDE_CITY_GLACIAS_ROOM",
       "dest_warp_id": "1"
     }

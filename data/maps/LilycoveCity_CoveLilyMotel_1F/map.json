@@ -49,7 +49,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MAN_1",
       "x": 10,
       "y": 3,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_UP",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -87,7 +87,7 @@
       "type": "trigger",
       "x": 10,
       "y": 2,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_1",
       "var_value": "0",
       "script": "LilycoveCity_CoveLilyMotel_1F_EventScript_BlockingTV"

@@ -49,7 +49,7 @@
       "graphics_id": "OBJ_EVENT_GFX_RAYQUAZA",
       "x": 14,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -62,7 +62,7 @@
       "graphics_id": "OBJ_EVENT_GFX_RAYQUAZA_STILL",
       "x": 14,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -76,7 +76,7 @@
     {
       "x": 16,
       "y": 14,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_SKY_PILLAR_5F",
       "dest_warp_id": "1"
     }
@@ -86,7 +86,7 @@
       "type": "trigger",
       "x": 14,
       "y": 9,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_SKY_PILLAR_RAYQUAZA_CRY_DONE",
       "var_value": "0",
       "script": "SkyPillar_Top_EventScript_AwakenRayquaza"

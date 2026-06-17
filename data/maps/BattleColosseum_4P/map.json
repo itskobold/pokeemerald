@@ -48,28 +48,28 @@
     {
       "x": 5,
       "y": 8,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 6,
       "y": 8,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 7,
       "y": 8,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 8,
       "y": 8,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     }
@@ -79,7 +79,7 @@
       "type": "trigger",
       "x": 3,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_BattleColosseum_4P_PlayerSpot0"
@@ -88,7 +88,7 @@
       "type": "trigger",
       "x": 3,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_BattleColosseum_4P_PlayerSpot2"
@@ -97,7 +97,7 @@
       "type": "trigger",
       "x": 10,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_BattleColosseum_4P_PlayerSpot1"
@@ -106,7 +106,7 @@
       "type": "trigger",
       "x": 10,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TEMP_0",
       "var_value": "0",
       "script": "EventScript_BattleColosseum_4P_PlayerSpot3"

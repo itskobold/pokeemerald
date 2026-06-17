@@ -143,7 +143,7 @@
     {
       "x": 5,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_BATTLE_FRONTIER_BATTLE_PALACE_CORRIDOR",
       "dest_warp_id": "0"
     }

@@ -49,7 +49,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MAN_1",
       "x": 6,
       "y": 2,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_LEFT",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -63,21 +63,21 @@
     {
       "x": 5,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110",
       "dest_warp_id": "1"
     },
     {
       "x": 6,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110",
       "dest_warp_id": "1"
     },
     {
       "x": 5,
       "y": 2,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_TRICK_HOUSE_PUZZLE1",
       "dest_warp_id": "0"
     }
@@ -87,7 +87,7 @@
       "type": "trigger",
       "x": 4,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TRICK_HOUSE_BEING_WATCHED_STATE",
       "var_value": "0",
       "script": "Route110_TrickHouseEntrance_EventScript_TrickMasterHiding"
@@ -96,7 +96,7 @@
       "type": "trigger",
       "x": 5,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TRICK_HOUSE_BEING_WATCHED_STATE",
       "var_value": "0",
       "script": "Route110_TrickHouseEntrance_EventScript_TrickMasterHiding"
@@ -105,7 +105,7 @@
       "type": "trigger",
       "x": 6,
       "y": 6,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TRICK_HOUSE_BEING_WATCHED_STATE",
       "var_value": "0",
       "script": "Route110_TrickHouseEntrance_EventScript_TrickMasterHiding"
@@ -114,7 +114,7 @@
       "type": "trigger",
       "x": 7,
       "y": 7,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_TRICK_HOUSE_BEING_WATCHED_STATE",
       "var_value": "0",
       "script": "Route110_TrickHouseEntrance_EventScript_TrickMasterHiding"

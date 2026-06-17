@@ -49,7 +49,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MANIAC",
       "x": 5,
       "y": 3,
-      "elevation": 3,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_UP",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -63,14 +63,14 @@
     {
       "x": 6,
       "y": 25,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE114_FOSSIL_MANIACS_HOUSE",
       "dest_warp_id": "2"
     },
     {
       "x": 7,
       "y": 25,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE114_FOSSIL_MANIACS_HOUSE",
       "dest_warp_id": "2"
     },
@@ -87,7 +87,7 @@
       "type": "trigger",
       "x": 5,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_FOSSIL_MANIAC_STATE",
       "var_value": "1",
       "script": "Route114_FossilManiacsTunnel_EventScript_ManiacMentionCaveIn"
@@ -96,7 +96,7 @@
       "type": "trigger",
       "x": 6,
       "y": 4,
-      "elevation": 3,
+      "elevation": 5,
       "var": "VAR_FOSSIL_MANIAC_STATE",
       "var_value": "1",
       "script": "Route114_FossilManiacsTunnel_EventScript_ManiacMentionCaveIn"

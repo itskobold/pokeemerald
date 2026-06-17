@@ -48,7 +48,7 @@
     {
       "x": 10,
       "y": 2,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_SEALED_CHAMBER_INNER_ROOM",
       "dest_warp_id": "0"
     }

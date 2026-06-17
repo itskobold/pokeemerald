@@ -101,21 +101,21 @@
     {
       "x": 1,
       "y": 6,
-      "elevation": 4,
+      "elevation": 6,
       "dest_map": "MAP_BATTLE_FRONTIER_POKEMON_CENTER_1F",
       "dest_warp_id": "2"
     },
     {
       "x": 5,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_UNION_ROOM",
       "dest_warp_id": "0"
     },
     {
       "x": 9,
       "y": 1,
-      "elevation": 3,
+      "elevation": 5,
       "dest_map": "MAP_TRADE_CENTER",
       "dest_warp_id": "0"
     }
