@@ -1,0 +1,66 @@
+{
+  "id": "MAP_OW_1_1",
+  "name": "ow_1_1",
+  "layout": "LAYOUT_OW_1_1",
+  "requires_flash": false,
+  "weather": "WEATHER_SANDSTORM",
+  "allow_cycling": true,
+  "allow_escaping": false,
+  "allow_running": true,
+  "num_locations": 1,
+  "locations": [
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_DUMMY",
+      "region_map_section": "MAPSEC_ABANDONED_SHIP",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_DUMMY",
+      "region_map_section": "MAPSEC_ABANDONED_SHIP",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_DUMMY",
+      "region_map_section": "MAPSEC_ABANDONED_SHIP",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    },
+    {
+      "secondary_tileset": "gTileset_Petalburg",
+      "music": "MUS_DUMMY",
+      "region_map_section": "MAPSEC_ABANDONED_SHIP",
+      "map_type": "MAP_TYPE_ROUTE",
+      "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+      "show_map_name": false
+    }
+  ],
+  "connections": [
+    {
+      "map": "MAP_OW_0_0",
+      "offset": 0,
+      "direction": "southwest"
+    },
+    {
+      "map": "MAP_OW_1_0",
+      "offset": 0,
+      "direction": "south"
+    },
+    {
+      "map": "MAP_OW_0_1",
+      "offset": 0,
+      "direction": "west"
+    }
+  ],
+  "object_events": [],
+  "warp_events": [],
+  "coord_events": [],
+  "bg_events": []
+}
