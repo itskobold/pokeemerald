@@ -2,20 +2,26 @@
 #define GUARD_GLOBAL_FIELDMAP_H
 
 // Masks/shifts for blocks in the map grid
-// A map grid block is now a full 16 bit metatile id.
-// This is the data stored in each data/layouts/*/map.bin file
-#define MAPGRID_METATILE_ID_MASK 0xFFFF // Bits 0-15
+// A map grid block is a packed 16 bit value, stored in each
+// data/layouts/*/map.bin file:
+//   bits 0-9   metatile id (max 1024)
+//   bits 10-11 location
+//   bits 12-15 biome (currently unused)
+#define MAPGRID_METATILE_ID_MASK  0x03FF // Bits 0-9
 #define MAPGRID_METATILE_ID_SHIFT 0
+#define MAPGRID_LOCATION_MASK     0x0C00 // Bits 10-11
+#define MAPGRID_LOCATION_SHIFT    10
+#define MAPGRID_BIOME_MASK        0xF000 // Bits 12-15
+#define MAPGRID_BIOME_SHIFT       12
 
 // Per-tile attributes are stored separately, one u8 per tile, in each
 // data/layouts/*/attributes.bin file (loaded parallel to map.bin):
-//   bits 0-1 collision, bits 2-5 elevation, bits 6-7 location
-#define MAPATTR_COLLISION_MASK 0x03 // Bits 0-1
-#define MAPATTR_ELEVATION_MASK 0x3C // Bits 2-5
-#define MAPATTR_LOCATION_MASK  0xC0 // Bits 6-7
+//   bit 0    collision
+//   bits 1-7 elevation
+#define MAPATTR_COLLISION_MASK  0x01 // Bit 0
+#define MAPATTR_ELEVATION_MASK  0xFE // Bits 1-7
 #define MAPATTR_COLLISION_SHIFT 0
-#define MAPATTR_ELEVATION_SHIFT 2
-#define MAPATTR_LOCATION_SHIFT  6
+#define MAPATTR_ELEVATION_SHIFT 1
 
 // The location attribute is 2 bits, so a map can define up to 4 distinct
 // per-location property sets (see struct MapHeaderLocationData / MapHeader).
@@ -30,26 +36,31 @@ enum
     ELEVATION_INVALID = 0xFFFF
 };
 
+// PACK_METATILE/PACK_LOCATION/PACK_BIOME operate on a map grid block (map.bin u16);
+// PACK_COLLISION/PACK_ELEVATION operate on an attribute byte (attributes.bin u8).
 #define PACK_METATILE(metatileId) PACK(metatileId, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
+#define PACK_LOCATION(location)   PACK(location, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
+#define PACK_BIOME(biome)         PACK(biome, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
 #define PACK_COLLISION(collision) PACK(collision, MAPATTR_COLLISION_SHIFT, MAPATTR_COLLISION_MASK)
 #define PACK_ELEVATION(elevation) PACK(elevation, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
-#define PACK_LOCATION(location)   PACK(location, MAPATTR_LOCATION_SHIFT, MAPATTR_LOCATION_MASK)
 #define UNPACK_METATILE(data)  UNPACK(data, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
+#define UNPACK_LOCATION(data)  UNPACK(data, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
+#define UNPACK_BIOME(data)     UNPACK(data, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
 #define UNPACK_COLLISION(attr) UNPACK(attr, MAPATTR_COLLISION_SHIFT, MAPATTR_COLLISION_MASK)
 #define UNPACK_ELEVATION(attr) UNPACK(attr, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
-#define UNPACK_LOCATION(attr)  UNPACK(attr, MAPATTR_LOCATION_SHIFT, MAPATTR_LOCATION_MASK)
 
-// An undefined map grid block has all metatile id bits set
-#define MAPGRID_UNDEFINED   MAPGRID_METATILE_ID_MASK
+// An undefined map grid block has every bit set (no real block, with metatile id
+// <= 0x3FF and biome 0, matches it).
+#define MAPGRID_UNDEFINED   0xFFFF
 
-// Both collision bits set in an attribute byte = impassable
+// The collision bit set in an attribute byte = impassable
 #define MAPATTR_IMPASSABLE  MAPATTR_COLLISION_MASK
 // Fill value for attribute tiles not yet loaded from a map (treated as impassable)
 #define MAPATTR_UNDEFINED   MAPATTR_IMPASSABLE
 
 // Sentinel flag, only valid as an argument to MapGridSetMetatileIdAt. It is not
 // stored in the grid; the setter strips it and marks the tile's collision impassable.
-// Uses bit 15 so it never collides with a real (<= 0x7FFF) metatile id.
+// Uses bit 15 so it never collides with a real (<= 0x3FF) metatile id argument.
 #define MAPGRID_IMPASSABLE  0x8000
 
 // Masks/shifts for metatile attributes
@@ -189,7 +200,7 @@ struct MapConnections
 };
 
 // Properties that apply per in-map location. A map's per-tile location attribute
-// (see MAPATTR_LOCATION_MASK) is intended to select which set of these properties
+// (see MAPGRID_LOCATION_MASK) is intended to select which set of these properties
 // is active. Each set is stored as its own const instance in ROM and referenced
 // by pointer from the map header (see MapHeader.locations).
 struct MapHeaderLocationData

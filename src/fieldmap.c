@@ -506,7 +506,7 @@ u8 MapGridGetCollisionAt(int x, int y)
 
 u8 MapGridGetMetatileLocationAt(int x, int y)
 {
-    return UNPACK_LOCATION(GetMapGridAttrAt(x, y));
+    return UNPACK_LOCATION(GetMapGridBlockAt(x, y));
 }
 
 u32 MapGridGetMetatileIdAt(int x, int y)
@@ -539,13 +539,14 @@ void MapGridSetMetatileIdAt(int x, int y, u16 metatile)
         i = x + y * gBackupMapLayout.width;
 
         // The MAPGRID_IMPASSABLE sentinel in the argument marks the tile impassable;
-        // otherwise the tile is made passable. Elevation and location are preserved.
+        // otherwise the tile is made passable. Elevation is preserved in the attribute
+        // byte; location and biome are preserved in the block.
         if (metatile & MAPGRID_IMPASSABLE)
             gBackupMapLayout.attributes[i] = (gBackupMapLayout.attributes[i] & ~MAPATTR_COLLISION_MASK) | MAPATTR_IMPASSABLE;
         else
             gBackupMapLayout.attributes[i] &= ~MAPATTR_COLLISION_MASK;
 
-        gBackupMapLayout.map[i] = metatile & ~MAPGRID_IMPASSABLE;
+        gBackupMapLayout.map[i] = (gBackupMapLayout.map[i] & ~MAPGRID_METATILE_ID_MASK) | (metatile & MAPGRID_METATILE_ID_MASK);
     }
 }
 
@@ -990,8 +991,8 @@ void MapGridSetMetatileLocationAt(int x, int y, u8 location)
 {
     if (AreCoordsWithinMapGridBounds(x, y))
     {
-        u8 *attr = &gBackupMapLayout.attributes[x + gBackupMapLayout.width * y];
-        *attr = (*attr & ~MAPATTR_LOCATION_MASK) | PACK_LOCATION(location);
+        u16 *block = &gBackupMapLayout.map[x + gBackupMapLayout.width * y];
+        *block = (*block & ~MAPGRID_LOCATION_MASK) | PACK_LOCATION(location);
     }
 }
 

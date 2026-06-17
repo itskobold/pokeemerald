@@ -47,10 +47,17 @@ void SetDebugNewGameFlags()
     FlagSet(FLAG_SYS_FRONTIER_PASS);
 
     mon = AllocZeroed(sizeof(struct Pokemon));
+
     CreateMon(mon, SPECIES_RAYQUAZA, 100, 31, FALSE, 0, OT_ID_PLAYER_ID, 0);
     SetMonMoveSlot(mon, MOVE_FLY, 0);
     GiveMonToPlayer(mon);
+
+    CreateMon(mon, SPECIES_KYOGRE, 100, 31, FALSE, 0, OT_ID_PLAYER_ID, 0);
+    SetMonMoveSlot(mon, MOVE_SURF, 0);
+    GiveMonToPlayer(mon);
+
     Free(mon);
+
     nationalDexNum = SpeciesToNationalPokedexNum(SPECIES_RAYQUAZA);
     GetSetPokedexFlag(nationalDexNum, FLAG_SET_SEEN);
     GetSetPokedexFlag(nationalDexNum, FLAG_SET_CAUGHT);
