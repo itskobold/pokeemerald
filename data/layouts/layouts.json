@@ -4427,7 +4427,7 @@
       "width": 80,
       "height": 80,
       "primary_tileset": "gTileset_Terrain",
-      "secondary_tileset": "gTileset_Petalburg",
+      "secondary_tileset": "gTileset_BattleFrontier",
       "border_filepath": "data/layouts/ow_0_1/border.bin",
       "blockdata_filepath": "data/layouts/ow_0_1/map.bin"
     },

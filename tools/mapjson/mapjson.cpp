@@ -165,8 +165,18 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
          << "\t.byte "  << json_to_string(map_data, "weather") << "\n"
          << "\t.byte "  << json_to_string(map_data, "map_type") << "\n";
 
-    if (version != "firered")
-        text << "\t.2byte 0\n";
+    if (version != "firered") {
+        // 0x18: numLocations (low 2 bits), stored as the location count minus 1
+        // (default 1 location -> 0). 0x19: unused padding byte.
+        int num_locations = 1;
+        auto it = map_data.object_items().find("num_locations");
+        if (it != map_data.object_items().end())
+            num_locations = it->second.int_value();
+        if (num_locations < 1)
+            num_locations = 1;
+        text << "\t.byte " << (num_locations - 1) << "\n"
+             << "\t.byte 0\n";
+    }
 
     if (version == "ruby")
         text << "\t.byte " << json_to_string(map_data, "show_map_name") << "\n";

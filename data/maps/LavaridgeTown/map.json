@@ -12,6 +12,7 @@
   "allow_running": true,
   "show_map_name": true,
   "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
+  "num_locations": 1,
   "connections": [
     {
       "map": "MAP_ROUTE112",

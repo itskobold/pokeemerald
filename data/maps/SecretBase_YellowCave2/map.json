@@ -13,6 +13,7 @@
   "allow_running": true,
   "show_map_name": true,
   "battle_scene": "MAP_BATTLE_SCENE_FRONTIER",
+  "num_locations": 1,
   "connections": null,
   "object_events": [
     {
