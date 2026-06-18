@@ -51,6 +51,9 @@
 #define ZOOM_CURSOR_OFFSET_X 0x34
 #define ZOOM_CURSOR_OFFSET_Y 0x44
 
+// Scroll speed (BG pixels per frame) of the freely-moving zoomed cursor.
+#define ZOOM_CURSOR_SPEED 1
+
 // Scroll bounds while zoomed, derived so the zoomed cursor reaches exactly the same
 // tile range as the non-zoomed cursor (MAPCURSOR_*_MIN .. MAPCURSOR_*_MAX).
 #define ZOOM_SCROLL_X_MIN (MAPCURSOR_X_MIN * 8 - ZOOM_CURSOR_OFFSET_X)
@@ -97,7 +100,7 @@ static bool32 sDrawFlyDestTextWindow;
 static u8 ProcessRegionMapInput_Full(void);
 static u8 MoveRegionMapCursor_Full(void);
 static u8 ProcessRegionMapInput_Zoomed(void);
-static u8 MoveRegionMapCursor_Zoomed(void);
+static void GetZoomTargetScroll(s16 *outX, s16 *outY);
 static void CalcZoomScrollParams(s16 scrollX, s16 scrollY, s16 c, s16 d, u16 e, u16 f, u8 rotation);
 static mapsec_u16_t GetMapSecIdAt(u16 x, u16 y);
 static void RegionMap_SetBG2XAndBG2Y(s16 x, s16 y);
@@ -609,8 +612,7 @@ bool8 LoadRegionMapGfx(void)
         }
         else
         {
-            sRegionMap->scrollX = sRegionMap->cursorPosX * 8 - 0x34;
-            sRegionMap->scrollY = sRegionMap->cursorPosY * 8 - 0x44;
+            GetZoomTargetScroll(&sRegionMap->scrollX, &sRegionMap->scrollY);
             sRegionMap->zoomedCursorPosX = sRegionMap->cursorPosX;
             sRegionMap->zoomedCursorPosY = sRegionMap->cursorPosY;
             CalcZoomScrollParams(sRegionMap->scrollX, sRegionMap->scrollY, 0x38, 0x48, 0x80, 0x80, 0);
@@ -756,79 +758,90 @@ static u8 MoveRegionMapCursor_Full(void)
 
 static u8 ProcessRegionMapInput_Zoomed(void)
 {
-    u8 input;
-
-    input = MAP_INPUT_NONE;
-    sRegionMap->zoomedCursorDeltaX = 0;
-    sRegionMap->zoomedCursorDeltaY = 0;
-    if (JOY_HELD(DPAD_UP) && sRegionMap->scrollY > ZOOM_SCROLL_Y_MIN)
-    {
-        sRegionMap->zoomedCursorDeltaY = -1;
-        input = MAP_INPUT_MOVE_START;
-    }
-    if (JOY_HELD(DPAD_DOWN) && sRegionMap->scrollY < ZOOM_SCROLL_Y_MAX)
-    {
-        sRegionMap->zoomedCursorDeltaY = +1;
-        input = MAP_INPUT_MOVE_START;
-    }
-    if (JOY_HELD(DPAD_LEFT) && sRegionMap->scrollX > ZOOM_SCROLL_X_MIN)
-    {
-        sRegionMap->zoomedCursorDeltaX = -1;
-        input = MAP_INPUT_MOVE_START;
-    }
-    if (JOY_HELD(DPAD_RIGHT) && sRegionMap->scrollX < ZOOM_SCROLL_X_MAX)
-    {
-        sRegionMap->zoomedCursorDeltaX = +1;
-        input = MAP_INPUT_MOVE_START;
-    }
-    if (JOY_NEW(A_BUTTON))
-    {
-        input = MAP_INPUT_A_BUTTON;
-    }
-    if (JOY_NEW(B_BUTTON))
-    {
-        input = MAP_INPUT_B_BUTTON;
-    }
-    if (input == MAP_INPUT_MOVE_START)
-    {
-        sRegionMap->inputCallback = MoveRegionMapCursor_Zoomed;
-        sRegionMap->zoomedCursorMovementFrameCounter = 0;
-    }
-    return input;
-}
-
-static u8 MoveRegionMapCursor_Zoomed(void)
-{
     u16 x;
     u16 y;
     mapsec_u16_t mapSecId;
 
-    sRegionMap->scrollY += sRegionMap->zoomedCursorDeltaY;
+    if (JOY_NEW(A_BUTTON))
+        return MAP_INPUT_A_BUTTON;
+    if (JOY_NEW(B_BUTTON))
+        return MAP_INPUT_B_BUTTON;
+
+    // The zoomed cursor moves freely (pixel by pixel while held) rather than snapping
+    // to whole tiles, so it can rest anywhere within a tile. The cursor stays locked at
+    // screen center; the map scrolls under it.
+    sRegionMap->zoomedCursorDeltaX = 0;
+    sRegionMap->zoomedCursorDeltaY = 0;
+    if (JOY_HELD(DPAD_UP) && sRegionMap->scrollY > ZOOM_SCROLL_Y_MIN)
+        sRegionMap->zoomedCursorDeltaY = -ZOOM_CURSOR_SPEED;
+    if (JOY_HELD(DPAD_DOWN) && sRegionMap->scrollY < ZOOM_SCROLL_Y_MAX)
+        sRegionMap->zoomedCursorDeltaY = +ZOOM_CURSOR_SPEED;
+    if (JOY_HELD(DPAD_LEFT) && sRegionMap->scrollX > ZOOM_SCROLL_X_MIN)
+        sRegionMap->zoomedCursorDeltaX = -ZOOM_CURSOR_SPEED;
+    if (JOY_HELD(DPAD_RIGHT) && sRegionMap->scrollX < ZOOM_SCROLL_X_MAX)
+        sRegionMap->zoomedCursorDeltaX = +ZOOM_CURSOR_SPEED;
+
+    if (sRegionMap->zoomedCursorDeltaX == 0 && sRegionMap->zoomedCursorDeltaY == 0)
+        return MAP_INPUT_NONE;
+
     sRegionMap->scrollX += sRegionMap->zoomedCursorDeltaX;
+    sRegionMap->scrollY += sRegionMap->zoomedCursorDeltaY;
+    if (sRegionMap->scrollX < ZOOM_SCROLL_X_MIN)
+        sRegionMap->scrollX = ZOOM_SCROLL_X_MIN;
+    else if (sRegionMap->scrollX > ZOOM_SCROLL_X_MAX)
+        sRegionMap->scrollX = ZOOM_SCROLL_X_MAX;
+    if (sRegionMap->scrollY < ZOOM_SCROLL_Y_MIN)
+        sRegionMap->scrollY = ZOOM_SCROLL_Y_MIN;
+    else if (sRegionMap->scrollY > ZOOM_SCROLL_Y_MAX)
+        sRegionMap->scrollY = ZOOM_SCROLL_Y_MAX;
     RegionMap_SetBG2XAndBG2Y(sRegionMap->scrollX, sRegionMap->scrollY);
-    sRegionMap->zoomedCursorMovementFrameCounter++;
-    if (sRegionMap->zoomedCursorMovementFrameCounter == 8)
+
+    // Re-evaluate the tile under the locked cursor. Only refresh the map section (and
+    // report MOVE_END so consumers redraw the name) when the cursor crosses into a new tile.
+    x = (sRegionMap->scrollX + ZOOM_CURSOR_OFFSET_X) / 8;
+    y = (sRegionMap->scrollY + ZOOM_CURSOR_OFFSET_Y) / 8;
+    if (x != sRegionMap->zoomedCursorPosX || y != sRegionMap->zoomedCursorPosY)
     {
-        x = (sRegionMap->scrollX + ZOOM_CURSOR_OFFSET_X) / 8;
-        y = (sRegionMap->scrollY + ZOOM_CURSOR_OFFSET_Y) / 8;
-        if (x != sRegionMap->zoomedCursorPosX || y != sRegionMap->zoomedCursorPosY)
+        sRegionMap->zoomedCursorPosX = x;
+        sRegionMap->zoomedCursorPosY = y;
+        mapSecId = GetMapSecIdAt(x, y);
+        sRegionMap->mapSecType = GetMapsecType(mapSecId);
+        if (mapSecId != sRegionMap->mapSecId)
         {
-            sRegionMap->zoomedCursorPosX = x;
-            sRegionMap->zoomedCursorPosY = y;
-            mapSecId = GetMapSecIdAt(x, y);
-            sRegionMap->mapSecType = GetMapsecType(mapSecId);
-            if (mapSecId != sRegionMap->mapSecId)
-            {
-                sRegionMap->mapSecId = mapSecId;
-                GetMapName(sRegionMap->mapSecName, sRegionMap->mapSecId, MAP_NAME_LENGTH);
-            }
-            GetPositionOfCursorWithinMapSec();
+            sRegionMap->mapSecId = mapSecId;
+            GetMapName(sRegionMap->mapSecName, sRegionMap->mapSecId, MAP_NAME_LENGTH);
         }
-        sRegionMap->zoomedCursorMovementFrameCounter = 0;
-        sRegionMap->inputCallback = ProcessRegionMapInput_Zoomed;
+        GetPositionOfCursorWithinMapSec();
         return MAP_INPUT_MOVE_END;
     }
     return MAP_INPUT_MOVE_CONT;
+}
+
+// Computes the target zoomed scroll position for the current cursor tile. When the cursor
+// sits on the player's tile, the focus is nudged to the player's actual sub-tile position
+// (playerIconOffset is in zoomed screen pixels, so halve it for the BG-pixel scroll);
+// otherwise it centers on the tile. The result is clamped to the zoomed scroll bounds.
+static void GetZoomTargetScroll(s16 *outX, s16 *outY)
+{
+    s16 x = sRegionMap->cursorPosX * 8 - ZOOM_CURSOR_OFFSET_X;
+    s16 y = sRegionMap->cursorPosY * 8 - ZOOM_CURSOR_OFFSET_Y;
+
+    if (sRegionMap->cursorPosX == sRegionMap->playerIconSpritePosX
+        && sRegionMap->cursorPosY == sRegionMap->playerIconSpritePosY)
+    {
+        x += sRegionMap->playerIconOffsetX / 2;
+        y += sRegionMap->playerIconOffsetY / 2;
+        if (x < ZOOM_SCROLL_X_MIN)
+            x = ZOOM_SCROLL_X_MIN;
+        else if (x > ZOOM_SCROLL_X_MAX)
+            x = ZOOM_SCROLL_X_MAX;
+        if (y < ZOOM_SCROLL_Y_MIN)
+            y = ZOOM_SCROLL_Y_MIN;
+        else if (y > ZOOM_SCROLL_Y_MAX)
+            y = ZOOM_SCROLL_Y_MAX;
+    }
+    *outX = x;
+    *outY = y;
 }
 
 void SetRegionMapDataForZoom(void)
@@ -839,8 +852,7 @@ void SetRegionMapDataForZoom(void)
         sRegionMap->scrollX = 0;
         sRegionMap->unk_040 = 0;
         sRegionMap->unk_03c = 0;
-        sRegionMap->unk_060 = sRegionMap->cursorPosX * 8 - ZOOM_CURSOR_OFFSET_X;
-        sRegionMap->unk_062 = sRegionMap->cursorPosY * 8 - ZOOM_CURSOR_OFFSET_Y;
+        GetZoomTargetScroll(&sRegionMap->unk_060, &sRegionMap->unk_062);
         sRegionMap->unk_044 = (sRegionMap->unk_060 << 8) / 16;
         sRegionMap->unk_048 = (sRegionMap->unk_062 << 8) / 16;
         sRegionMap->zoomedCursorPosX = sRegionMap->cursorPosX;
@@ -850,6 +862,17 @@ void SetRegionMapDataForZoom(void)
     }
     else
     {
+        // The zoomed cursor can rest between tiles (free movement). Round it to the nearest
+        // tile and snap the scroll to that tile so the zoom-out is focused on it. Adding half
+        // a tile (4 px) before the /8 floor rounds to nearest; this stays within bounds since
+        // the scroll itself is clamped to [ZOOM_SCROLL_*_MIN, ZOOM_SCROLL_*_MAX].
+        u16 tileX = (sRegionMap->scrollX + ZOOM_CURSOR_OFFSET_X + 4) / 8;
+        u16 tileY = (sRegionMap->scrollY + ZOOM_CURSOR_OFFSET_Y + 4) / 8;
+        sRegionMap->scrollX = tileX * 8 - ZOOM_CURSOR_OFFSET_X;
+        sRegionMap->scrollY = tileY * 8 - ZOOM_CURSOR_OFFSET_Y;
+        sRegionMap->zoomedCursorPosX = tileX;
+        sRegionMap->zoomedCursorPosY = tileY;
+
         sRegionMap->unk_03c = sRegionMap->scrollX * 0x100;
         sRegionMap->unk_040 = sRegionMap->scrollY * 0x100;
         sRegionMap->unk_060 = 0;
@@ -1008,12 +1031,33 @@ static mapsec_u16_t GetMapSecIdAt(u16 x, u16 y)
     return sRegionMap_MapSectionLayout[y][x];
 }
 
+// Maps the player's position along one axis of the current map to a sub-tile pixel offset
+// in the range -8..+8 for the zoomed region map icon. The player at the map's near edge
+// (left/top) sits at -8, the far edge (right/bottom) at +8, and the exact center at 0.
+static s8 GetPlayerIconSubtileOffset(s32 coord, s32 extent)
+{
+    s32 offset;
+
+    if (extent < 2)
+        return 0;
+    // (coord / (extent - 1) - 0.5) * 16, in integer math.
+    offset = ((coord * 2 - (extent - 1)) * 8) / (extent - 1);
+    if (offset < -8)
+        offset = -8;
+    else if (offset > 8)
+        offset = 8;
+    return offset;
+}
+
 static void InitMapBasedOnPlayerLocation(void)
 {
     const struct MapHeader *mapHeader;
     u8 gridX;
     u8 gridY;
     struct WarpData *warp;
+
+    sRegionMap->playerIconOffsetX = 0;
+    sRegionMap->playerIconOffsetY = 0;
 
     if (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SS_TIDAL_CORRIDOR)
         && (gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SS_TIDAL_CORRIDOR)
@@ -1093,6 +1137,12 @@ static void InitMapBasedOnPlayerLocation(void)
 
     sRegionMap->cursorPosX = gridX + MAPCURSOR_X_MIN;
     sRegionMap->cursorPosY = (MAP_HEIGHT - 1 - gridY) + MAPCURSOR_Y_MIN;
+
+    // Nudge the zoomed player icon within its tile to reflect where the player actually
+    // stands inside the current map, instead of always centering it. No vertical flip:
+    // map y and screen y both increase downward, so top-of-map -> top-of-tile.
+    sRegionMap->playerIconOffsetX = GetPlayerIconSubtileOffset(gSaveBlock1Ptr->playerPos.x, gMapHeader.mapLayout->width);
+    sRegionMap->playerIconOffsetY = GetPlayerIconSubtileOffset(gSaveBlock1Ptr->playerPos.y, gMapHeader.mapLayout->height);
 }
 
 static void RegionMap_InitializeStateBasedOnSSTidalLocation(void)
@@ -1433,8 +1483,8 @@ void CreateRegionMapPlayerIcon(u16 tileTag, u16 paletteTag)
     }
     else
     {
-        sRegionMap->playerIconSprite->x = sRegionMap->playerIconSpritePosX * 16 - 0x30;
-        sRegionMap->playerIconSprite->y = sRegionMap->playerIconSpritePosY * 16 - 0x42;
+        sRegionMap->playerIconSprite->x = sRegionMap->playerIconSpritePosX * 16 - 0x30 + sRegionMap->playerIconOffsetX;
+        sRegionMap->playerIconSprite->y = sRegionMap->playerIconSpritePosY * 16 - 0x42 + sRegionMap->playerIconOffsetY;
         sRegionMap->playerIconSprite->callback = SpriteCB_PlayerIconMapZoomed;
     }
 }
@@ -1454,8 +1504,8 @@ static void UnhideRegionMapPlayerIcon(void)
     {
         if (sRegionMap->zoomed == TRUE)
         {
-            sRegionMap->playerIconSprite->x = sRegionMap->playerIconSpritePosX * 16 - 0x30;
-            sRegionMap->playerIconSprite->y = sRegionMap->playerIconSpritePosY * 16 - 0x42;
+            sRegionMap->playerIconSprite->x = sRegionMap->playerIconSpritePosX * 16 - 0x30 + sRegionMap->playerIconOffsetX;
+            sRegionMap->playerIconSprite->y = sRegionMap->playerIconSpritePosY * 16 - 0x42 + sRegionMap->playerIconOffsetY;
             sRegionMap->playerIconSprite->callback = SpriteCB_PlayerIconMapZoomed;
             sRegionMap->playerIconSprite->invisible = FALSE;
         }

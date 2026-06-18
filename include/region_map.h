@@ -81,7 +81,12 @@ struct RegionMap {
     /*0x084*/ u8 bgNum2;
     /*0x085*/ u8 charBaseIdx2;
     /*0x086*/ u8 mapBaseIdx2;
-    /*0x087*/ u8 filler_087[0xFD];
+    // Sub-tile pixel offset for the zoomed player icon, derived from the player's
+    // relative position within the current map (see InitMapBasedOnPlayerLocation).
+    // Range -8..+8; 0 = centered in the tile.
+    /*0x087*/ s8 playerIconOffsetX;
+    /*0x088*/ s8 playerIconOffsetY;
+    /*0x089*/ u8 filler_087[0xFB];
     /*0x184*/ u8 cursorSmallImage[0x100];
     /*0x284*/ u8 cursorLargeImage[0x600];
 }; // size = 0x884
