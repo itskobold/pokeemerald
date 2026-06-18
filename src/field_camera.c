@@ -445,6 +445,8 @@ static void CenterCameraOnTile(int x, int y)
 {
     int width = gMapHeader.mapLayout->width;
     int height = gMapHeader.mapLayout->height;
+    bool8 cameraMoved;
+    bool8 gfxReloaded;
     u8 i;
 
     if (x < 0)
@@ -456,14 +458,26 @@ static void CenterCameraOnTile(int x, int y)
     else if (y > height - 1)
         y = height - 1;
 
+    // Only rebuild the view when the focus actually moves (or the camera is sitting mid-step). Re-
+    // centring on the tile the camera already rests on — e.g. opening the Track box, which re-tracks
+    // the player at its current tile — must NOT zero the field-camera offset and DrawWholeMapView:
+    // that rewrites the BG buffer from whatever rolled, but correct, alignment it inherited from the
+    // map-entry view (saved map view / connection stitch) to a canonical one, and the buffer rewrite
+    // and scroll register settle over two frames — the one-off viewport shift seen on the first Track
+    // open after warping/connecting in. With no movement the BG is already correct, so leave it be.
+    cameraMoved = (gCameraPos.x != x || gCameraPos.y != y || gFieldCamera.x != 0 || gFieldCamera.y != 0);
+
     gCameraPos.x = x;
     gCameraPos.y = y;
 
-    gFieldCamera.x = 0;
-    gFieldCamera.y = 0;
-    gTotalCameraPixelOffsetX = 0;
-    gTotalCameraPixelOffsetY = 0;
-    ResetFieldCamera();
+    if (cameraMoved)
+    {
+        gFieldCamera.x = 0;
+        gFieldCamera.y = 0;
+        gTotalCameraPixelOffsetX = 0;
+        gTotalCameraPixelOffsetY = 0;
+        ResetFieldCamera();
+    }
 
     // Respawn/cull around the new focus, then snap every live sprite into the new frame so
     // none are left at a stale sub-tile position relative to the camera. UpdateObjectEventsForCameraUpdate
@@ -481,8 +495,11 @@ static void CenterCameraOnTile(int x, int y)
     // the previous focus's — otherwise the new surroundings flash with the old (player's) tileset
     // for the frame before the deferred swap catches up. Safe to do synchronously here because a
     // jump lands tile-aligned, with no sub-tile scroll offset to corrupt.
-    UpdateMapLocationGfxImmediate(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
-    DrawWholeMapView();
+    gfxReloaded = UpdateMapLocationGfxImmediate(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
+    // Redraw when the focus moved, or when a tileset swap above means the resident graphics changed
+    // under the current view. A pure re-centre on the resting tile needs neither.
+    if (cameraMoved || gfxReloaded)
+        DrawWholeMapView();
     UpdateCameraElevation();
     UpdateCameraBiome();
 }

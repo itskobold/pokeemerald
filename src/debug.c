@@ -1,8 +1,6 @@
 #include "global.h"
 #include "debug.h"
 #include "event_data.h"
-#include "event_object_lock.h"
-#include "event_object_movement.h"
 #include "field_camera.h"
 #include "field_player_avatar.h"
 #include "item.h"
@@ -235,7 +233,6 @@ void Debug_ShowMainMenu(void)
     // the D-pad drives the menu and freecam scrolling pauses while it is up.
     if (!IsCameraDetachedFromPlayer())
     {
-        FreezeObjectEvents();
         PlayerFreeze();
         StopPlayerAvatar();
     }
@@ -292,8 +289,6 @@ static void Debug_DestroyMenu(u8 taskId)
 static void Debug_CloseMenu(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
-    if (!IsFreecamActive())
-        ScriptUnfreezeObjectEvents();
     UnlockPlayerFieldControls();
 }
 
@@ -352,8 +347,8 @@ static void DebugAction_Camera_ToggleFreecam(u8 taskId)
         Debug_EnableFreecam(taskId);
 }
 
-// Detaches the camera from the player and lets the D-pad drive it. Freecam needs the field
-// frozen with controls locked; the menu set that up when it opened from normal play. But
+// Detaches the camera from the player and lets the D-pad drive it. Freecam needs the
+// controls locked; the menu set that up when it opened from normal play. But
 // when we open from NPC tracking the field is still running (object events unfrozen) and
 // the camera is anchored to that NPC, so freeze the field and drop the anchor here. Without
 // this the NPC keeps walking and the camera stays glued to it, so the D-pad can't move it.
@@ -361,10 +356,7 @@ static void Debug_EnableFreecam(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
     if (GetCameraTrackedLocalId() != 0)
-    {
-        FreezeObjectEvents();
         StopCameraObjectTracking();
-    }
     SetFreecamActive(TRUE);
     // Hand input back: the overworld keeps the player parked while detached, and freecam
     // scrolls the camera from the D-pad now that controls are unlocked.
@@ -379,7 +371,6 @@ static void Debug_DisableFreecam(u8 taskId)
     Debug_DestroyMenu(taskId);
     RecenterCameraOnPlayer();
     SetFreecamActive(FALSE);
-    ScriptUnfreezeObjectEvents();
     UnlockPlayerFieldControls();
 }
 
@@ -539,7 +530,6 @@ static void Debug_TearDownNpcBox(u8 taskId)
 static void Debug_CloseTrackNpcBox(u8 taskId)
 {
     Debug_TearDownNpcBox(taskId);
-    ScriptUnfreezeObjectEvents();
     // Hand input back either way. When still tracking an NPC the overworld keeps the player
     // parked (and the start menu / L+R+Select stay reachable); when tracking the player
     // (id 0) this simply returns normal control.
@@ -556,7 +546,6 @@ static void Debug_CommitPanNpcBox(u8 taskId)
     u8 localId = Debug_LocalIdForOrder(sTrackNpcOrder);
 
     Debug_TearDownNpcBox(taskId);
-    ScriptUnfreezeObjectEvents();
     PanCameraToLocalId(localId);
     UnlockPlayerFieldControls();
 }

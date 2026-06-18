@@ -944,10 +944,20 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
 // starting to track an NPC that sits in a different location. Applying the swap up front lets the
 // caller's DrawWholeMapView render the right graphics immediately. No music/popup: a deliberate
 // repoint, like TryUpdateMapLocationSilent. The caller redraws the map afterwards.
-void UpdateMapLocationGfxImmediate(s16 x, s16 y)
+// Returns TRUE if it actually reloaded the secondary tileset (so the caller knows it must redraw
+// the map); FALSE if nothing changed.
+bool8 UpdateMapLocationGfxImmediate(s16 x, s16 y)
 {
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
     u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
+    // A deferred swap in flight means the active-location pointer was already advanced but its
+    // tileset has NOT been loaded into VRAM yet (the task hadn't reached a tile-aligned frame to
+    // fire). The jump cancels that task, so its pending graphics load must be performed here — even
+    // if the location index ends up unchanged below — or the redraw shows the stale tileset for a
+    // frame. This is the flicker after warping/connecting in: a connection doesn't reset field
+    // tasks, and a warp can leave a swap mid-flight, so the first NPC jump lands with one pending
+    // (Fly doesn't, because its long fly-in animation lets the swap settle first).
+    bool8 mustReload = (taskId != TASK_NONE);
 
     // A jump supersedes any deferred swap left over from prior scrolling: its latched target is
     // stale now that the camera has teleported, and letting it fire would switch to the wrong
@@ -955,14 +965,20 @@ void UpdateMapLocationGfxImmediate(s16 x, s16 y)
     if (taskId != TASK_NONE)
         DestroyTask(taskId);
 
-    if (newLocation == GetActiveMapLocation())
-        return;
-    // Ignore tiles tagged with a location the map doesn't actually define.
-    if (newLocation >= MAX_MAP_LOCATIONS || gMapHeader.locations[newLocation] == NULL)
-        return;
+    // Adopt the destination tile's location when the map actually defines it (ignore tiles tagged
+    // with an undefined location, like TryUpdateMapLocation); a real change is its own reason to
+    // reload. ApplyActiveLocationSecondaryTileset then loads whichever location is active — the one
+    // just set, or the existing one when only resolving an in-flight swap.
+    if (newLocation < MAX_MAP_LOCATIONS && gMapHeader.locations[newLocation] != NULL
+     && newLocation != GetActiveMapLocation())
+    {
+        SetActiveMapLocation(newLocation);
+        mustReload = TRUE;
+    }
 
-    SetActiveMapLocation(newLocation);
-    ApplyActiveLocationSecondaryTileset();
+    if (mustReload)
+        ApplyActiveLocationSecondaryTileset();
+    return mustReload;
 }
 
 static void LoadMapFromWarp(bool32 a1)
