@@ -1,6 +1,7 @@
 #include "global.h"
 #include "battle_pyramid.h"
 #include "bg.h"
+#include "field_camera.h"
 #include "fieldmap.h"
 #include "fldeff.h"
 #include "fldeff_misc.h"
@@ -33,7 +34,7 @@ EWRAM_DATA static u16 ALIGNED(4) sBackupMapData[MAX_MAP_DATA_SIZE] = {0};
 EWRAM_DATA static u8 ALIGNED(4) sBackupMapAttrData[MAX_MAP_DATA_SIZE] = {0};
 EWRAM_DATA struct MapHeader gMapHeader = {0};
 // Index (0..MAX_MAP_LOCATIONS-1) of the location property set currently active for
-// gMapHeader, selected by the location attribute of the tile the player stands on.
+// gMapHeader, selected by the location attribute of the tile the camera is focused on.
 EWRAM_DATA static u8 sActiveMapLocation = 0;
 EWRAM_DATA struct Camera gCamera = {0};
 EWRAM_DATA static struct ConnectionFlags sMapConnectionFlags = {0};
@@ -105,9 +106,10 @@ void SetActiveMapLocation(u8 location)
     sActiveMapLocation = location;
 }
 
-// Selects the active location from the tile the player is standing on. Called on
-// map load so the initial tileset/music/map name reflect the spawn location.
-void SetActiveMapLocationFromPlayer(void)
+// Selects the active location from the tile the camera is focused on (gSaveBlock1Ptr->pos
+// is the camera focus). Called on map load so the initial tileset/music/map name reflect
+// the spawn location; thereafter location is updated as the camera moves (TryUpdateMapLocation).
+void SetActiveMapLocationFromCamera(void)
 {
     SetActiveMapLocation(MapGridGetMetatileLocationAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET,
                                                       gSaveBlock1Ptr->pos.y + MAP_OFFSET));
@@ -117,7 +119,8 @@ void InitMap(void)
 {
     InitMapLayoutData(&gMapHeader);
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
-    SetActiveMapLocationFromPlayer();
+    SetActiveMapLocationFromCamera();
+    UpdateCameraElevation();
     RunOnLoadMapScript();
 }
 
@@ -126,7 +129,8 @@ void InitMapFromSavedGame(void)
     InitMapLayoutData(&gMapHeader);
     InitSecretBaseAppearance(FALSE);
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
-    SetActiveMapLocationFromPlayer();
+    SetActiveMapLocationFromCamera();
+    UpdateCameraElevation();
     LoadSavedMapView();
     RunOnLoadMapScript();
     UpdateTVScreensOnMap(gBackupMapLayout.width, gBackupMapLayout.height);

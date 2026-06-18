@@ -42,6 +42,10 @@ static void (*sFieldCameraPanningCallback)(void);
 COMMON_DATA struct CameraObject gFieldCamera = {0};
 COMMON_DATA u16 gTotalCameraPixelOffsetY = 0;
 COMMON_DATA u16 gTotalCameraPixelOffsetX = 0;
+// The camera's actual elevation level, tracked exactly like gPlayerElevation but from the
+// camera's focus tile (gSaveBlock1Ptr->pos). Since the camera follows the player most of the
+// time, this usually equals gPlayerElevation; it diverges only while the camera is detached.
+EWRAM_DATA u8 gCameraElevation = 0;
 
 static void ResetCameraOffset(struct FieldCameraOffset *cameraOffset)
 {
@@ -342,6 +346,18 @@ u32 InitCameraUpdateCallback(u8 trackedSpriteId)
     return 0;
 }
 
+// Tracks the camera's actual elevation level from its current focus tile, mirroring how
+// gPlayerElevation is tracked for the player. Only ordinary elevation levels
+// (ELEVATION_FIRST_LEVEL and up) update it; the stored value is the level (tile value minus
+// ELEVATION_FIRST_LEVEL, i.e. 0-123). Special tiles (transition, collision, water,
+// multi-level) leave the last tracked level untouched.
+void UpdateCameraElevation(void)
+{
+    u8 elevation = MapGridGetElevationAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+    if (elevation >= ELEVATION_FIRST_LEVEL)
+        gCameraElevation = elevation - ELEVATION_FIRST_LEVEL;
+}
+
 void CameraUpdate(void)
 {
     int deltaX;
@@ -398,6 +414,13 @@ void CameraUpdate(void)
     if (deltaX != 0 || deltaY != 0)
     {
         CameraMove(deltaX, deltaY);
+        // Location is driven by the camera, not the player: whenever the camera's focus
+        // advances to a new tile, re-evaluate the active map location from that tile. This
+        // keeps location transitions correct even when the camera is detached from the
+        // player (see SpawnCameraObject). CameraMove has just updated gSaveBlock1Ptr->pos
+        // to the camera's new focus tile.
+        TryUpdateMapLocation(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+        UpdateCameraElevation();
         UpdateObjectEventsForCameraUpdate(deltaX, deltaY);
         RotatingGatePuzzleCameraUpdate(deltaX, deltaY);
         SetBerryTreesSeen();

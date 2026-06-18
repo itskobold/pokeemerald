@@ -156,7 +156,7 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
     {
         IncrementGameStat(GAME_STAT_STEPS);
         IncrementBirthIslandRockStepCount();
-        TryUpdateMapLocation(position.x, position.y);
+        // Map location is updated from camera movement (see CameraUpdate), not player steps.
         if (TryStartStepBasedScript(&position, metatileBehavior, playerDirection) == TRUE)
             return TRUE;
     }

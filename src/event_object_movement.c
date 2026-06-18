@@ -2303,7 +2303,7 @@ void CameraObjectSetFollowedSpriteId(u8 spriteId)
     }
 }
 
-static u8 UNUSED CameraObjectGetFollowedSpriteId(void)
+u8 CameraObjectGetFollowedSpriteId(void)
 {
     struct Sprite *camera = FindCameraSprite();
     if (camera == NULL)

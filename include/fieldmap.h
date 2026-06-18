@@ -46,7 +46,7 @@ void SetCameraFocusCoords(u16 x, u16 y);
 void InitMap(void);
 void InitMapFromSavedGame(void);
 void SetActiveMapLocation(u8 location);
-void SetActiveMapLocationFromPlayer(void);
+void SetActiveMapLocationFromCamera(void);
 void InitTrainerHillMap(void);
 void InitBattlePyramidMap(bool8 setPlayerPosition);
 void CopyMapTilesetsToVram(struct MapLayout const *mapLayout);

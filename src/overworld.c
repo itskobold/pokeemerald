@@ -826,9 +826,10 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
         ShowMapNamePopup();
 }
 
-// Called when the player steps onto a tile. If that tile belongs to a different
-// map location than the one currently active, switch to it: reload the new
-// location's secondary tileset graphics, update the music, and show its name.
+// Called from CameraUpdate when the camera's focus advances to a new tile (x, y are the
+// camera's focus tile). If that tile belongs to a different map location than the one
+// currently active, switch to it: reload the new location's secondary tileset graphics,
+// update the music, and show its name.
 void TryUpdateMapLocation(s16 x, s16 y)
 {
     u8 taskId;
@@ -842,18 +843,20 @@ void TryUpdateMapLocation(s16 x, s16 y)
 
     SetActiveMapLocation(newLocation);
 
-    // Music and the map-name popup don't depend on the tileset transfer, so do
-    // them immediately as the player crosses the boundary.
-    Overworld_ChangeMusicToDefault();
-    if (GetActiveLocationData()->showMapName == TRUE)
-        ShowMapNamePopup();
+    // The music and map-name popup are player-facing, so only trigger them when the camera
+    // is following the player. While the camera is detached (e.g. a scripted pan), switch the
+    // location's graphics but leave the music and popup alone.
+    if (CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId())
+    {
+        Overworld_ChangeMusicToDefault();
+        if (GetActiveLocationData()->showMapName == TRUE)
+            ShowMapNamePopup();
+    }
 
-    // Hand the graphics swap to a task. It can't run now: the player only
-    // reaches T_TILE_CENTER for the boundary tile as the next step begins, so
-    // the camera is still scrolling toward the destination tile. Reloading the
-    // tileset and redrawing while the BG sits at a sub-tile scroll offset
-    // corrupts the tiles at the screen edges. The task waits for the camera to
-    // settle on the tile first (see Task_UpdateMapLocationGfx).
+    // Hand the graphics swap to a task. It can't run now: the camera is still scrolling
+    // toward the new focus tile, so the BG sits at a sub-tile scroll offset; reloading the
+    // tileset and redrawing now corrupts the tiles at the screen edges. The task waits for
+    // the camera to settle on a tile first (see Task_UpdateMapLocationGfx).
     // Reuse any switch already in flight so the newest location wins.
     taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     if (taskId == TASK_NONE)
@@ -861,16 +864,19 @@ void TryUpdateMapLocation(s16 x, s16 y)
 }
 
 // Reloads the active location's secondary tileset and redraws the visible map,
-// but only once the camera has finished scrolling onto the destination tile
-// (the player is centered, not mid-step). The graphics swap and the redraw run
-// together in the same frame so the on-screen tile indices and the loaded
-// graphics never disagree, which would otherwise show as garbage.
+// but only once the camera has finished scrolling onto its new focus tile (no
+// sub-tile scroll offset). The graphics swap and the redraw run together in the
+// same frame so the on-screen tile indices and the loaded graphics never
+// disagree, which would otherwise show as garbage.
 static void Task_UpdateMapLocationGfx(u8 taskId)
 {
     s32 paletteIndex;
 
-    // Wait until the camera has reached the destination tile.
-    if (gPlayerAvatar.tileTransitionState == T_TILE_TRANSITION)
+    // Wait until the camera is aligned to a tile (no sub-tile scroll offset) before swapping
+    // the secondary tileset and redrawing; doing it mid-scroll corrupts the screen-edge tiles.
+    // Keyed on the camera itself rather than the player, so it's correct when the camera is
+    // detached from the player.
+    if (gFieldCamera.x != 0 || gFieldCamera.y != 0)
         return;
 
     CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
