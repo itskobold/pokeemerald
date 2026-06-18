@@ -425,34 +425,64 @@ static void DebugAction_Camera_Cancel(u8 taskId)
     Debug_OpenMainMenu();
 }
 
-// Number of object event templates defined by the current map.
-static u8 Debug_TrackedObjectCount(void)
+// A template is trackable only if the map currently has it spawned, i.e. its flag isn't
+// set. This matches the engine's own spawn test (see TrySpawnObjectEvents) and skips
+// object events a script has hidden/despawned.
+static bool8 Debug_TemplateIsTrackable(const struct ObjectEventTemplate *template)
 {
-    if (gMapHeader.events == NULL)
-        return 0;
-    return gMapHeader.events->objectEventCount;
+    return !FlagGet(template->flagId);
 }
 
-// Maps a list position to its track id: 0 -> player; k -> the k-th template's local id.
+// Number of trackable (spawned) object event templates in the current map.
+static u8 Debug_TrackedObjectCount(void)
+{
+    u8 i, count = 0;
+
+    if (gMapHeader.events == NULL)
+        return 0;
+    for (i = 0; i < gMapHeader.events->objectEventCount; i++)
+    {
+        if (Debug_TemplateIsTrackable(&gSaveBlock1Ptr->objectEventTemplates[i]))
+            count++;
+    }
+    return count;
+}
+
+// Maps a list position to its track id: 0 -> player; k -> the k-th trackable template's
+// local id (hidden/despawned templates are skipped over).
 static u8 Debug_LocalIdForOrder(u8 order)
 {
+    u8 i, count = 0;
+
     if (order == 0)
         return 0; // player
-    return gSaveBlock1Ptr->objectEventTemplates[order - 1].localId;
+    if (gMapHeader.events == NULL)
+        return 0;
+    for (i = 0; i < gMapHeader.events->objectEventCount; i++)
+    {
+        if (Debug_TemplateIsTrackable(&gSaveBlock1Ptr->objectEventTemplates[i]) && ++count == order)
+            return gSaveBlock1Ptr->objectEventTemplates[i].localId;
+    }
+    return 0;
 }
 
 // Inverse of Debug_LocalIdForOrder, so reopening the box lands on the tracked object.
 static u8 Debug_OrderForLocalId(u8 localId)
 {
-    u8 i, count;
+    u8 i, count = 0;
 
     if (localId == 0)
         return 0;
-    count = Debug_TrackedObjectCount();
-    for (i = 0; i < count; i++)
+    if (gMapHeader.events == NULL)
+        return 0;
+    for (i = 0; i < gMapHeader.events->objectEventCount; i++)
     {
-        if (gSaveBlock1Ptr->objectEventTemplates[i].localId == localId)
-            return i + 1;
+        if (Debug_TemplateIsTrackable(&gSaveBlock1Ptr->objectEventTemplates[i]))
+        {
+            count++;
+            if (gSaveBlock1Ptr->objectEventTemplates[i].localId == localId)
+                return count;
+        }
     }
     return 0;
 }
