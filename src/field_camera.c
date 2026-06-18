@@ -6,11 +6,21 @@
 #include "fieldmap.h"
 #include "event_object_movement.h"
 #include "gpu_regs.h"
+#include "main.h"
 #include "menu.h"
 #include "overworld.h"
 #include "rotating_gate.h"
 #include "sprite.h"
 #include "text.h"
+
+// Camera scroll speed (pixels per frame) used by the debug freecam. Must divide
+// 16 so the camera always comes to rest aligned to a tile boundary.
+#define FREECAM_SPEED 4
+
+// Local id the camera-track tools use to mean "the player". Real NPC local ids start
+// at 1, and the engine's own LOCALID_PLAYER (255) is awkward to show in a numeric box,
+// so the player is exposed as 0 instead.
+#define TRACK_LOCAL_ID_PLAYER 0
 
 EWRAM_DATA bool8 gUnusedBikeCameraAheadPanback = FALSE;
 
@@ -32,12 +42,26 @@ static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
 static void DrawMetatile(s32, const u16 *, u16);
 static void CameraPanningCB_PanAhead(void);
+static void UpdateFreecamMovement(struct CameraObject *);
+void MoveCameraAndRedrawMap(int deltaX, int deltaY);
 
 static struct FieldCameraOffset sFieldCameraOffset;
 static s16 sHorizontalCameraPan;
 static s16 sVerticalCameraPan;
 static bool8 sBikeCameraPanFlag;
 static void (*sFieldCameraPanningCallback)(void);
+
+// Debug freecam state: when active the camera detaches from the player and is
+// scrolled directly by the D-pad (see UpdateFreecamMovement).
+static bool8 sFreecamActive;
+static bool8 sFreecamPaused;
+static s16 sFreecamMoveX;
+static s16 sFreecamMoveY;
+
+// Local id of the object event the camera is currently tracking (see
+// TRACK_LOCAL_ID_PLAYER). Defaults to the player, repointed on the fly by the debug
+// "Track NPC" tool.
+static u8 sCameraTrackedLocalId;
 
 COMMON_DATA struct CameraObject gFieldCamera = {0};
 COMMON_DATA u16 gTotalCameraPixelOffsetY = 0;
@@ -323,11 +347,224 @@ static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x
 
 static void CameraUpdateCallback(struct CameraObject *fieldCamera)
 {
+    if (sFreecamActive)
+    {
+        UpdateFreecamMovement(fieldCamera);
+        return;
+    }
     if (fieldCamera->spriteId != 0)
     {
         fieldCamera->movementSpeedX = gSprites[fieldCamera->spriteId].sCamera_MoveX;
         fieldCamera->movementSpeedY = gSprites[fieldCamera->spriteId].sCamera_MoveY;
     }
+}
+
+// Drives the camera from the D-pad while the debug freecam is active, instead of
+// following the player's sprite. Movement direction is only (re)evaluated when the
+// camera is sitting exactly on a tile boundary, so an in-progress step always
+// finishes and the camera comes to rest grid-aligned (matching normal movement).
+// Movement is clamped to the current map's bounds, keeping the camera focus within
+// the same range the player can occupy so RecenterCameraOnPlayer can snap back with
+// a single CameraMove (no connection-crossing edge cases).
+static void UpdateFreecamMovement(struct CameraObject *fieldCamera)
+{
+    if (fieldCamera->x == 0 && fieldCamera->y == 0)
+    {
+        u16 keys = sFreecamPaused ? 0 : gMain.heldKeys;
+        int width = gMapHeader.mapLayout->width;
+        int height = gMapHeader.mapLayout->height;
+
+        sFreecamMoveX = 0;
+        sFreecamMoveY = 0;
+        if ((keys & DPAD_RIGHT) && gSaveBlock1Ptr->cameraPos.x < width - 1)
+            sFreecamMoveX = FREECAM_SPEED;
+        else if ((keys & DPAD_LEFT) && gSaveBlock1Ptr->cameraPos.x > 0)
+            sFreecamMoveX = -FREECAM_SPEED;
+        if ((keys & DPAD_DOWN) && gSaveBlock1Ptr->cameraPos.y < height - 1)
+            sFreecamMoveY = FREECAM_SPEED;
+        else if ((keys & DPAD_UP) && gSaveBlock1Ptr->cameraPos.y > 0)
+            sFreecamMoveY = -FREECAM_SPEED;
+    }
+    fieldCamera->movementSpeedX = sFreecamMoveX;
+    fieldCamera->movementSpeedY = sFreecamMoveY;
+}
+
+bool8 IsFreecamActive(void)
+{
+    return sFreecamActive;
+}
+
+void SetFreecamActive(bool8 active)
+{
+    sFreecamActive = active;
+    sFreecamPaused = FALSE;
+    sFreecamMoveX = 0;
+    sFreecamMoveY = 0;
+}
+
+void SetFreecamPaused(bool8 paused)
+{
+    sFreecamPaused = paused;
+}
+
+// Jumps the camera focus to a tile (map coordinates without MAP_OFFSET, clamped to the
+// current map) and rebuilds a pristine, tile-aligned view there: the sub-tile scroll
+// offsets are zeroed, the scene is reculled/respawned, and every object sprite is snapped
+// into the new frame. Resetting to a clean tile-aligned state each time is what keeps the
+// camera from drifting when re-centring repeatedly on objects caught between tiles.
+static void CenterCameraOnTile(int x, int y)
+{
+    int width = gMapHeader.mapLayout->width;
+    int height = gMapHeader.mapLayout->height;
+    u8 i;
+
+    if (x < 0)
+        x = 0;
+    else if (x > width - 1)
+        x = width - 1;
+    if (y < 0)
+        y = 0;
+    else if (y > height - 1)
+        y = height - 1;
+
+    gSaveBlock1Ptr->cameraPos.x = x;
+    gSaveBlock1Ptr->cameraPos.y = y;
+
+    gFieldCamera.x = 0;
+    gFieldCamera.y = 0;
+    gTotalCameraPixelOffsetX = 0;
+    gTotalCameraPixelOffsetY = 0;
+    ResetFieldCamera();
+
+    // Respawn/cull around the new focus, then snap every live sprite into the new frame so
+    // none are left at a stale sub-tile position relative to the camera.
+    UpdateObjectEventsForCameraUpdate(0, 0);
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+    {
+        if (gObjectEvents[i].active)
+            MoveObjectEventToMapCoords(&gObjectEvents[i], gObjectEvents[i].currentCoords.x, gObjectEvents[i].currentCoords.y);
+    }
+    DrawWholeMapView();
+    UpdateCameraElevation();
+    UpdateCameraBiome();
+}
+
+// Finds the spawn position of an object event template by local id, in object-event
+// coordinates (i.e. including MAP_OFFSET). Returns FALSE if the current map has no
+// such template.
+static bool8 GetObjectEventTemplateCoordsByLocalId(u8 localId, s16 *x, s16 *y)
+{
+    u8 i;
+
+    if (gMapHeader.events == NULL)
+        return FALSE;
+
+    for (i = 0; i < gMapHeader.events->objectEventCount; i++)
+    {
+        struct ObjectEventTemplate *template = &gSaveBlock1Ptr->objectEventTemplates[i];
+        if (template->localId == localId)
+        {
+            *x = template->x + MAP_OFFSET;
+            *y = template->y + MAP_OFFSET;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+// Returns the currently-spawned object event for a track id (0 = player), or
+// OBJECT_EVENTS_COUNT if it isn't spawned right now (e.g. culled off-screen).
+static u8 ResolveTrackedObjectEvent(u8 localId)
+{
+    if (localId == TRACK_LOCAL_ID_PLAYER)
+    {
+        u8 objectEventId = gPlayerAvatar.objectEventId;
+        return gObjectEvents[objectEventId].active ? objectEventId : OBJECT_EVENTS_COUNT;
+    }
+    // Returns OBJECT_EVENTS_COUNT when the object isn't spawned right now.
+    return GetObjectEventIdByLocalIdAndMap(localId, gSaveBlock1Ptr->location.mapNum,
+                                           gSaveBlock1Ptr->location.mapGroup);
+}
+
+// Tracks an object event by local id (0 = the player), changeable on the fly. Stable
+// across culling/respawn: if the target is currently culled we move the camera onto its
+// default position (its map template, or gSaveBlock1's saved tile for the player), which
+// recreates the scene there and respawns it; the object event currently bearing that
+// local id is then followed, so a respawn into a different gObjectEvents slot is
+// transparent.
+//
+// When repointing to the player to leave freecam, call this while freecam is still
+// flagged active so the location update swaps the tileset silently, without the
+// player-facing music/popup (see TryUpdateMapLocation).
+void SetCameraTrackedLocalId(u8 localId)
+{
+    u8 objectEventId = ResolveTrackedObjectEvent(localId);
+    s16 targetX, targetY;
+    u8 i;
+
+    if (objectEventId < OBJECT_EVENTS_COUNT)
+    {
+        // Currently spawned: aim at where it stands.
+        targetX = gObjectEvents[objectEventId].currentCoords.x;
+        targetY = gObjectEvents[objectEventId].currentCoords.y;
+    }
+    else if (localId == TRACK_LOCAL_ID_PLAYER)
+    {
+        // The player object can be culled like any other; recover its tile from the save.
+        targetX = gSaveBlock1Ptr->playerPos.x + MAP_OFFSET;
+        targetY = gSaveBlock1Ptr->playerPos.y + MAP_OFFSET;
+    }
+    else if (!GetObjectEventTemplateCoordsByLocalId(localId, &targetX, &targetY))
+    {
+        return; // No such object event in this map.
+    }
+
+    // Drop the previous anchor before the rebuild, so snapping sprites into the new frame
+    // doesn't resync the camera onto the object we're about to stop following.
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+        gObjectEvents[i].trackedByCamera = FALSE;
+
+    // Jump to the target, rebuilding a clean tile-aligned scene around it (also respawns it
+    // if it was culled).
+    CenterCameraOnTile(targetX - MAP_OFFSET, targetY - MAP_OFFSET);
+    sCameraTrackedLocalId = localId;
+
+    // Follow it if it is (now) spawned. A flag-removed object never spawns, so the camera
+    // simply rests on its default position with nothing to follow.
+    objectEventId = ResolveTrackedObjectEvent(localId);
+    if (objectEventId < OBJECT_EVENTS_COUNT)
+    {
+        struct ObjectEvent *tracked = &gObjectEvents[objectEventId];
+
+        // Make the tracked object the camera's anchor, exactly as the engine does for the
+        // player (see SetCameraToTrackPlayer): the trackedByCamera object is the one the
+        // culling/redraw scrolls around.
+        tracked->trackedByCamera = TRUE;
+
+        // The camera follows the object's SPRITE, so the object has to be live for the
+        // camera to track its movement. An off-screen target respawns unfrozen (which is
+        // why those already worked); an on-screen one was frozen when the menu opened, so
+        // its sprite never moved and the camera looked stuck on its start position. Clear
+        // any half-finished step so it restarts cleanly from the tile it was snapped to,
+        // then unfreeze it.
+        tracked->singleMovementActive = FALSE;
+        ObjectEventClearHeldMovement(tracked);
+        UnfreezeObjectEvent(tracked);
+
+        CameraObjectSetFollowedSpriteId(tracked->spriteId);
+        TryUpdateMapLocation(gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET, gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET);
+    }
+}
+
+u8 GetCameraTrackedLocalId(void)
+{
+    return sCameraTrackedLocalId;
+}
+
+// Reattaches the camera to the player, used when leaving freecam.
+void RecenterCameraOnPlayer(void)
+{
+    SetCameraTrackedLocalId(TRACK_LOCAL_ID_PLAYER);
 }
 
 void ResetCameraUpdateInfo(void)

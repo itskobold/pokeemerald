@@ -847,9 +847,10 @@ void TryUpdateMapLocation(s16 x, s16 y)
     SetActiveMapLocation(newLocation);
 
     // The music and map-name popup are player-facing, so only trigger them when the camera
-    // is following the player. While the camera is detached (e.g. a scripted pan), switch the
-    // location's graphics but leave the music and popup alone.
-    if (CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId())
+    // is following the player. While the camera is detached (e.g. a scripted pan) or the debug
+    // freecam is scrolling around, switch the location's graphics but leave the music and popup
+    // alone.
+    if (!IsFreecamActive() && CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId())
     {
         Overworld_ChangeMusicToDefault();
         if (GetActiveLocationData()->showMapName == TRUE)
