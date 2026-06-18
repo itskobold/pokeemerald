@@ -38,6 +38,7 @@ void GetCameraFocusCoords(u16 *x, u16 *y);
 u8 MapGridGetMetatileLayerTypeAt(int x, int y);
 u8 MapGridGetElevationAt(int x, int y);
 u8 MapGridGetMetatileLocationAt(int x, int y);
+u8 MapGridGetMetatileBiomeAt(int x, int y);
 void MapGridSetMetatileElevationAt(int x, int y, u8 elevation);
 void MapGridSetMetatileLocationAt(int x, int y, u8 location);
 bool8 CameraMove(int x, int y);

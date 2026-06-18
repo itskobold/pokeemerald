@@ -7765,8 +7765,15 @@ u8 ElevationToPriority(u8 elevation)
 
 void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
 {
+    bool32 isPlayer = (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId]);
     u8 curElevation = MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
     u8 prevElevation = MapGridGetElevationAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
+
+    // Track the player's biome from the tile it's on. There are no special cases for biome,
+    // so this happens unconditionally (before the multi-level early return below), both on
+    // warp-in and on each tile-to-tile move.
+    if (isPlayer)
+        gPlayerBiome = MapGridGetMetatileBiomeAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
 
     if (curElevation == ELEVATION_MULTI_LEVEL || prevElevation == ELEVATION_MULTI_LEVEL)
         return;
@@ -7781,7 +7788,7 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
     // ELEVATION_FIRST_LEVEL, i.e. 0-123). Special tiles (transition, collision, water,
     // multi-level) leave the last tracked level untouched. This fires both when the player
     // spawns on a warp destination tile and on each tile-to-tile move.
-    if (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId] && curElevation >= ELEVATION_FIRST_LEVEL)
+    if (isPlayer && curElevation >= ELEVATION_FIRST_LEVEL)
         gPlayerElevation = curElevation - ELEVATION_FIRST_LEVEL;
 }
 

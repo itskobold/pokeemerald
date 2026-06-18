@@ -121,6 +121,7 @@ void InitMap(void)
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
     SetActiveMapLocationFromCamera();
     UpdateCameraElevation();
+    UpdateCameraBiome();
     RunOnLoadMapScript();
 }
 
@@ -131,6 +132,7 @@ void InitMapFromSavedGame(void)
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
     SetActiveMapLocationFromCamera();
     UpdateCameraElevation();
+    UpdateCameraBiome();
     LoadSavedMapView();
     RunOnLoadMapScript();
     UpdateTVScreensOnMap(gBackupMapLayout.width, gBackupMapLayout.height);
@@ -517,6 +519,11 @@ u8 MapGridGetCollisionAt(int x, int y)
 u8 MapGridGetMetatileLocationAt(int x, int y)
 {
     return UNPACK_LOCATION(GetMapGridBlockAt(x, y));
+}
+
+u8 MapGridGetMetatileBiomeAt(int x, int y)
+{
+    return UNPACK_BIOME(GetMapGridBlockAt(x, y));
 }
 
 u32 MapGridGetMetatileIdAt(int x, int y)

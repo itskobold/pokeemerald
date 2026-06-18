@@ -46,6 +46,9 @@ COMMON_DATA u16 gTotalCameraPixelOffsetX = 0;
 // camera's focus tile (gSaveBlock1Ptr->pos). Since the camera follows the player most of the
 // time, this usually equals gPlayerElevation; it diverges only while the camera is detached.
 EWRAM_DATA u8 gCameraElevation = 0;
+// The biome of the camera's focus tile, tracked like gPlayerBiome but from the camera. Usually
+// equals gPlayerBiome; diverges only while the camera is detached.
+EWRAM_DATA u8 gCameraBiome = 0;
 
 static void ResetCameraOffset(struct FieldCameraOffset *cameraOffset)
 {
@@ -358,6 +361,13 @@ void UpdateCameraElevation(void)
         gCameraElevation = elevation - ELEVATION_FIRST_LEVEL;
 }
 
+// Tracks the biome of the camera's focus tile, mirroring gPlayerBiome. No special cases:
+// the camera's biome is just whatever the focus tile's biome value is.
+void UpdateCameraBiome(void)
+{
+    gCameraBiome = MapGridGetMetatileBiomeAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+}
+
 void CameraUpdate(void)
 {
     int deltaX;
@@ -421,6 +431,7 @@ void CameraUpdate(void)
         // to the camera's new focus tile.
         TryUpdateMapLocation(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
         UpdateCameraElevation();
+        UpdateCameraBiome();
         UpdateObjectEventsForCameraUpdate(deltaX, deltaY);
         RotatingGatePuzzleCameraUpdate(deltaX, deltaY);
         SetBerryTreesSeen();

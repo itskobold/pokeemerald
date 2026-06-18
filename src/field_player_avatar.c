@@ -40,6 +40,9 @@ EWRAM_DATA struct PlayerAvatar gPlayerAvatar = {};
 // ELEVATION_FIRST_LEVEL, i.e. 0-123). Updated on warp-in and on each tile-to-tile move; see
 // ObjectEventUpdateElevation. Transient/derived state, not part of the save.
 EWRAM_DATA u8 gPlayerElevation = 0;
+// The biome of the tile the player is on (no special cases — just the tile's biome value).
+// Updated alongside gPlayerElevation in ObjectEventUpdateElevation. Transient, not saved.
+EWRAM_DATA u8 gPlayerBiome = 0;
 
 // static declarations
 static u8 ObjectEventCB2_NoMovement2(void);

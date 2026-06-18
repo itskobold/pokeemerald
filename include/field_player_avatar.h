@@ -4,6 +4,8 @@
 // The player's actual elevation level (real levels only, stored as the tile's elevation
 // value minus ELEVATION_FIRST_LEVEL, i.e. 0-123). See gPlayerElevation in field_player_avatar.c.
 extern u8 gPlayerElevation;
+// The biome of the tile the player is on (the tile's raw biome value, no special cases).
+extern u8 gPlayerBiome;
 
 void PlayerStep(u8 direction, u16 newKeys, u16 heldKeys);
 void ClearPlayerAvatarInfo(void);

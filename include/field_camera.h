@@ -15,6 +15,7 @@ extern struct CameraObject gFieldCamera;
 extern u16 gTotalCameraPixelOffsetX;
 extern u16 gTotalCameraPixelOffsetY;
 extern u8 gCameraElevation;
+extern u8 gCameraBiome;
 
 void DrawWholeMapView(void);
 void CurrentMapDrawMetatileAt(int x, int y);
@@ -25,6 +26,7 @@ void ResetCameraUpdateInfo(void);
 u32 InitCameraUpdateCallback(u8 trackedSpriteId);
 void CameraUpdate(void);
 void UpdateCameraElevation(void);
+void UpdateCameraBiome(void);
 void SetCameraPanningCallback(void (*callback)(void));
 void SetCameraPanning(s16 horizontal, s16 vertical);
 void InstallCameraPanAheadCallback(void);
