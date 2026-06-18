@@ -227,6 +227,15 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
              << "allow_escaping=" << json_to_string(map_data, "allow_escaping") << ", "
              << "allow_running=" << json_to_string(map_data, "allow_running") << "\n";
 
+    if (version == "emerald") {
+        // 0x26: world-grid position, mapGridX (bits 0-4) and mapGridY (bits 5-9). Default 0.
+        string map_grid_x = json_to_string(map_data, "map_grid_x", true);
+        string map_grid_y = json_to_string(map_data, "map_grid_y", true);
+        if (map_grid_x.empty()) map_grid_x = "0";
+        if (map_grid_y.empty()) map_grid_y = "0";
+        text << "\t.2byte (" << map_grid_x << ") | ((" << map_grid_y << ") << 5)\n";
+    }
+
     if (version == "firered")
         text << "\t.byte " << json_to_string(map_data, "floor_number") << "\n";
 

@@ -238,6 +238,11 @@ struct MapHeader
                bool8 allowEscaping:1; // Escape Rope and Dig
                bool8 allowRunning:1;
                // the remaining bits are unused
+    // Position of this map within the world map grid. Each coordinate is 0-31 (5 bits).
+    // Occupies struct padding at 0x26, so it does not grow sizeof(struct MapHeader).
+    /* 0x26 */ u16 mapGridX:5;
+               u16 mapGridY:5;
+               // the remaining 6 bits are unused
 };
 
 
@@ -427,6 +432,7 @@ extern struct PlayerAvatar gPlayerAvatar;
 // location attribute of the tile the player stands on). Defined in fieldmap.c.
 const struct MapHeaderLocationData *GetActiveLocationData(void);
 u8 GetActiveMapLocation(void);
+void GetMapGridXY(u8 *outX, u8 *outY);
 extern struct Camera gCamera;
 
 #endif // GUARD_GLOBAL_FIELDMAP_H

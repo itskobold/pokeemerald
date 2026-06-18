@@ -90,6 +90,13 @@ u8 GetActiveMapLocation(void)
     return sActiveMapLocation;
 }
 
+// Returns the current map's position within the world map grid (each coordinate 0-31).
+void GetMapGridXY(u8 *outX, u8 *outY)
+{
+    *outX = gMapHeader.mapGridX;
+    *outY = gMapHeader.mapGridY;
+}
+
 // Returns the location property set the rest of the game should read for the
 // current map. Falls back to slot 0 if the requested slot is undefined (NULL).
 const struct MapHeaderLocationData *GetActiveLocationData(void)
