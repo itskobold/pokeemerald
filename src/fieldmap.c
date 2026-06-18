@@ -114,9 +114,8 @@ void SetActiveMapLocation(u8 location)
     sActiveMapLocation = location;
 }
 
-// Selects the active location from the tile the camera is focused on (gCameraPos
-// is the camera focus). Called on map load so the initial tileset/music/map name reflect
-// the spawn location; thereafter location is updated as the camera moves (TryUpdateMapLocation).
+// Selects the active location from the camera's focus tile, on map load, so the initial
+// tileset/music/map name reflect the spawn location; thereafter TryUpdateMapLocation updates it.
 void SetActiveMapLocationFromCamera(void)
 {
     SetActiveMapLocation(MapGridGetMetatileLocationAt(gCameraPos.x + MAP_OFFSET,
@@ -135,10 +134,9 @@ void InitMap(void)
 
 void InitMapFromSavedGame(void)
 {
-    // Continuing a saved game doesn't warp in, so seed the camera's focus tile from the
-    // saved player position here (a warp would do this in SetPlayerCoordsFromWarp). Without
-    // this gCameraPos stays at its zero-initialised value and the camera loads off in the
-    // map's corner.
+    // Continuing a saved game doesn't warp in, so seed the camera's focus tile from the saved
+    // player position here (SetPlayerCoordsFromWarp would do this on a warp), else gCameraPos stays
+    // zero and the camera loads in the map's corner.
     gCameraPos = gSaveBlock1Ptr->playerPos;
     InitMapLayoutData(&gMapHeader);
     InitSecretBaseAppearance(FALSE);

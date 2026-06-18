@@ -12,9 +12,8 @@ struct CameraObject
 };
 
 extern struct CameraObject gFieldCamera;
-// The camera's focus tile (map-relative), advanced by CameraMove. Usually equals the
-// player's tile, but diverges when the camera is detached from the player. Seeded from the
-// player's position on map entry (see SetPlayerCoordsFromWarp).
+// The camera's focus tile (map-relative), advanced by CameraMove. Equals the player's tile while
+// attached, diverging when the camera is detached. Seeded from the player's position on map entry.
 extern struct Coords16 gCameraPos;
 extern u16 gTotalCameraPixelOffsetX;
 extern u16 gTotalCameraPixelOffsetY;

@@ -2217,16 +2217,12 @@ static bool8 ObjectEventDoesElevationMatch(struct ObjectEvent *objectEvent, u8 e
 void UpdateObjectEventsForCameraUpdate(s16 x, s16 y)
 {
     UpdateObjectEventCoordsForCameraUpdate();
-    // Cull objects that have left the view BEFORE spawning the ones entering it. The spawn and
-    // cull windows are identical (left/top/right/bottom all match), so an object is never culled
-    // and immediately respawned in the same pass — the resulting object set is independent of
-    // order. What the order changes is transient slot pressure: object events, sprite OAM, and
-    // palette/gfx slots are limited, and on a dense map the slots can be nearly full. Spawning
-    // first (the original order) means an entering edge object finds no free slot until the
-    // exiting one is culled a step later, so it silently fails to load for a frame — visible as
-    // flickering tiles/sprites while panning or tracking across a crowded map, and as wholesale
-    // load failures on a far camera jump (where the entire old view is still resident). Freeing
-    // the departed objects first guarantees room for whatever the new view needs.
+    // Cull objects that have left the view BEFORE spawning the ones entering it. The cull and spawn
+    // windows are identical, so this never culls-then-respawns the same object; it only relieves
+    // slot pressure. Spawning first (the original order) could leave an entering edge object with no
+    // free object/sprite/palette slot until the exiting one is culled a step later, silently failing
+    // to load for a frame — the flicker while panning across a crowded map, and load failures on a
+    // far camera jump where the whole old view is still resident.
     RemoveObjectEventsOutsideView();
     TrySpawnObjectEvents(x, y);
 }
@@ -7779,15 +7775,12 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
     u8 curElevation = MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
     u8 prevElevation = MapGridGetElevationAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
 
-    // Track the player's biome from the tile it's on. There are no special cases for biome,
-    // so this happens unconditionally (before the multi-level early return below), both on
-    // warp-in and on each tile-to-tile move.
+    // Track the player's biome from its tile (no special cases, so before the multi-level early
+    // return below) and keep the saved player tile in sync with the player object. playerPos is
+    // strictly the player's position, distinct from the camera's focus tile; strip MAP_OFFSET.
     if (isPlayer)
     {
         gPlayerBiome = MapGridGetMetatileBiomeAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
-        // Keep the saved player tile (gSaveBlock1Ptr->pos) in sync with the player object's
-        // current tile. This is strictly the player's position, distinct from the camera's
-        // focus tile (gCameraPos). currentCoords include MAP_OFFSET; strip it.
         gSaveBlock1Ptr->playerPos.x = objEvent->currentCoords.x - MAP_OFFSET;
         gSaveBlock1Ptr->playerPos.y = objEvent->currentCoords.y - MAP_OFFSET;
     }
@@ -7800,11 +7793,8 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
     if (curElevation != ELEVATION_TRANSITION && curElevation != ELEVATION_MULTI_LEVEL)
         objEvent->previousElevation = curElevation;
 
-    // Track the local player's actual elevation level. Only ordinary elevation levels
-    // (ELEVATION_FIRST_LEVEL and up) count; the stored value is the level (tile value minus
-    // ELEVATION_FIRST_LEVEL, i.e. 0-123). Special tiles (transition, collision, water,
-    // multi-level) leave the last tracked level untouched. This fires both when the player
-    // spawns on a warp destination tile and on each tile-to-tile move.
+    // Track the player's elevation level. Only ordinary levels (ELEVATION_FIRST_LEVEL and up) count,
+    // stored as the level (tile value minus ELEVATION_FIRST_LEVEL); special tiles leave it untouched.
     if (isPlayer && curElevation >= ELEVATION_FIRST_LEVEL)
         gPlayerElevation = curElevation - ELEVATION_FIRST_LEVEL;
 }

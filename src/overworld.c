@@ -623,8 +623,8 @@ static void SetPlayerCoordsFromWarp(void)
         gSaveBlock1Ptr->playerPos.x = gMapHeader.mapLayout->width / 2;
         gSaveBlock1Ptr->playerPos.y = gMapHeader.mapLayout->height / 2;
     }
-    // The camera spawns focused on the player. Seed the camera's focus tile from the
-    // player's warp-in position; CameraMove takes over advancing it from here.
+    // Seed the camera's focus tile from the player's warp-in position; CameraMove advances it
+    // from here.
     gCameraPos = gSaveBlock1Ptr->playerPos;
 }
 
@@ -847,27 +847,20 @@ static void UpdateMapLocation(s16 x, s16 y, bool8 allowPlayerFacing)
     if (newLocation >= MAX_MAP_LOCATIONS || gMapHeader.locations[newLocation] == NULL)
         return;
 
-    // Defer the whole switch — active-location pointer, tileset graphics, music and map-name
-    // popup — to Task_UpdateMapLocationGfx, which runs once the camera is settled on a tile.
-    // Flipping the active location here (eagerly) would let this same frame's edge redraw draw
-    // the new location's metatiles against the old, still-loaded tileset graphics, garbling the
-    // leading-edge tiles until the camera next settled (visible as a brief flicker while panning
-    // quickly across location boundaries). Latching the target and swapping everything together
-    // keeps the on-screen indices and the loaded graphics in lockstep. Reuse any switch already
-    // in flight so the newest location wins.
+    // Defer the whole switch — active-location pointer, tileset graphics, music and map-name popup
+    // — to Task_UpdateMapLocationGfx, which runs once the camera is settled on a tile. Flipping the
+    // active location eagerly here would draw the new location's metatiles against the old, still-
+    // loaded tileset graphics until the camera next settled. Reuse any switch already in flight.
     if (taskId == TASK_NONE)
         taskId = CreateTask(Task_UpdateMapLocationGfx, 80);
     gTasks[taskId].data[0] = newLocation;
 
-    // The music and map-name popup are player-facing, so only trigger them when this is a
-    // player-driven crossing and the camera is attached to and following the player. While the
-    // camera is detached for any reason (debug freecam scrolling, tracking an NPC, or panning
-    // between NPCs) switch the location's graphics but leave the music and popup alone.
-    // IsCameraDetachedFromPlayer covers the pan case the followed-sprite check alone misses: a
-    // pan leaves the camera object still pointed at the player's sprite until it locks onto the
-    // target, so without this a pan would pop the name of every section it crosses. Latched here
-    // (when the crossing happens) and applied with the swap, since the deferred task can't tell a
-    // player crossing from a debug repoint by the time it runs.
+    // The music and map-name popup are player-facing, so only trigger them for a player-driven
+    // crossing with the camera attached to and following the player. The IsCameraDetachedFromPlayer
+    // check covers the pan case the followed-sprite check misses: a pan still points the camera
+    // object at the player's sprite until it locks on, so without it a pan would pop every section
+    // it crosses. Latched here and applied with the swap, since the deferred task can't tell a
+    // player crossing from a debug repoint.
     gTasks[taskId].data[1] = (allowPlayerFacing
                               && !IsCameraDetachedFromPlayer()
                               && CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId());
@@ -881,11 +874,10 @@ void TryUpdateMapLocation(s16 x, s16 y)
     UpdateMapLocation(x, y, TRUE);
 }
 
-// Switches the active location's graphics to match a tile WITHOUT the player-facing
-// music/popup. Used for deliberate camera repoints (the debug track/pan jumps), which must
-// never pop a map name: the camera lands "attached" to the new target the same frame, so the
-// player-facing guard above wouldn't catch it, and a popup raised while the debug menu is open
-// corrupts the menu graphics.
+// Switches the active location's graphics to match a tile WITHOUT the player-facing music/popup.
+// Used for deliberate camera repoints (the debug track/pan jumps), which must never pop a map name:
+// the camera lands "attached" the same frame so the guard above wouldn't catch it, and a popup
+// raised while the debug menu is open corrupts the menu graphics.
 void TryUpdateMapLocationSilent(s16 x, s16 y)
 {
     UpdateMapLocation(x, y, FALSE);
@@ -906,19 +898,14 @@ static void ApplyActiveLocationSecondaryTileset(void)
     InitSecondaryTilesetAnimation();
 }
 
-// Switches the active location to its latched target (data[0]) and reloads that location's
-// secondary tileset, redrawing the visible map — but only once the camera has finished scrolling
-// onto its new focus tile (no sub-tile scroll offset). The active-location flip, the graphics
-// swap and the redraw all run together in the same frame so the on-screen tile indices and the
-// loaded graphics never disagree, which would otherwise show as garbage. The player-facing music
-// and map-name popup (latched in data[1]) are applied here too, now that the new location is
-// active and its data readable.
+// Switches the active location to its latched target (data[0]), reloads that location's secondary
+// tileset and redraws — but only once the camera has settled on its new focus tile. The flip,
+// graphics swap and redraw run together so the on-screen tile indices and loaded graphics never
+// disagree. The player-facing music and map-name popup (data[1]) are applied here too.
 static void Task_UpdateMapLocationGfx(u8 taskId)
 {
-    // Wait until the camera is aligned to a tile (no sub-tile scroll offset) before swapping
-    // the secondary tileset and redrawing; doing it mid-scroll corrupts the screen-edge tiles.
-    // Keyed on the camera itself rather than the player, so it's correct when the camera is
-    // detached from the player.
+    // Wait until the camera is tile-aligned before swapping the tileset and redrawing; doing it
+    // mid-scroll corrupts the screen-edge tiles. Keyed on the camera, so it's correct while detached.
     if (gFieldCamera.x != 0 || gFieldCamera.y != 0)
         return;
 
@@ -936,39 +923,30 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
 }
 
 // Synchronously switches the active location to the one containing tile (x, y) and loads its
-// secondary tileset, for a camera JUMP that lands tile-aligned (the debug camera snapping onto an
-// NPC via CenterCameraOnTile). The deferred Task_UpdateMapLocationGfx exists for mid-scroll
-// crossings, where swapping at a sub-tile offset corrupts the screen edges; a jump has no such
-// offset, so deferring it instead would draw the destination's tiles with the previous (e.g. the
-// player's) location tileset for one frame until the task caught up — the flicker seen when
-// starting to track an NPC that sits in a different location. Applying the swap up front lets the
-// caller's DrawWholeMapView render the right graphics immediately. No music/popup: a deliberate
-// repoint, like TryUpdateMapLocationSilent. The caller redraws the map afterwards.
-// Returns TRUE if it actually reloaded the secondary tileset (so the caller knows it must redraw
-// the map); FALSE if nothing changed.
+// secondary tileset, for a camera JUMP that lands tile-aligned (CenterCameraOnTile). Deferring it
+// (as Task_UpdateMapLocationGfx does for mid-scroll crossings) would draw the destination's tiles
+// with the previous location's tileset for a frame; applying the swap up front lets the caller's
+// DrawWholeMapView render the right graphics immediately. No music/popup, like
+// TryUpdateMapLocationSilent. Returns TRUE if it reloaded the secondary tileset (so the caller
+// knows it must redraw the map); FALSE if nothing changed.
 bool8 UpdateMapLocationGfxImmediate(s16 x, s16 y)
 {
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
     u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     // A deferred swap in flight means the active-location pointer was already advanced but its
-    // tileset has NOT been loaded into VRAM yet (the task hadn't reached a tile-aligned frame to
-    // fire). The jump cancels that task, so its pending graphics load must be performed here — even
-    // if the location index ends up unchanged below — or the redraw shows the stale tileset for a
-    // frame. This is the flicker after warping/connecting in: a connection doesn't reset field
-    // tasks, and a warp can leave a swap mid-flight, so the first NPC jump lands with one pending
-    // (Fly doesn't, because its long fly-in animation lets the swap settle first).
+    // tileset hasn't been loaded into VRAM yet. The jump cancels that task, so its pending load must
+    // happen here — even if the location index ends up unchanged below — or the redraw shows the
+    // stale tileset for a frame (the flicker after warping/connecting in, which can leave a swap
+    // mid-flight; Fly's long fly-in animation lets the swap settle first, so it doesn't).
     bool8 mustReload = (taskId != TASK_NONE);
 
     // A jump supersedes any deferred swap left over from prior scrolling: its latched target is
-    // stale now that the camera has teleported, and letting it fire would switch to the wrong
-    // location once the camera settles here.
+    // stale now the camera has teleported, and letting it fire would switch to the wrong location.
     if (taskId != TASK_NONE)
         DestroyTask(taskId);
 
-    // Adopt the destination tile's location when the map actually defines it (ignore tiles tagged
-    // with an undefined location, like TryUpdateMapLocation); a real change is its own reason to
-    // reload. ApplyActiveLocationSecondaryTileset then loads whichever location is active — the one
-    // just set, or the existing one when only resolving an in-flight swap.
+    // Adopt the destination tile's location when the map defines it (ignoring undefined-location
+    // tiles, like TryUpdateMapLocation); a real change is its own reason to reload.
     if (newLocation < MAX_MAP_LOCATIONS && gMapHeader.locations[newLocation] != NULL
      && newLocation != GetActiveMapLocation())
     {
@@ -1606,10 +1584,9 @@ static void DoCB1_Overworld(u16 newKeys, u16 heldKeys)
     if (ArePlayerFieldControlsLocked())
         return;
 
-    // While the camera is detached from the player (debug freecam or NPC tracking) the
-    // player stays parked: walking and field interactions are suppressed so they can't
-    // wander off-camera. The start menu and the debug menu are still reachable, so the
-    // game can be operated while the camera is looking elsewhere.
+    // While the camera is detached from the player, the player stays parked: walking and field
+    // interactions are suppressed so they can't wander off-camera. The start and debug menus stay
+    // reachable, so the game can be operated while the camera is looking elsewhere.
     if (IsCameraDetachedFromPlayer())
     {
         if (inputStruct.pressedLRSelect)
@@ -2087,8 +2064,7 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
     case 3:
         InitObjectEventsLocal();
         SetCameraToTrackPlayer();
-        // A full map load starts fresh on the player: any debug camera tracking referred to the
-        // previous map's objects.
+        // A full map load starts fresh on the player; any debug tracking referred to the old map.
         ResetCameraTracking();
         (*state)++;
         break;
@@ -2156,10 +2132,9 @@ static bool32 ReturnToFieldLocal(u8 *state)
     case 1:
         InitViewGraphics();
         TryLoadTrainerHillEReaderPalette();
-        // Returning to the same map (e.g. closing a menu): resume any debug camera tracking that
-        // SetCameraToTrackPlayer above reset, now that the view graphics are set back up. If a field
-        // move was just chosen, this instead snaps the camera back to the player (see
-        // RequestCameraResetToPlayerOnFieldReturn) so the move's animation plays on-screen.
+        // Returning to the same map (e.g. closing a menu): resume any debug tracking that
+        // SetCameraToTrackPlayer above reset. If a field move was just chosen, this instead snaps
+        // the camera back to the player so the move's animation plays on-screen.
         RestoreCameraTracking();
         (*state)++;
         break;

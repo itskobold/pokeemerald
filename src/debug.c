@@ -119,9 +119,7 @@ enum
     DEBUG_NPC_BOX_MODE_PAN,
 };
 
-// Time budget (in frames) for camera pans started from the debug menu: the camera reaches the target
-// in roughly this many frames regardless of distance (see PanCameraToLocalId / PanCameraToTile),
-// ~0.4s at 60fps.
+// Target duration (frames) for camera pans started from the debug menu, ~0.4s at 60fps.
 #define DEBUG_PAN_FRAMES 24
 
 #define tMenuTaskId  data[0]
@@ -186,10 +184,8 @@ static u8 sPanTileWindowId;
 static s16 sPanTileX;
 static s16 sPanTileY;
 
-// Writable copy of the camera submenu items, filled from the const template each time the menu is
-// shown (see Debug_ShowCameraMenu). debug.o's .data section is discarded by the linker, so the
-// template stays const (.rodata) and only this uninitialized .bss copy holds the swapped freecam
-// label.
+// Writable copy of the camera submenu items, refilled from the const template each time the menu is
+// shown, so the freecam label can be swapped (debug.o's .data is discarded by the linker).
 static struct ListMenuItem sCameraMenuItems[DEBUG_CAMERA_ITEM_CANCEL + 1];
 
 static const u8 sDebugText_Camera[] = _("Camera");
@@ -261,14 +257,12 @@ static const struct ListMenuTemplate sDebugMenuListTemplate =
 
 void Debug_ShowMainMenu(void)
 {
-    // Tear down any active map-name popup so its window/BG data is freed before the
-    // menu draws its own window.
+    // Free any active map-name popup's window/BG data before the menu draws its own window.
     HideMapNamePopUpWindow();
 
-    // When opening from normal play, freeze the player and field. When opening from a
-    // detached camera (freecam/tracking) the player is already parked by the overworld and
-    // the world is in the state that mode wants, so leave it be. Either way lock controls so
-    // the D-pad drives the menu and freecam scrolling pauses while it is up.
+    // When opening from normal play, freeze the player and field. When detached (freecam/tracking)
+    // the player is already parked, so leave the world be. Either way lock controls so the D-pad
+    // drives the menu and freecam scrolling pauses.
     if (!IsCameraDetachedFromPlayer())
     {
         PlayerFreeze();
@@ -320,10 +314,9 @@ static void Debug_DestroyMenu(u8 taskId)
     sDebugMenuOpen = FALSE;
 }
 
-// Closes the menu entirely and hands input back. Object events are unfrozen unless freecam
-// is running (which wants a still world to pan over); tracking and normal play both want
-// them moving. Controls are always unlocked: while the camera is still detached the
-// overworld keeps the player parked, but the start menu and L+R+Select stay reachable.
+// Closes the menu entirely and hands input back. Controls are always unlocked; while the camera is
+// still detached the overworld keeps the player parked, but the start menu and L+R+Select stay
+// reachable.
 static void Debug_CloseMenu(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -366,10 +359,8 @@ static void DebugTask_HandleMenuInput_Camera(u8 taskId)
     }
 }
 
-// Shows the camera submenu, first setting the freecam entry's label to reflect what selecting it
-// will do: "Disable freecam" while freecam is running, "Enable freecam" otherwise. Used by every
-// path that (re)opens the camera menu. The const template is copied into sCameraMenuItems so the
-// label can be swapped without a writable global in debug.o (whose .data the linker discards).
+// Shows the camera submenu, first setting the freecam entry's label to "Disable freecam" while
+// freecam is running, "Enable freecam" otherwise.
 static void Debug_ShowCameraMenu(void)
 {
     u32 i;
@@ -400,25 +391,19 @@ static void DebugAction_Camera_ToggleFreecam(u8 taskId)
         Debug_EnableFreecam(taskId);
 }
 
-// Detaches the camera from the player and lets the D-pad drive it. Freecam needs the
-// controls locked; the menu set that up when it opened from normal play. But
-// when we open from NPC tracking the field is still running (object events unfrozen) and
-// the camera is anchored to that NPC, so freeze the field and drop the anchor here. Without
-// this the NPC keeps walking and the camera stays glued to it, so the D-pad can't move it.
+// Detaches the camera from the player and lets the D-pad drive it. When opening from NPC tracking
+// the camera is still anchored to that NPC, so drop the anchor here or the D-pad can't move it.
 static void Debug_EnableFreecam(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
     if (GetCameraTrackedLocalId() != 0)
         StopCameraObjectTracking();
     SetFreecamActive(TRUE);
-    // Hand input back: the overworld keeps the player parked while detached, and freecam
-    // scrolls the camera from the D-pad now that controls are unlocked.
     UnlockPlayerFieldControls();
 }
 
-// Reattaches the camera to the player and hands control back. RecenterCameraOnPlayer
-// runs before clearing the freecam flag so the location's graphics are restored
-// without the music/popup the player would otherwise see (see RecenterCameraOnPlayer).
+// Reattaches the camera to the player and hands control back. RecenterCameraOnPlayer runs before
+// clearing the freecam flag so the location's graphics swap stays silent.
 static void Debug_DisableFreecam(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -428,9 +413,6 @@ static void Debug_DisableFreecam(u8 taskId)
 }
 
 // Opens the numeric scroll box used to pick which object event the camera tracks.
-// The menu already froze object events and locked controls when it opened, and we
-// keep that state while scrolling (the D-pad drives the box, not the player). On
-// close the camera keeps tracking the chosen object.
 static void DebugAction_Camera_TrackNPC(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -462,9 +444,7 @@ static void Debug_DrawPanTileBox(void)
     CopyWindowToVram(sPanTileWindowId, COPYWIN_GFX);
 }
 
-// Opens the "Pan to tile" coordinate box. The destination starts on the camera's current focus tile
-// so you nudge outward from where you are. The menu already froze the field and locked controls when
-// it opened; that state holds while the D-pad drives the box.
+// Opens the "Pan to tile" coordinate box, starting on the camera's current focus tile.
 static void Debug_OpenPanTileBox(void)
 {
     sPanTileX = gCameraPos.x;
@@ -490,8 +470,7 @@ static void Debug_TearDownPanTileBox(u8 taskId)
 }
 
 // Commits the box (A): closes it and glides the camera to the chosen tile, then hands input back so
-// the camera travels while the world runs (the overworld keeps the player parked while detached,
-// exactly like committing a Pan to NPC). DebugTask_WaitPanToTile then drops into freecam once the
+// the camera travels while the world runs. DebugTask_WaitPanToTile drops into freecam once the
 // camera settles, so the result can be driven around.
 static void Debug_CommitPanTileBox(u8 taskId)
 {
@@ -504,8 +483,7 @@ static void Debug_CommitPanTileBox(u8 taskId)
     CreateTask(DebugTask_WaitPanToTile, 3);
 }
 
-// Backs out of the box (B) without moving the camera, returning to the camera submenu. The field
-// stays frozen and controls stay locked, which is the state the submenu expects.
+// Backs out of the box (B) without moving the camera, returning to the camera submenu.
 static void Debug_CancelPanTileBox(u8 taskId)
 {
     Debug_TearDownPanTileBox(taskId);
@@ -558,10 +536,8 @@ static void DebugTask_PanTileInput(u8 taskId)
     }
 }
 
-// Polls the tile pan started by Debug_CommitPanTileBox. Once the camera has settled on the tile,
-// switch to freecam so the D-pad drives it from there (controls are already unlocked, so freecam
-// reads input immediately). If the pan is superseded before it arrives (e.g. the player reopens the
-// menu and starts tracking something), just stop waiting without touching the camera.
+// Polls the tile pan started by Debug_CommitPanTileBox. Once the camera settles, switch to freecam
+// so the D-pad drives it. If the pan is superseded before it arrives, just stop waiting.
 static void DebugTask_WaitPanToTile(u8 taskId)
 {
     if (!IsCameraPanActive())
@@ -573,9 +549,8 @@ static void DebugTask_WaitPanToTile(u8 taskId)
     }
 }
 
-// Opens the same selection box in "pan" mode: scrolling only previews the choice; pressing A
-// smoothly pans the camera to the picked object (see PanCameraToLocalId) and hands control
-// back, B steps back to the camera menu without moving the camera.
+// Opens the same selection box in "pan" mode: scrolling only previews the choice; A smoothly pans
+// the camera to the picked object, B steps back to the camera menu without moving it.
 static void DebugAction_Camera_PanNPC(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -583,9 +558,7 @@ static void DebugAction_Camera_PanNPC(u8 taskId)
 }
 
 // Returns the camera to the player from any detached state (freecam, NPC tracking, or a pan/tile
-// rest) and hands control back. RecenterCameraOnPlayer snaps the focus onto the player and re-anchors
-// (also ending any pan); running it before clearing the freecam flag keeps the location's graphics
-// swap silent, exactly as Debug_DisableFreecam does.
+// rest) and hands control back, keeping the graphics swap silent as Debug_DisableFreecam does.
 static void DebugAction_Camera_Reset(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -596,14 +569,12 @@ static void DebugAction_Camera_Reset(u8 taskId)
 
 static void DebugAction_Camera_Cancel(u8 taskId)
 {
-    // Step back up to the main menu.
     Debug_DestroyMenu(taskId);
     Debug_OpenMainMenu();
 }
 
-// A template is trackable only if the map currently has it spawned, i.e. its flag isn't
-// set. This matches the engine's own spawn test (see TrySpawnObjectEvents) and skips
-// object events a script has hidden/despawned.
+// A template is trackable only if the map currently has it spawned (its flag isn't set), matching
+// the engine's own spawn test, so hidden/despawned object events are skipped.
 static bool8 Debug_TemplateIsTrackable(const struct ObjectEventTemplate *template)
 {
     return !FlagGet(template->flagId);
@@ -663,11 +634,8 @@ static u8 Debug_OrderForLocalId(u8 localId)
     return 0;
 }
 
-// Points the camera at the chosen track id. Tracking and freecam are mutually exclusive
-// ways to detach the camera, so switching the track target (to an NPC or back to the
-// player) takes over from any running freecam. SetCameraTrackedLocalId runs first, while
-// freecam is still flagged active, so the location swap stays silent (see
-// SetCameraTrackedLocalId / TryUpdateMapLocation).
+// Points the camera at the chosen track id, taking over from any running freecam. SetCameraTrackedLocalId
+// runs first, while freecam is still flagged active, so the location swap stays silent.
 static void Debug_SetCameraTrack(u8 localId)
 {
     SetCameraTrackedLocalId(localId);
@@ -701,10 +669,8 @@ static void Debug_OpenNpcBox(u8 mode)
     Debug_DrawTrackNpcBox();
     CopyWindowToVram(sTrackNpcWindowId, COPYWIN_FULL);
 
-    // Build the arrow pair by hand rather than via AddScrollIndicatorArrowPairParameterized so the
-    // hide-at-bounds thresholds can be swapped for the reversed controls (up increases the value,
-    // down decreases it): the top/up arrow hides at the max and the bottom/down arrow hides at 0, so
-    // each shows only while its direction can still change the value. (See DebugTask_TrackNpcInput.)
+    // Build the arrow pair by hand so the hide-at-bounds thresholds match the reversed controls (up
+    // increases the value, down decreases it): the up arrow hides at the max, the down arrow at 0.
     {
         struct ScrollArrowsTemplate arrows;
 
@@ -740,25 +706,18 @@ static void Debug_TearDownNpcBox(u8 taskId)
     sDebugMenuOpen = FALSE;
 }
 
-// Closes the box but leaves the camera tracking the selected object. Object events are
-// unfrozen so the tracked NPC moves and the camera follows it. When tracking the player
-// (id 0) the player regains control; when tracking an NPC the overworld keeps the player
-// parked (so they can't walk off-camera) while L + R + Select still reopens the box to
-// change or stop tracking.
+// Closes the box but leaves the camera tracking the selected object, handing input back. When
+// tracking the player (id 0) this returns normal control; when tracking an NPC the overworld keeps
+// the player parked while L+R+Select still reopens the box to change or stop tracking.
 static void Debug_CloseTrackNpcBox(u8 taskId)
 {
     Debug_TearDownNpcBox(taskId);
-    // Hand input back either way. When still tracking an NPC the overworld keeps the player
-    // parked (and the start menu / L+R+Select stay reachable); when tracking the player
-    // (id 0) this simply returns normal control.
     UnlockPlayerFieldControls();
 }
 
-// Commits the pan box (A): starts the camera gliding to the selected object and hands input
-// back. Object events are unfrozen so the world runs while the camera travels and the target
-// NPC keeps moving; PanCameraToLocalId chases its live position and locks on at arrival, after
-// which the overworld keeps the player parked just as ordinary tracking does (so they can't
-// walk off-camera, and L + R + Select still reopens the menu to change or stop it).
+// Commits the pan box (A): starts the camera gliding to the selected object and hands input back so
+// the world runs while it travels. PanCameraToLocalId chases the target's live position and locks
+// on at arrival, after which the overworld keeps the player parked just as ordinary tracking does.
 static void Debug_CommitPanNpcBox(u8 taskId)
 {
     u8 localId = Debug_LocalIdForOrder(sTrackNpcOrder);
@@ -769,8 +728,6 @@ static void Debug_CommitPanNpcBox(u8 taskId)
 }
 
 // Backs out of the pan box (B) without moving the camera, returning to the camera submenu.
-// The field stays frozen and controls stay locked (as set when the debug menu opened), which
-// is the state the submenu expects.
 static void Debug_CancelPanNpcBox(u8 taskId)
 {
     Debug_TearDownNpcBox(taskId);
