@@ -65,11 +65,16 @@ static s16 sFreecamMoveY;
 static u8 sCameraTrackedLocalId;
 
 // Debug "pan to NPC" state: when active the camera detaches from the player and auto-scrolls
-// toward the object event with local id sCameraPanLocalId (re-resolved each tile so a moving,
+// toward the object event with local id sCameraPanLocalId (re-resolved at each tile so a moving,
 // or culled-then-spawned, target is chased), then locks onto it like SetCameraTrackedLocalId.
 // Mutually exclusive with freecam. See PanCameraToLocalId / UpdateCameraPanMovement.
+// sCameraPanSpeed is a single constant scroll speed (px/frame) held for the whole pan: chosen from
+// the target distance and the requested duration so a far target travels faster, giving a roughly
+// distance-independent pan time. It is always a divisor of 16 so the camera lands cleanly on tile
+// boundaries, which is what keeps the motion smooth (constant speed, no per-frame jitter).
 static bool8 sCameraPanActive;
 static u8 sCameraPanLocalId;
+static s16 sCameraPanSpeed;
 static s16 sCameraPanMoveX;
 static s16 sCameraPanMoveY;
 
@@ -754,14 +759,35 @@ static void LockCameraOntoPanTarget(u8 objectEventId)
     TryUpdateMapLocationSilent(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
 }
 
-// Drives the camera toward the pan target while "Pan to NPC" is active, reusing the freecam
-// scroll path: movement is only (re)evaluated on a tile boundary so each step finishes
-// grid-aligned. The target tile is re-resolved every boundary, so a moving NPC is chased and a
-// culled target (headed for its default tile) is picked up the moment the scroll brings it
-// into view and spawns it. On arrival the camera locks onto the (now spawned) object exactly
-// like SetCameraTrackedLocalId and the pan ends; if the target stays culled at its default tile
-// (e.g. a flag-removed object that never spawns) the pan stays armed and the camera simply
-// rests there.
+// Picks the pan scroll speed: the divisor of 16 (1, 2, 4, 8 or 16 px/frame) nearest to `ideal`
+// px/frame. Smooth panning needs a constant speed that evenly divides a 16px tile so the camera
+// always lands on tile boundaries (where CameraUpdate redraws); a speed that didn't divide 16 would
+// skip boundaries and tear. `ideal` comes from distance / duration, so a farther target picks a
+// faster bucket and the pan time stays roughly constant. Clamped to [1, 16].
+static s16 SnapPanSpeed(s32 ideal)
+{
+    if (ideal < 2)        // midpoint of 1 and 2 (1.5) rounded
+        return 1;
+    else if (ideal < 3)   // midpoint of 2 and 4
+        return 2;
+    else if (ideal < 6)   // midpoint of 4 and 8
+        return 4;
+    else if (ideal < 12)  // midpoint of 8 and 16
+        return 8;
+    else
+        return 16;
+}
+
+// Drives the camera toward the pan target while "Pan to NPC" is active, reusing CameraUpdate's
+// tile-stepping. Direction is only (re)evaluated on a tile boundary so each step finishes
+// grid-aligned, and the speed is the constant sCameraPanSpeed chosen up front from the distance and
+// requested duration (see PanCameraToLocalId) — holding one speed for the whole pan is what makes
+// the motion smooth, with no per-frame velocity jitter. The target tile is re-resolved every
+// boundary, so a moving NPC is chased and a culled target (headed for its default tile) is picked up
+// the moment the scroll brings it into view and spawns it. On arrival the camera locks onto the (now
+// spawned) object exactly like SetCameraTrackedLocalId and the pan ends; if the target stays culled
+// at its default tile (e.g. a flag-removed object that never spawns) the pan stays armed and the
+// camera simply rests there.
 static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
 {
     if (fieldCamera->x == 0 && fieldCamera->y == 0)
@@ -772,13 +798,13 @@ static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
         sCameraPanMoveX = 0;
         sCameraPanMoveY = 0;
         if (gCameraPos.x < targetX)
-            sCameraPanMoveX = FREECAM_SPEED;
+            sCameraPanMoveX = sCameraPanSpeed;
         else if (gCameraPos.x > targetX)
-            sCameraPanMoveX = -FREECAM_SPEED;
+            sCameraPanMoveX = -sCameraPanSpeed;
         if (gCameraPos.y < targetY)
-            sCameraPanMoveY = FREECAM_SPEED;
+            sCameraPanMoveY = sCameraPanSpeed;
         else if (gCameraPos.y > targetY)
-            sCameraPanMoveY = -FREECAM_SPEED;
+            sCameraPanMoveY = -sCameraPanSpeed;
 
         // Focus tile now matches the target tile.
         if (sCameraPanMoveX == 0 && sCameraPanMoveY == 0)
@@ -801,14 +827,18 @@ static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
 }
 
 // Smoothly pans the camera to an object event (0 = the player), as an alternative to
-// SetCameraTrackedLocalId's instant jump. Detaches the camera from whatever it is currently
-// tracking (dropping the old anchor and cancelling any freecam/pan already running), then
-// scrolls tile-by-tile toward the target until it arrives, at which point it locks on exactly
-// like SetCameraTrackedLocalId. Stable across culling: while the target is culled the camera
-// heads for its default position; the scroll spawns it as it enters view, and a spawned
-// target's continually-updating position is chased so a moving NPC is followed in. Does
-// nothing if the target isn't present in the current map.
-void PanCameraToLocalId(u8 localId)
+// SetCameraTrackedLocalId's instant jump. `panFrames` is the pan's target duration: the scroll
+// speed is chosen from the distance so a near and a far target take roughly the same length of
+// time (see SnapPanSpeed). The speed is constant for the whole pan and snaps to a divisor of 16, so
+// the motion stays smooth but the realised duration tracks `panFrames` in coarse steps rather than
+// landing on it exactly. A budget of 0 is treated as 1 (fastest, 16px/frame).
+// Detaches the camera from whatever it is currently tracking (dropping the old anchor and
+// cancelling any freecam/pan already running), then scrolls toward the target until it arrives, at
+// which point it locks on exactly like SetCameraTrackedLocalId. Stable across culling: while the
+// target is culled the camera heads for its default position; the scroll spawns it as it enters
+// view, and a spawned target's continually-updating position is chased so a moving NPC is followed
+// in. Does nothing if the target isn't present in the current map.
+void PanCameraToLocalId(u8 localId, u8 panFrames)
 {
     s16 targetX, targetY;
     u8 i;
@@ -841,6 +871,28 @@ void PanCameraToLocalId(u8 localId)
     // player parked while it travels (and once it arrives, exactly as if Track NPC was used).
     sCameraTrackedLocalId = localId;
     sCameraPanLocalId = localId;
+
+    // Pick the constant scroll speed from how far the target is and how long the pan should take, so
+    // distant targets travel faster and the pan time stays roughly the same regardless of distance.
+    // The speed snaps to a divisor of 16 (the requirement for smooth, boundary-aligned scrolling),
+    // so the resulting duration tracks `panFrames` in coarse steps rather than exactly. The reach is
+    // the larger of the two axis distances (the axis that takes longest), measured from the now
+    // tile-aligned focus to the target's current tile.
+    {
+        s16 dx, dy, reachTiles;
+        u16 frames = (panFrames == 0) ? 1 : panFrames;
+
+        GetPanTargetTile(localId, &targetX, &targetY);
+        dx = targetX - gCameraPos.x;
+        dy = targetY - gCameraPos.y;
+        if (dx < 0)
+            dx = -dx;
+        if (dy < 0)
+            dy = -dy;
+        reachTiles = (dx > dy) ? dx : dy;
+        sCameraPanSpeed = SnapPanSpeed((s32)reachTiles * 16 / frames);
+    }
+
     sCameraPanMoveX = 0;
     sCameraPanMoveY = 0;
     sCameraPanActive = TRUE;

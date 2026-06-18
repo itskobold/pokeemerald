@@ -117,6 +117,10 @@ enum
     DEBUG_NPC_BOX_MODE_PAN,
 };
 
+// Time budget (in frames) for the "Pan to NPC" glide: the camera reaches the chosen object in this
+// many frames regardless of distance (see PanCameraToLocalId), ~0.4s at 60fps.
+#define DEBUG_PAN_NPC_FRAMES 24
+
 #define tMenuTaskId  data[0]
 #define tWindowId    data[1]
 
@@ -546,7 +550,7 @@ static void Debug_CommitPanNpcBox(u8 taskId)
     u8 localId = Debug_LocalIdForOrder(sTrackNpcOrder);
 
     Debug_TearDownNpcBox(taskId);
-    PanCameraToLocalId(localId);
+    PanCameraToLocalId(localId, DEBUG_PAN_NPC_FRAMES);
     UnlockPlayerFieldControls();
 }
 

@@ -37,7 +37,7 @@ bool8 IsCameraDetachedFromPlayer(void);
 void RecenterCameraOnPlayer(void);
 void StopCameraObjectTracking(void);
 void SetCameraTrackedLocalId(u8 localId);
-void PanCameraToLocalId(u8 localId);
+void PanCameraToLocalId(u8 localId, u8 panFrames);
 void RestoreCameraTracking(void);
 void ResetCameraTracking(void);
 void RequestCameraResetToPlayerOnFieldReturn(void);
