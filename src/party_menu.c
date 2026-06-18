@@ -15,6 +15,7 @@
 #include "easy_chat.h"
 #include "event_data.h"
 #include "evolution_scene.h"
+#include "field_camera.h"
 #include "field_control_avatar.h"
 #include "field_effect.h"
 #include "field_player_avatar.h"
@@ -3750,10 +3751,15 @@ static void CursorCb_FieldMove(u8 taskId)
                 sPartyMenuInternal->data[0] = fieldMove;
                 break;
             case FIELD_MOVE_FLY:
+                // Fly opens the fly map first, which can be backed out of; the camera reset is
+                // requested only once a location is actually chosen (see ReturnToFieldFromFlyMapSelect).
                 gPartyMenu.exitCallback = CB2_OpenFlyMap;
                 Task_ClosePartyMenu(taskId);
                 break;
             default:
+                // As above, for the field moves that return straight to the overworld (Surf,
+                // Strength, Sweet Scent, Cut, Rock Smash, Dive, Waterfall, Secret Power...).
+                RequestCameraResetToPlayerOnFieldReturn();
                 gPartyMenu.exitCallback = CB2_ReturnToField;
                 Task_ClosePartyMenu(taskId);
                 break;
@@ -3799,6 +3805,9 @@ static void Task_HandleFieldMoveExitAreaYesNoInput(u8 taskId)
     switch (Menu_ProcessInputNoWrapClearOnChoose())
     {
     case 0:
+        // Confirmed Teleport/Dig: snap the debug camera back to the player for the exit animation
+        // that plays here before the warp.
+        RequestCameraResetToPlayerOnFieldReturn();
         gPartyMenu.exitCallback = CB2_ReturnToField;
         Task_ClosePartyMenu(taskId);
         break;

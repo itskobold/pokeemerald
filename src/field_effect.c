@@ -1340,6 +1340,9 @@ void ReturnToFieldFromFlyMapSelect(void)
 {
     SetMainCallback2(CB2_ReturnToField);
     gFieldCallback = FieldCallback_UseFly;
+    // A fly location was chosen (the map wasn't just backed out of): snap the debug camera back to
+    // the player so the player-centred fly-out animation plays on-screen.
+    RequestCameraResetToPlayerOnFieldReturn();
 }
 
 static void FieldCallback_UseFly(void)

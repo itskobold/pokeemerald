@@ -107,7 +107,16 @@ enum
 {
     DEBUG_CAMERA_ITEM_TOGGLE_FREECAM,
     DEBUG_CAMERA_ITEM_TRACK_NPC,
+    DEBUG_CAMERA_ITEM_PAN_NPC,
     DEBUG_CAMERA_ITEM_CANCEL,
+};
+
+// "Track NPC" / "Pan to NPC" share one numeric scroll box; the mode decides whether choosing
+// an object jumps the camera live (track) or arms a smooth pan committed with A (pan).
+enum
+{
+    DEBUG_NPC_BOX_MODE_TRACK,
+    DEBUG_NPC_BOX_MODE_PAN,
 };
 
 #define tMenuTaskId  data[0]
@@ -121,8 +130,11 @@ static void Debug_CloseMenu(u8 taskId);
 static void Debug_OpenMainMenu(void);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_DisableFreecam(u8 taskId);
-static void Debug_OpenTrackNpcBox(void);
+static void Debug_OpenNpcBox(u8 mode);
+static void Debug_TearDownNpcBox(u8 taskId);
 static void Debug_CloseTrackNpcBox(u8 taskId);
+static void Debug_CommitPanNpcBox(u8 taskId);
+static void Debug_CancelPanNpcBox(u8 taskId);
 static void Debug_DrawTrackNpcBox(void);
 static u8 Debug_TrackedObjectCount(void);
 static u8 Debug_LocalIdForOrder(u8 order);
@@ -136,6 +148,7 @@ static void DebugAction_OpenCameraMenu(u8 taskId);
 static void DebugAction_Cancel(u8 taskId);
 static void DebugAction_Camera_ToggleFreecam(u8 taskId);
 static void DebugAction_Camera_TrackNPC(u8 taskId);
+static void DebugAction_Camera_PanNPC(u8 taskId);
 static void DebugAction_Camera_Cancel(u8 taskId);
 
 // Tracks whether a debug menu window is currently displayed. While a debug menu/box is
@@ -150,12 +163,15 @@ static u8 sTrackNpcWindowId;
 static u8 sTrackNpcArrowTaskId;
 static u16 sTrackNpcOrder;  // position in the player+templates list
 static u8 sTrackNpcMaxOrder; // == object event count, for the scroll arrows
+static u8 sTrackNpcBoxMode; // DEBUG_NPC_BOX_MODE_*: track (live jump) vs pan (commit with A)
 
 static const u8 sDebugText_Camera[] = _("Camera");
 static const u8 sDebugText_Cancel[] = _("Cancel");
 static const u8 sDebugText_Camera_ToggleFreecam[] = _("Toggle freecam");
 static const u8 sDebugText_Camera_TrackNPC[] = _("Track NPC");
+static const u8 sDebugText_Camera_PanNPC[] = _("Pan to NPC");
 static const u8 sDebugText_TrackNpc_Label[] = _("Track ");
+static const u8 sDebugText_PanNpc_Label[] = _("Pan ");
 
 static const struct ListMenuItem sDebugMenuItems_Main[] =
 {
@@ -167,6 +183,7 @@ static const struct ListMenuItem sDebugMenuItems_Camera[] =
 {
     [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = {sDebugText_Camera_ToggleFreecam, DEBUG_CAMERA_ITEM_TOGGLE_FREECAM},
     [DEBUG_CAMERA_ITEM_TRACK_NPC]      = {sDebugText_Camera_TrackNPC, DEBUG_CAMERA_ITEM_TRACK_NPC},
+    [DEBUG_CAMERA_ITEM_PAN_NPC]        = {sDebugText_Camera_PanNPC, DEBUG_CAMERA_ITEM_PAN_NPC},
     [DEBUG_CAMERA_ITEM_CANCEL]         = {sDebugText_Cancel, DEBUG_CAMERA_ITEM_CANCEL},
 };
 
@@ -180,6 +197,7 @@ static void (*const sDebugMenuActions_Camera[])(u8) =
 {
     [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = DebugAction_Camera_ToggleFreecam,
     [DEBUG_CAMERA_ITEM_TRACK_NPC]      = DebugAction_Camera_TrackNPC,
+    [DEBUG_CAMERA_ITEM_PAN_NPC]        = DebugAction_Camera_PanNPC,
     [DEBUG_CAMERA_ITEM_CANCEL]         = DebugAction_Camera_Cancel,
 };
 
@@ -372,7 +390,16 @@ static void Debug_DisableFreecam(u8 taskId)
 static void DebugAction_Camera_TrackNPC(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
-    Debug_OpenTrackNpcBox();
+    Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_TRACK);
+}
+
+// Opens the same selection box in "pan" mode: scrolling only previews the choice; pressing A
+// smoothly pans the camera to the picked object (see PanCameraToLocalId) and hands control
+// back, B steps back to the camera menu without moving the camera.
+static void DebugAction_Camera_PanNPC(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_PAN);
 }
 
 static void DebugAction_Camera_Cancel(u8 taskId)
@@ -460,7 +487,7 @@ static void Debug_DrawTrackNpcBox(void)
 {
     u8 text[16];
 
-    StringCopy(text, sDebugText_TrackNpc_Label);
+    StringCopy(text, sTrackNpcBoxMode == DEBUG_NPC_BOX_MODE_PAN ? sDebugText_PanNpc_Label : sDebugText_TrackNpc_Label);
     ConvertIntToDecimalStringN(gStringVar1, Debug_LocalIdForOrder(sTrackNpcOrder), STR_CONV_MODE_LEADING_ZEROS, 3);
     StringAppend(text, gStringVar1);
 
@@ -469,8 +496,9 @@ static void Debug_DrawTrackNpcBox(void)
     CopyWindowToVram(sTrackNpcWindowId, COPYWIN_GFX);
 }
 
-static void Debug_OpenTrackNpcBox(void)
+static void Debug_OpenNpcBox(u8 mode)
 {
+    sTrackNpcBoxMode = mode;
     // Start on whatever the camera is already tracking (the player by default).
     sTrackNpcOrder = Debug_OrderForLocalId(GetCameraTrackedLocalId());
     sTrackNpcMaxOrder = Debug_TrackedObjectCount();
@@ -487,7 +515,20 @@ static void Debug_OpenTrackNpcBox(void)
 
     CreateTask(DebugTask_TrackNpcInput, 3);
     sDebugMenuOpen = TRUE;
-    Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+    // Track mode jumps the camera live as you scroll; pan mode only previews and waits for A.
+    if (mode == DEBUG_NPC_BOX_MODE_TRACK)
+        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+}
+
+// Tears down the box's window, scroll arrows and input task. Shared by every box exit path;
+// the caller decides what field/camera state to restore afterwards.
+static void Debug_TearDownNpcBox(u8 taskId)
+{
+    RemoveScrollIndicatorArrowPair(sTrackNpcArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sTrackNpcWindowId, TRUE);
+    RemoveWindow(sTrackNpcWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
 }
 
 // Closes the box but leaves the camera tracking the selected object. Object events are
@@ -497,11 +538,7 @@ static void Debug_OpenTrackNpcBox(void)
 // change or stop tracking.
 static void Debug_CloseTrackNpcBox(u8 taskId)
 {
-    RemoveScrollIndicatorArrowPair(sTrackNpcArrowTaskId);
-    ClearStdWindowAndFrameToTransparent(sTrackNpcWindowId, TRUE);
-    RemoveWindow(sTrackNpcWindowId);
-    DestroyTask(taskId);
-    sDebugMenuOpen = FALSE;
+    Debug_TearDownNpcBox(taskId);
     ScriptUnfreezeObjectEvents();
     // Hand input back either way. When still tracking an NPC the overworld keeps the player
     // parked (and the start menu / L+R+Select stay reachable); when tracking the player
@@ -509,26 +546,65 @@ static void Debug_CloseTrackNpcBox(u8 taskId)
     UnlockPlayerFieldControls();
 }
 
+// Commits the pan box (A): starts the camera gliding to the selected object and hands input
+// back. Object events are unfrozen so the world runs while the camera travels and the target
+// NPC keeps moving; PanCameraToLocalId chases its live position and locks on at arrival, after
+// which the overworld keeps the player parked just as ordinary tracking does (so they can't
+// walk off-camera, and L + R + Select still reopens the menu to change or stop it).
+static void Debug_CommitPanNpcBox(u8 taskId)
+{
+    u8 localId = Debug_LocalIdForOrder(sTrackNpcOrder);
+
+    Debug_TearDownNpcBox(taskId);
+    ScriptUnfreezeObjectEvents();
+    PanCameraToLocalId(localId);
+    UnlockPlayerFieldControls();
+}
+
+// Backs out of the pan box (B) without moving the camera, returning to the camera submenu.
+// The field stays frozen and controls stay locked (as set when the debug menu opened), which
+// is the state the submenu expects.
+static void Debug_CancelPanNpcBox(u8 taskId)
+{
+    Debug_TearDownNpcBox(taskId);
+    Debug_ShowMenu(sDebugMenuItems_Camera, ARRAY_COUNT(sDebugMenuItems_Camera), DebugTask_HandleMenuInput_Camera);
+}
+
 static void DebugTask_TrackNpcInput(u8 taskId)
 {
+    bool8 trackMode = (sTrackNpcBoxMode == DEBUG_NPC_BOX_MODE_TRACK);
+
     if (JOY_REPEAT(DPAD_DOWN) && sTrackNpcOrder < sTrackNpcMaxOrder)
     {
         sTrackNpcOrder++;
         PlaySE(SE_SELECT);
         Debug_DrawTrackNpcBox();
-        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+        if (trackMode)
+            Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
     }
     else if (JOY_REPEAT(DPAD_UP) && sTrackNpcOrder > 0)
     {
         sTrackNpcOrder--;
         PlaySE(SE_SELECT);
         Debug_DrawTrackNpcBox();
-        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+        if (trackMode)
+            Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+    }
+    else if (!trackMode && JOY_NEW(A_BUTTON))
+    {
+        // Pan mode commits the selection: glide the camera to the chosen object.
+        PlaySE(SE_SELECT);
+        Debug_CommitPanNpcBox(taskId);
     }
     else if (JOY_NEW(B_BUTTON))
     {
         PlaySE(SE_SELECT);
-        Debug_CloseTrackNpcBox(taskId);
+        // Track mode keeps its live selection and returns to the field; pan mode discards the
+        // (uncommitted) selection and steps back to the camera menu.
+        if (trackMode)
+            Debug_CloseTrackNpcBox(taskId);
+        else
+            Debug_CancelPanNpcBox(taskId);
     }
 }
 

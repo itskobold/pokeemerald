@@ -830,11 +830,10 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
         ShowMapNamePopup();
 }
 
-// Called from CameraUpdate when the camera's focus advances to a new tile (x, y are the
-// camera's focus tile). If that tile belongs to a different map location than the one
-// currently active, switch to it: reload the new location's secondary tileset graphics,
-// update the music, and show its name.
-void TryUpdateMapLocation(s16 x, s16 y)
+// Switches the active map location to whatever the tile (x, y) belongs to, reloading that
+// location's secondary tileset graphics. allowPlayerFacing gates the player-facing extras
+// (music change + map-name popup): see the two wrappers below.
+static void UpdateMapLocation(s16 x, s16 y, bool8 allowPlayerFacing)
 {
     u8 taskId;
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
@@ -847,11 +846,16 @@ void TryUpdateMapLocation(s16 x, s16 y)
 
     SetActiveMapLocation(newLocation);
 
-    // The music and map-name popup are player-facing, so only trigger them when the camera
-    // is following the player. While the camera is detached (e.g. a scripted pan) or the debug
-    // freecam is scrolling around, switch the location's graphics but leave the music and popup
-    // alone.
-    if (!IsFreecamActive() && CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId())
+    // The music and map-name popup are player-facing, so only trigger them when this is a
+    // player-driven crossing and the camera is attached to and following the player. While the
+    // camera is detached for any reason (debug freecam scrolling, tracking an NPC, or panning
+    // between NPCs) switch the location's graphics but leave the music and popup alone.
+    // IsCameraDetachedFromPlayer covers the pan case the followed-sprite check alone misses: a
+    // pan leaves the camera object still pointed at the player's sprite until it locks onto the
+    // target, so without this a pan would pop the name of every section it crosses.
+    if (allowPlayerFacing
+     && !IsCameraDetachedFromPlayer()
+     && CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId())
     {
         Overworld_ChangeMusicToDefault();
         if (GetActiveLocationData()->showMapName == TRUE)
@@ -866,6 +870,24 @@ void TryUpdateMapLocation(s16 x, s16 y)
     taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     if (taskId == TASK_NONE)
         CreateTask(Task_UpdateMapLocationGfx, 80);
+}
+
+// Called from CameraUpdate when the camera's focus advances to a new tile (x, y are the
+// camera's focus tile). If that tile belongs to a different location, switch to it; when the
+// player is the one crossing the boundary, also change the music and pop the map name.
+void TryUpdateMapLocation(s16 x, s16 y)
+{
+    UpdateMapLocation(x, y, TRUE);
+}
+
+// Switches the active location's graphics to match a tile WITHOUT the player-facing
+// music/popup. Used for deliberate camera repoints (the debug track/pan jumps), which must
+// never pop a map name: the camera lands "attached" to the new target the same frame, so the
+// player-facing guard above wouldn't catch it, and a popup raised while the debug menu is open
+// corrupts the menu graphics.
+void TryUpdateMapLocationSilent(s16 x, s16 y)
+{
+    UpdateMapLocation(x, y, FALSE);
 }
 
 // Reloads the active location's secondary tileset and redraws the visible map,
@@ -1999,6 +2021,9 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
     case 3:
         InitObjectEventsLocal();
         SetCameraToTrackPlayer();
+        // A full map load starts fresh on the player: any debug camera tracking referred to the
+        // previous map's objects.
+        ResetCameraTracking();
         (*state)++;
         break;
     case 4:
@@ -2065,6 +2090,11 @@ static bool32 ReturnToFieldLocal(u8 *state)
     case 1:
         InitViewGraphics();
         TryLoadTrainerHillEReaderPalette();
+        // Returning to the same map (e.g. closing a menu): resume any debug camera tracking that
+        // SetCameraToTrackPlayer above reset, now that the view graphics are set back up. If a field
+        // move was just chosen, this instead snaps the camera back to the player (see
+        // RequestCameraResetToPlayerOnFieldReturn) so the move's animation plays on-screen.
+        RestoreCameraTracking();
         (*state)++;
         break;
     case 2:

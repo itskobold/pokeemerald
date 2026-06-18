@@ -13,6 +13,7 @@
 #include "event_object_movement.h"
 #include "event_scripts.h"
 #include "fieldmap.h"
+#include "field_camera.h"
 #include "field_effect.h"
 #include "field_player_avatar.h"
 #include "field_screen_effect.h"
@@ -118,6 +119,9 @@ static void SetUpItemUseOnFieldCallback(u8 taskId)
 {
     if (gTasks[taskId].tUsingRegisteredKeyItem != TRUE)
     {
+        // Used from the bag: this returns to the field to play a player-centred effect (Bike, Rod,
+        // Itemfinder, Wailmer Pail, Escape Rope...), so snap the debug camera back to the player.
+        RequestCameraResetToPlayerOnFieldReturn();
         gFieldCallback = FieldCB_UseItemOnField;
         SetUpItemUseCallback(taskId);
     }
@@ -685,6 +689,10 @@ void ItemUseOutOfBattle_Berry(u8 taskId)
 {
     if (IsPlayerFacingEmptyBerryTreePatch() == TRUE)
     {
+        // Returns to the field to plant the berry in front of the player; snap the debug camera
+        // back to the player (this path sets up the field return directly, not via
+        // SetUpItemUseOnFieldCallback).
+        RequestCameraResetToPlayerOnFieldReturn();
         sItemUseOnFieldCB = ItemUseOnFieldCB_Berry;
         gFieldCallback = FieldCB_UseItemOnField;
         gBagMenu->newScreenCallback = CB2_ReturnToField;
