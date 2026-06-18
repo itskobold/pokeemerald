@@ -80,7 +80,7 @@ void FieldClearPlayerInput(struct FieldInput *input)
     input->heldDirection2 = FALSE;
     input->tookStep = FALSE;
     input->pressedBButton = FALSE;
-    input->pressedStartSelect = FALSE;
+    input->pressedLRSelect = FALSE;
     input->input_field_1_1 = FALSE;
     input->input_field_1_2 = FALSE;
     input->input_field_1_3 = FALSE;
@@ -97,10 +97,10 @@ void FieldGetPlayerInput(struct FieldInput *input, u16 newKeys, u16 heldKeys)
     {
         if (GetPlayerSpeed() != PLAYER_SPEED_FASTEST)
         {
-            // Open the debug menu when Start and Select are held together.
-            if ((heldKeys & START_BUTTON) && (heldKeys & SELECT_BUTTON)
-             && (newKeys & (START_BUTTON | SELECT_BUTTON)))
-                input->pressedStartSelect = TRUE;
+            // Open the debug menu when L, R and Select are held together.
+            if ((heldKeys & L_BUTTON) && (heldKeys & R_BUTTON) && (heldKeys & SELECT_BUTTON)
+             && (newKeys & (L_BUTTON | R_BUTTON | SELECT_BUTTON)))
+                input->pressedLRSelect = TRUE;
             else if (newKeys & START_BUTTON)
                 input->pressedStartButton = TRUE;
             if (newKeys & SELECT_BUTTON)
@@ -185,7 +185,7 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
     }
     if (input->pressedAButton && TrySetupDiveDownScript() == TRUE)
         return TRUE;
-    if (input->pressedStartSelect)
+    if (input->pressedLRSelect)
     {
         PlaySE(SE_WIN_OPEN);
         Debug_ShowMainMenu();

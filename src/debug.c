@@ -222,6 +222,9 @@ void Debug_ShowMainMenu(void)
     // menu draws its own window.
     HideMapNamePopUpWindow();
 
+    // Stop script execution
+    ScriptContext_Stop();
+
     if (Debug_IsCameraDetached())
     {
         // The field is already locked; just halt freecam scrolling so the D-pad drives
@@ -297,6 +300,8 @@ static void Debug_CloseMenu(u8 taskId)
         ScriptUnfreezeObjectEvents();
         UnlockPlayerFieldControls();
     }
+
+    ScriptContext_Enable();
 }
 
 // Starts/stops the background task that lets Start + Select reopen the menu while the
@@ -351,14 +356,14 @@ static void DebugTask_HandleMenuInput_Camera(u8 taskId)
     }
 }
 
-// Runs while the camera is detached (freecam or tracking an NPC) so Start + Select can
+// Runs while the camera is detached (freecam or tracking an NPC) so L + R + Select can
 // reopen the menu, since the player's field input handler is disabled in those modes.
 static void DebugTask_DetachedInput(u8 taskId)
 {
     if (sDebugMenuOpen)
         return;
 
-    if (JOY_HELD(START_BUTTON) && JOY_HELD(SELECT_BUTTON) && JOY_NEW(START_BUTTON | SELECT_BUTTON))
+    if (JOY_HELD(L_BUTTON) && JOY_HELD(R_BUTTON) && JOY_HELD(SELECT_BUTTON) && JOY_NEW(L_BUTTON | R_BUTTON | SELECT_BUTTON))
     {
         PlaySE(SE_WIN_OPEN);
         Debug_ShowMainMenu();
@@ -487,6 +492,18 @@ static u8 Debug_OrderForLocalId(u8 localId)
     return 0;
 }
 
+// Points the camera at the chosen track id. Tracking and freecam are mutually exclusive
+// ways to detach the camera, so switching the track target (to an NPC or back to the
+// player) takes over from any running freecam. SetCameraTrackedLocalId runs first, while
+// freecam is still flagged active, so the location swap stays silent (see
+// SetCameraTrackedLocalId / TryUpdateMapLocation).
+static void Debug_SetCameraTrack(u8 localId)
+{
+    SetCameraTrackedLocalId(localId);
+    if (IsFreecamActive())
+        SetFreecamActive(FALSE);
+}
+
 static void Debug_DrawTrackNpcBox(void)
 {
     u8 text[16];
@@ -518,7 +535,7 @@ static void Debug_OpenTrackNpcBox(void)
 
     CreateTask(DebugTask_TrackNpcInput, 3);
     sDebugMenuOpen = TRUE;
-    SetCameraTrackedLocalId(Debug_LocalIdForOrder(sTrackNpcOrder));
+    Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
 }
 
 // Closes the box but leaves the camera tracking the selected object. Object events are
@@ -553,14 +570,14 @@ static void DebugTask_TrackNpcInput(u8 taskId)
         sTrackNpcOrder++;
         PlaySE(SE_SELECT);
         Debug_DrawTrackNpcBox();
-        SetCameraTrackedLocalId(Debug_LocalIdForOrder(sTrackNpcOrder));
+        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
     }
     else if (JOY_REPEAT(DPAD_UP) && sTrackNpcOrder > 0)
     {
         sTrackNpcOrder--;
         PlaySE(SE_SELECT);
         Debug_DrawTrackNpcBox();
-        SetCameraTrackedLocalId(Debug_LocalIdForOrder(sTrackNpcOrder));
+        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
     }
     else if (JOY_NEW(B_BUTTON))
     {
