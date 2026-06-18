@@ -36,6 +36,10 @@
 static EWRAM_DATA u8 sSpinStartFacingDir = 0;
 EWRAM_DATA struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT] = {};
 EWRAM_DATA struct PlayerAvatar gPlayerAvatar = {};
+// The player's actual elevation level (an ordinary level only, stored as tile value minus
+// ELEVATION_FIRST_LEVEL, i.e. 0-123). Updated on warp-in and on each tile-to-tile move; see
+// ObjectEventUpdateElevation. Transient/derived state, not part of the save.
+EWRAM_DATA u8 gPlayerElevation = 0;
 
 // static declarations
 static u8 ObjectEventCB2_NoMovement2(void);

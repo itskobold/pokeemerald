@@ -39,6 +39,7 @@ enum
     ELEVATION_COLLISION = 1,   // Impassable at any elevation
     ELEVATION_SURF = 2,        // Surfable water
     ELEVATION_MULTI_LEVEL = 3, // Shared by every elevation (e.g. bridges)
+    ELEVATION_FIRST_LEVEL = 4, // First ordinary elevation level (real levels are >= this)
     ELEVATION_DEFAULT = 5,     // Default ground level
     ELEVATION_INVALID = 0xFFFF
 };

@@ -7775,6 +7775,14 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
 
     if (curElevation != ELEVATION_TRANSITION && curElevation != ELEVATION_MULTI_LEVEL)
         objEvent->previousElevation = curElevation;
+
+    // Track the local player's actual elevation level. Only ordinary elevation levels
+    // (ELEVATION_FIRST_LEVEL and up) count; the stored value is the level (tile value minus
+    // ELEVATION_FIRST_LEVEL, i.e. 0-123). Special tiles (transition, collision, water,
+    // multi-level) leave the last tracked level untouched. This fires both when the player
+    // spawns on a warp destination tile and on each tile-to-tile move.
+    if (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId] && curElevation >= ELEVATION_FIRST_LEVEL)
+        gPlayerElevation = curElevation - ELEVATION_FIRST_LEVEL;
 }
 
 void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 subpriority)

@@ -1,6 +1,10 @@
 #ifndef GUARD_FIELD_PLAYER_AVATAR_H
 #define GUARD_FIELD_PLAYER_AVATAR_H
 
+// The player's actual elevation level (real levels only, stored as the tile's elevation
+// value minus ELEVATION_FIRST_LEVEL, i.e. 0-123). See gPlayerElevation in field_player_avatar.c.
+extern u8 gPlayerElevation;
+
 void PlayerStep(u8 direction, u16 newKeys, u16 heldKeys);
 void ClearPlayerAvatarInfo(void);
 void SetPlayerAvatarExtraStateTransition(u8 graphicsId, u8 transitionFlag);
