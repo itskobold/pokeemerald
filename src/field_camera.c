@@ -466,13 +466,22 @@ static void CenterCameraOnTile(int x, int y)
     ResetFieldCamera();
 
     // Respawn/cull around the new focus, then snap every live sprite into the new frame so
-    // none are left at a stale sub-tile position relative to the camera.
+    // none are left at a stale sub-tile position relative to the camera. UpdateObjectEventsForCameraUpdate
+    // culls before it spawns, so a far jump frees the old view's object/sprite slots before
+    // trying to fill them with the new context's objects (see its definition).
     UpdateObjectEventsForCameraUpdate(0, 0);
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         if (gObjectEvents[i].active)
             MoveObjectEventToMapCoords(&gObjectEvents[i], gObjectEvents[i].currentCoords.x, gObjectEvents[i].currentCoords.y);
     }
+    // The jump may have landed in a different location (e.g. tracking an NPC that stands in a
+    // different secondary tileset to the player). Apply that location's tileset synchronously
+    // BEFORE redrawing, so the whole-map redraw below uses the destination's graphics instead of
+    // the previous focus's — otherwise the new surroundings flash with the old (player's) tileset
+    // for the frame before the deferred swap catches up. Safe to do synchronously here because a
+    // jump lands tile-aligned, with no sub-tile scroll offset to corrupt.
+    UpdateMapLocationGfxImmediate(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
     DrawWholeMapView();
     UpdateCameraElevation();
     UpdateCameraBiome();
@@ -900,10 +909,15 @@ void CameraUpdate(void)
     }
     if (curMovementOffsetY != 0 && curMovementOffsetY == -movementSpeedY)
     {
+        // Y-axis mid-step reversal must move the camera (and redraw the slice) on the Y axis.
+        // Upstream wrote deltaX here; the player never hits this path (its camera is input-gated
+        // to tile boundaries and so never reverses mid-step), but a tracked free-roaming NPC that
+        // turns around between tiles did, redrawing the wrong (E/W) slice and leaving the newly
+        // exposed N/S edge stale for a frame -> the brief tile flicker while tracking NPCs.
         if (movementSpeedY > 0)
-            deltaX = 1;
+            deltaY = 1;
         else
-            deltaX = -1;
+            deltaY = -1;
     }
 
     gFieldCamera.x += movementSpeedX;

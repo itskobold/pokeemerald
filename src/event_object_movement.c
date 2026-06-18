@@ -2217,8 +2217,18 @@ static bool8 ObjectEventDoesElevationMatch(struct ObjectEvent *objectEvent, u8 e
 void UpdateObjectEventsForCameraUpdate(s16 x, s16 y)
 {
     UpdateObjectEventCoordsForCameraUpdate();
-    TrySpawnObjectEvents(x, y);
+    // Cull objects that have left the view BEFORE spawning the ones entering it. The spawn and
+    // cull windows are identical (left/top/right/bottom all match), so an object is never culled
+    // and immediately respawned in the same pass — the resulting object set is independent of
+    // order. What the order changes is transient slot pressure: object events, sprite OAM, and
+    // palette/gfx slots are limited, and on a dense map the slots can be nearly full. Spawning
+    // first (the original order) means an entering edge object finds no free slot until the
+    // exiting one is culled a step later, so it silently fails to load for a frame — visible as
+    // flickering tiles/sprites while panning or tracking across a crowded map, and as wholesale
+    // load failures on a far camera jump (where the entire old view is still resident). Freeing
+    // the departed objects first guarantees room for whatever the new view needs.
     RemoveObjectEventsOutsideView();
+    TrySpawnObjectEvents(x, y);
 }
 
 // The "CameraObject" functions below are responsible for an invisible sprite

@@ -835,16 +835,29 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
 // (music change + map-name popup): see the two wrappers below.
 static void UpdateMapLocation(s16 x, s16 y, bool8 allowPlayerFacing)
 {
-    u8 taskId;
+    u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
+    // Where the visible map is headed: a swap already queued is aiming for its latched target
+    // (data[0]); with nothing queued we're settled in the active location.
+    u8 currentTarget = (taskId == TASK_NONE) ? GetActiveMapLocation() : gTasks[taskId].data[0];
 
-    if (newLocation == GetActiveMapLocation())
+    if (newLocation == currentTarget)
         return;
     // Ignore tiles tagged with a location the map doesn't actually define.
     if (newLocation >= MAX_MAP_LOCATIONS || gMapHeader.locations[newLocation] == NULL)
         return;
 
-    SetActiveMapLocation(newLocation);
+    // Defer the whole switch — active-location pointer, tileset graphics, music and map-name
+    // popup — to Task_UpdateMapLocationGfx, which runs once the camera is settled on a tile.
+    // Flipping the active location here (eagerly) would let this same frame's edge redraw draw
+    // the new location's metatiles against the old, still-loaded tileset graphics, garbling the
+    // leading-edge tiles until the camera next settled (visible as a brief flicker while panning
+    // quickly across location boundaries). Latching the target and swapping everything together
+    // keeps the on-screen indices and the loaded graphics in lockstep. Reuse any switch already
+    // in flight so the newest location wins.
+    if (taskId == TASK_NONE)
+        taskId = CreateTask(Task_UpdateMapLocationGfx, 80);
+    gTasks[taskId].data[0] = newLocation;
 
     // The music and map-name popup are player-facing, so only trigger them when this is a
     // player-driven crossing and the camera is attached to and following the player. While the
@@ -852,24 +865,12 @@ static void UpdateMapLocation(s16 x, s16 y, bool8 allowPlayerFacing)
     // between NPCs) switch the location's graphics but leave the music and popup alone.
     // IsCameraDetachedFromPlayer covers the pan case the followed-sprite check alone misses: a
     // pan leaves the camera object still pointed at the player's sprite until it locks onto the
-    // target, so without this a pan would pop the name of every section it crosses.
-    if (allowPlayerFacing
-     && !IsCameraDetachedFromPlayer()
-     && CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId())
-    {
-        Overworld_ChangeMusicToDefault();
-        if (GetActiveLocationData()->showMapName == TRUE)
-            ShowMapNamePopup();
-    }
-
-    // Hand the graphics swap to a task. It can't run now: the camera is still scrolling
-    // toward the new focus tile, so the BG sits at a sub-tile scroll offset; reloading the
-    // tileset and redrawing now corrupts the tiles at the screen edges. The task waits for
-    // the camera to settle on a tile first (see Task_UpdateMapLocationGfx).
-    // Reuse any switch already in flight so the newest location wins.
-    taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
-    if (taskId == TASK_NONE)
-        CreateTask(Task_UpdateMapLocationGfx, 80);
+    // target, so without this a pan would pop the name of every section it crosses. Latched here
+    // (when the crossing happens) and applied with the swap, since the deferred task can't tell a
+    // player crossing from a debug repoint by the time it runs.
+    gTasks[taskId].data[1] = (allowPlayerFacing
+                              && !IsCameraDetachedFromPlayer()
+                              && CameraObjectGetFollowedSpriteId() == GetPlayerAvatarSpriteId());
 }
 
 // Called from CameraUpdate when the camera's focus advances to a new tile (x, y are the
@@ -890,15 +891,30 @@ void TryUpdateMapLocationSilent(s16 x, s16 y)
     UpdateMapLocation(x, y, FALSE);
 }
 
-// Reloads the active location's secondary tileset and redraws the visible map,
-// but only once the camera has finished scrolling onto its new focus tile (no
-// sub-tile scroll offset). The graphics swap and the redraw run together in the
-// same frame so the on-screen tile indices and the loaded graphics never
-// disagree, which would otherwise show as garbage.
-static void Task_UpdateMapLocationGfx(u8 taskId)
+// Loads the active location's secondary tileset graphics and palette into VRAM and restarts its
+// animation. Shared by the deferred (Task_UpdateMapLocationGfx) and synchronous
+// (UpdateMapLocationGfxImmediate) location swaps; callers SetActiveMapLocation first and redraw
+// the map (DrawWholeMapView) afterwards.
+static void ApplyActiveLocationSecondaryTileset(void)
 {
     s32 paletteIndex;
 
+    CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
+    LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
+    for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
+        ApplyWeatherColorMapToPal(paletteIndex);
+    InitSecondaryTilesetAnimation();
+}
+
+// Switches the active location to its latched target (data[0]) and reloads that location's
+// secondary tileset, redrawing the visible map — but only once the camera has finished scrolling
+// onto its new focus tile (no sub-tile scroll offset). The active-location flip, the graphics
+// swap and the redraw all run together in the same frame so the on-screen tile indices and the
+// loaded graphics never disagree, which would otherwise show as garbage. The player-facing music
+// and map-name popup (latched in data[1]) are applied here too, now that the new location is
+// active and its data readable.
+static void Task_UpdateMapLocationGfx(u8 taskId)
+{
     // Wait until the camera is aligned to a tile (no sub-tile scroll offset) before swapping
     // the secondary tileset and redrawing; doing it mid-scroll corrupts the screen-edge tiles.
     // Keyed on the camera itself rather than the player, so it's correct when the camera is
@@ -906,13 +922,47 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
     if (gFieldCamera.x != 0 || gFieldCamera.y != 0)
         return;
 
-    CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
-    LoadSecondaryTilesetPalette(gMapHeader.mapLayout);
-    for (paletteIndex = NUM_PALS_IN_PRIMARY; paletteIndex < NUM_PALS_TOTAL; paletteIndex++)
-        ApplyWeatherColorMapToPal(paletteIndex);
+    SetActiveMapLocation(gTasks[taskId].data[0]);
+    ApplyActiveLocationSecondaryTileset();
     DrawWholeMapView();
-    InitSecondaryTilesetAnimation();
+
+    if (gTasks[taskId].data[1])
+    {
+        Overworld_ChangeMusicToDefault();
+        if (GetActiveLocationData()->showMapName == TRUE)
+            ShowMapNamePopup();
+    }
     DestroyTask(taskId);
+}
+
+// Synchronously switches the active location to the one containing tile (x, y) and loads its
+// secondary tileset, for a camera JUMP that lands tile-aligned (the debug camera snapping onto an
+// NPC via CenterCameraOnTile). The deferred Task_UpdateMapLocationGfx exists for mid-scroll
+// crossings, where swapping at a sub-tile offset corrupts the screen edges; a jump has no such
+// offset, so deferring it instead would draw the destination's tiles with the previous (e.g. the
+// player's) location tileset for one frame until the task caught up — the flicker seen when
+// starting to track an NPC that sits in a different location. Applying the swap up front lets the
+// caller's DrawWholeMapView render the right graphics immediately. No music/popup: a deliberate
+// repoint, like TryUpdateMapLocationSilent. The caller redraws the map afterwards.
+void UpdateMapLocationGfxImmediate(s16 x, s16 y)
+{
+    u8 newLocation = MapGridGetMetatileLocationAt(x, y);
+    u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
+
+    // A jump supersedes any deferred swap left over from prior scrolling: its latched target is
+    // stale now that the camera has teleported, and letting it fire would switch to the wrong
+    // location once the camera settles here.
+    if (taskId != TASK_NONE)
+        DestroyTask(taskId);
+
+    if (newLocation == GetActiveMapLocation())
+        return;
+    // Ignore tiles tagged with a location the map doesn't actually define.
+    if (newLocation >= MAX_MAP_LOCATIONS || gMapHeader.locations[newLocation] == NULL)
+        return;
+
+    SetActiveMapLocation(newLocation);
+    ApplyActiveLocationSecondaryTileset();
 }
 
 static void LoadMapFromWarp(bool32 a1)
