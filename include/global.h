@@ -983,7 +983,7 @@ struct ExternalEventFlags
 
 struct SaveBlock1
 {
-    /*0x00*/ struct Coords16 pos;
+    /*0x00*/ struct Coords16 playerPos; // The player's tile position (map-relative). For the camera's focus tile see cameraPos.
     /*0x04*/ struct WarpData location;
     /*0x0C*/ struct WarpData continueGameWarp;
     /*0x14*/ struct WarpData dynamicWarp;
@@ -1064,7 +1064,8 @@ struct SaveBlock1
     /*0x31DC*/ struct Roamer roamer;
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
-    /*0x3598*/ u8 unused_3598[0x180];
+    /*0x3598*/ struct Coords16 cameraPos; // The camera's focus tile (map-relative), advanced by CameraMove. Usually equals pos, but diverges when the camera is detached from the player.
+    /*0x359C*/ u8 unused_3598[0x17C];
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

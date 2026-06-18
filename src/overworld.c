@@ -606,22 +606,25 @@ static void SetPlayerCoordsFromWarp(void)
     if (gSaveBlock1Ptr->location.warpId >= 0 && gSaveBlock1Ptr->location.warpId < gMapHeader.events->warpCount)
     {
         // warpId is a valid warp for this map, use the coords of that warp.
-        gSaveBlock1Ptr->pos.x = gMapHeader.events->warps[gSaveBlock1Ptr->location.warpId].x;
-        gSaveBlock1Ptr->pos.y = gMapHeader.events->warps[gSaveBlock1Ptr->location.warpId].y;
+        gSaveBlock1Ptr->playerPos.x = gMapHeader.events->warps[gSaveBlock1Ptr->location.warpId].x;
+        gSaveBlock1Ptr->playerPos.y = gMapHeader.events->warps[gSaveBlock1Ptr->location.warpId].y;
     }
     else if (gSaveBlock1Ptr->location.x >= 0 && gSaveBlock1Ptr->location.y >= 0)
     {
         // Invalid warpId given. The given coords are valid, use those instead.
         // WARP_ID_NONE is used to reach this intentionally.
-        gSaveBlock1Ptr->pos.x = gSaveBlock1Ptr->location.x;
-        gSaveBlock1Ptr->pos.y = gSaveBlock1Ptr->location.y;
+        gSaveBlock1Ptr->playerPos.x = gSaveBlock1Ptr->location.x;
+        gSaveBlock1Ptr->playerPos.y = gSaveBlock1Ptr->location.y;
     }
     else
     {
         // Invalid warpId and coords given. Put player in center of map.
-        gSaveBlock1Ptr->pos.x = gMapHeader.mapLayout->width / 2;
-        gSaveBlock1Ptr->pos.y = gMapHeader.mapLayout->height / 2;
+        gSaveBlock1Ptr->playerPos.x = gMapHeader.mapLayout->width / 2;
+        gSaveBlock1Ptr->playerPos.y = gMapHeader.mapLayout->height / 2;
     }
+    // The camera spawns focused on the player. Seed the camera's focus tile from the
+    // player's warp-in position; CameraMove takes over advancing it from here.
+    gSaveBlock1Ptr->cameraPos = gSaveBlock1Ptr->playerPos;
 }
 
 void WarpIntoMap(void)
@@ -643,7 +646,7 @@ void SetWarpDestinationToMapWarp(s8 mapGroup, s8 mapNum, s8 warpId)
 
 void SetDynamicWarp(s32 unused, s8 mapGroup, s8 mapNum, s8 warpId)
 {
-    SetWarpData(&gSaveBlock1Ptr->dynamicWarp, mapGroup, mapNum, warpId, gSaveBlock1Ptr->pos.x, gSaveBlock1Ptr->pos.y);
+    SetWarpData(&gSaveBlock1Ptr->dynamicWarp, mapGroup, mapNum, warpId, gSaveBlock1Ptr->playerPos.x, gSaveBlock1Ptr->playerPos.y);
 }
 
 void SetDynamicWarpWithCoords(s32 unused, s8 mapGroup, s8 mapNum, s8 warpId, s8 x, s8 y)
@@ -1017,7 +1020,7 @@ static u8 GetAdjustedInitialDirection(struct InitialPlayerAvatarState *playerStr
 
 static u16 GetCenterScreenMetatileBehavior(void)
 {
-    return MapGridGetMetatileBehaviorAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+    return MapGridGetMetatileBehaviorAt(gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET, gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET);
 }
 
 bool32 Overworld_IsBikingAllowed(void)
@@ -1178,7 +1181,7 @@ u16 GetCurrLocationDefaultMusic(void)
     }
     else
     {
-        if (gSaveBlock1Ptr->pos.x < 24)
+        if (gSaveBlock1Ptr->playerPos.x < 24)
             return MUS_ROUTE110;
         else
             return MUS_ROUTE119;

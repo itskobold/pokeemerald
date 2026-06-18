@@ -64,11 +64,11 @@ bool8 ShouldDoBrailleDigEffect(void)
      && (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEALED_CHAMBER_OUTER_ROOM)
      && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEALED_CHAMBER_OUTER_ROOM)))
     {
-        if (gSaveBlock1Ptr->pos.x == 10 && gSaveBlock1Ptr->pos.y == 3)
+        if (gSaveBlock1Ptr->playerPos.x == 10 && gSaveBlock1Ptr->playerPos.y == 3)
             return TRUE;
-        if (gSaveBlock1Ptr->pos.x == 9 && gSaveBlock1Ptr->pos.y == 3)
+        if (gSaveBlock1Ptr->playerPos.x == 9 && gSaveBlock1Ptr->playerPos.y == 3)
             return TRUE;
-        if (gSaveBlock1Ptr->pos.x == 11 && gSaveBlock1Ptr->pos.y == 3)
+        if (gSaveBlock1Ptr->playerPos.x == 11 && gSaveBlock1Ptr->playerPos.y == 3)
             return TRUE;
     }
 
@@ -170,17 +170,17 @@ bool8 ShouldDoBrailleRegirockEffect(void)
         && gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_DESERT_RUINS)
         && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_DESERT_RUINS))
     {
-        if (gSaveBlock1Ptr->pos.x == 6 && gSaveBlock1Ptr->pos.y == 23)
+        if (gSaveBlock1Ptr->playerPos.x == 6 && gSaveBlock1Ptr->playerPos.y == 23)
         {
             sIsRegisteelPuzzle = FALSE;
             return TRUE;
         }
-        else if (gSaveBlock1Ptr->pos.x == 5 && gSaveBlock1Ptr->pos.y == 23)
+        else if (gSaveBlock1Ptr->playerPos.x == 5 && gSaveBlock1Ptr->playerPos.y == 23)
         {
             sIsRegisteelPuzzle = FALSE;
             return TRUE;
         }
-        else if (gSaveBlock1Ptr->pos.x == 7 && gSaveBlock1Ptr->pos.y == 23)
+        else if (gSaveBlock1Ptr->playerPos.x == 7 && gSaveBlock1Ptr->playerPos.y == 23)
         {
             sIsRegisteelPuzzle = FALSE;
             return TRUE;
@@ -220,7 +220,7 @@ bool8 ShouldDoBrailleRegisteelEffect(void)
 {
     if (!FlagGet(FLAG_SYS_REGISTEEL_PUZZLE_COMPLETED) && (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_ANCIENT_TOMB) && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_ANCIENT_TOMB)))
     {
-        if (gSaveBlock1Ptr->pos.x == 8 && gSaveBlock1Ptr->pos.y == 25)
+        if (gSaveBlock1Ptr->playerPos.x == 8 && gSaveBlock1Ptr->playerPos.y == 25)
         {
             sIsRegisteelPuzzle = TRUE;
             return TRUE;
@@ -300,7 +300,7 @@ bool8 ShouldDoBrailleRegicePuzzle(void)
         {
             u8 xPos = sRegicePathCoords[i][0];
             u8 yPos = sRegicePathCoords[i][1];
-            if (gSaveBlock1Ptr->pos.x == xPos && gSaveBlock1Ptr->pos.y == yPos)
+            if (gSaveBlock1Ptr->playerPos.x == xPos && gSaveBlock1Ptr->playerPos.y == yPos)
             {
                 // Player is standing on a correct space, set the corresponding bit
                 if (i < 16)
@@ -327,7 +327,7 @@ bool8 ShouldDoBrailleRegicePuzzle(void)
                     return FALSE;
 
                 // A lap has been completed, the puzzle is complete when the player returns to the braille message.
-                if (gSaveBlock1Ptr->pos.x == 8 && gSaveBlock1Ptr->pos.y == 21)
+                if (gSaveBlock1Ptr->playerPos.x == 8 && gSaveBlock1Ptr->playerPos.y == 21)
                     return TRUE;
                 else
                     return FALSE;

@@ -1649,10 +1649,10 @@ void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
 
     if (gMapHeader.events != NULL)
     {
-        s16 left = gSaveBlock1Ptr->pos.x - 2;
-        s16 right = gSaveBlock1Ptr->pos.x + MAP_OFFSET_W + 2;
-        s16 top = gSaveBlock1Ptr->pos.y;
-        s16 bottom = gSaveBlock1Ptr->pos.y + MAP_OFFSET_H + 2;
+        s16 left = gSaveBlock1Ptr->cameraPos.x - 2;
+        s16 right = gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET_W + 2;
+        s16 top = gSaveBlock1Ptr->cameraPos.y;
+        s16 bottom = gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET_H + 2;
 
         if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
             objectCount = GetNumBattlePyramidObjectEvents();
@@ -1698,10 +1698,10 @@ void RemoveObjectEventsOutsideView(void)
 
 static void RemoveObjectEventIfOutsideView(struct ObjectEvent *objectEvent)
 {
-    s16 left =   gSaveBlock1Ptr->pos.x - 2;
-    s16 right =  gSaveBlock1Ptr->pos.x + 17;
-    s16 top =    gSaveBlock1Ptr->pos.y;
-    s16 bottom = gSaveBlock1Ptr->pos.y + 16;
+    s16 left =   gSaveBlock1Ptr->cameraPos.x - 2;
+    s16 right =  gSaveBlock1Ptr->cameraPos.x + 17;
+    s16 top =    gSaveBlock1Ptr->cameraPos.y;
+    s16 bottom = gSaveBlock1Ptr->cameraPos.y + 16;
 
     if (objectEvent->currentCoords.x >= left && objectEvent->currentCoords.x <= right
      && objectEvent->currentCoords.y >= top && objectEvent->currentCoords.y <= bottom)
@@ -4792,8 +4792,8 @@ static void MoveCoordsInDirection(u32 dir, s16 *x, s16 *y, s16 deltaX, s16 delta
 
 void GetMapCoordsFromSpritePos(s16 x, s16 y, s16 *destX, s16 *destY)
 {
-    *destX = (x - gSaveBlock1Ptr->pos.x) << 4;
-    *destY = (y - gSaveBlock1Ptr->pos.y) << 4;
+    *destX = (x - gSaveBlock1Ptr->cameraPos.x) << 4;
+    *destY = (y - gSaveBlock1Ptr->cameraPos.y) << 4;
     *destX -= gTotalCameraPixelOffsetX;
     *destY -= gTotalCameraPixelOffsetY;
 }
@@ -4814,8 +4814,8 @@ void SetSpritePosToMapCoords(s16 mapX, s16 mapY, s16 *destX, s16 *destY)
     if (gFieldCamera.y < 0)
         dy -= 16;
 
-    *destX = ((mapX - gSaveBlock1Ptr->pos.x) << 4) + dx;
-    *destY = ((mapY - gSaveBlock1Ptr->pos.y) << 4) + dy;
+    *destX = ((mapX - gSaveBlock1Ptr->cameraPos.x) << 4) + dx;
+    *destY = ((mapY - gSaveBlock1Ptr->cameraPos.y) << 4) + dy;
 }
 
 void SetSpritePosToOffsetMapCoords(s16 *x, s16 *y, s16 dx, s16 dy)
@@ -7773,7 +7773,14 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
     // so this happens unconditionally (before the multi-level early return below), both on
     // warp-in and on each tile-to-tile move.
     if (isPlayer)
+    {
         gPlayerBiome = MapGridGetMetatileBiomeAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
+        // Keep the saved player tile (gSaveBlock1Ptr->pos) in sync with the player object's
+        // current tile. This is strictly the player's position, distinct from the camera's
+        // focus tile (gSaveBlock1Ptr->cameraPos). currentCoords include MAP_OFFSET; strip it.
+        gSaveBlock1Ptr->playerPos.x = objEvent->currentCoords.x - MAP_OFFSET;
+        gSaveBlock1Ptr->playerPos.y = objEvent->currentCoords.y - MAP_OFFSET;
+    }
 
     if (curElevation == ELEVATION_MULTI_LEVEL || prevElevation == ELEVATION_MULTI_LEVEL)
         return;

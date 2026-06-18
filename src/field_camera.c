@@ -43,7 +43,7 @@ COMMON_DATA struct CameraObject gFieldCamera = {0};
 COMMON_DATA u16 gTotalCameraPixelOffsetY = 0;
 COMMON_DATA u16 gTotalCameraPixelOffsetX = 0;
 // The camera's actual elevation level, tracked exactly like gPlayerElevation but from the
-// camera's focus tile (gSaveBlock1Ptr->pos). Since the camera follows the player most of the
+// camera's focus tile (gSaveBlock1Ptr->cameraPos). Since the camera follows the player most of the
 // time, this usually equals gPlayerElevation; it diverges only while the camera is detached.
 EWRAM_DATA u8 gCameraElevation = 0;
 // The biome of the camera's focus tile, tracked like gPlayerBiome but from the camera. Usually
@@ -100,7 +100,7 @@ void GetCameraOffsetWithPan(s16 *x, s16 *y)
 
 void DrawWholeMapView(void)
 {
-    DrawWholeMapViewInternal(gSaveBlock1Ptr->pos.x, gSaveBlock1Ptr->pos.y, gMapHeader.mapLayout);
+    DrawWholeMapViewInternal(gSaveBlock1Ptr->cameraPos.x, gSaveBlock1Ptr->cameraPos.y, gMapHeader.mapLayout);
     sFieldCameraOffset.copyBGToVRAM = TRUE;
 }
 
@@ -157,7 +157,7 @@ static void RedrawMapSliceNorth(struct FieldCameraOffset *cameraOffset, const st
         temp = cameraOffset->xTileOffset + i;
         if (temp >= 32)
             temp -= 32;
-        DrawMetatileAt(mapLayout, r7 + temp, gSaveBlock1Ptr->pos.x + i / 2, gSaveBlock1Ptr->pos.y + 14);
+        DrawMetatileAt(mapLayout, r7 + temp, gSaveBlock1Ptr->cameraPos.x + i / 2, gSaveBlock1Ptr->cameraPos.y + 14);
     }
 }
 
@@ -172,7 +172,7 @@ static void RedrawMapSliceSouth(struct FieldCameraOffset *cameraOffset, const st
         temp = cameraOffset->xTileOffset + i;
         if (temp >= 32)
             temp -= 32;
-        DrawMetatileAt(mapLayout, r7 + temp, gSaveBlock1Ptr->pos.x + i / 2, gSaveBlock1Ptr->pos.y);
+        DrawMetatileAt(mapLayout, r7 + temp, gSaveBlock1Ptr->cameraPos.x + i / 2, gSaveBlock1Ptr->cameraPos.y);
     }
 }
 
@@ -187,7 +187,7 @@ static void RedrawMapSliceEast(struct FieldCameraOffset *cameraOffset, const str
         temp = cameraOffset->yTileOffset + i;
         if (temp >= 32)
             temp -= 32;
-        DrawMetatileAt(mapLayout, temp * 32 + r6, gSaveBlock1Ptr->pos.x, gSaveBlock1Ptr->pos.y + i / 2);
+        DrawMetatileAt(mapLayout, temp * 32 + r6, gSaveBlock1Ptr->cameraPos.x, gSaveBlock1Ptr->cameraPos.y + i / 2);
     }
 }
 
@@ -204,7 +204,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *cameraOffset, const str
         temp = cameraOffset->yTileOffset + i;
         if (temp >= 32)
             temp -= 32;
-        DrawMetatileAt(mapLayout, temp * 32 + r5, gSaveBlock1Ptr->pos.x + 14, gSaveBlock1Ptr->pos.y + i / 2);
+        DrawMetatileAt(mapLayout, temp * 32 + r5, gSaveBlock1Ptr->cameraPos.x + 14, gSaveBlock1Ptr->cameraPos.y + i / 2);
     }
 }
 
@@ -303,7 +303,7 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, u16 offset)
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)
 {
-    x -= gSaveBlock1Ptr->pos.x;
+    x -= gSaveBlock1Ptr->cameraPos.x;
     x *= 2;
     if (x >= 32 || x < 0)
         return -1;
@@ -311,7 +311,7 @@ static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x
     if (x >= 32)
         x -= 32;
 
-    y = (y - gSaveBlock1Ptr->pos.y) * 2;
+    y = (y - gSaveBlock1Ptr->cameraPos.y) * 2;
     if (y >= 32 || y < 0)
         return -1;
     y = y + cameraOffset->yTileOffset;
@@ -356,7 +356,7 @@ u32 InitCameraUpdateCallback(u8 trackedSpriteId)
 // multi-level) leave the last tracked level untouched.
 void UpdateCameraElevation(void)
 {
-    u8 elevation = MapGridGetElevationAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+    u8 elevation = MapGridGetElevationAt(gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET, gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET);
     if (elevation >= ELEVATION_FIRST_LEVEL)
         gCameraElevation = elevation - ELEVATION_FIRST_LEVEL;
 }
@@ -365,7 +365,7 @@ void UpdateCameraElevation(void)
 // the camera's biome is just whatever the focus tile's biome value is.
 void UpdateCameraBiome(void)
 {
-    gCameraBiome = MapGridGetMetatileBiomeAt(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+    gCameraBiome = MapGridGetMetatileBiomeAt(gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET, gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET);
 }
 
 void CameraUpdate(void)
@@ -427,9 +427,9 @@ void CameraUpdate(void)
         // Location is driven by the camera, not the player: whenever the camera's focus
         // advances to a new tile, re-evaluate the active map location from that tile. This
         // keeps location transitions correct even when the camera is detached from the
-        // player (see SpawnCameraObject). CameraMove has just updated gSaveBlock1Ptr->pos
+        // player (see SpawnCameraObject). CameraMove has just updated gSaveBlock1Ptr->cameraPos
         // to the camera's new focus tile.
-        TryUpdateMapLocation(gSaveBlock1Ptr->pos.x + MAP_OFFSET, gSaveBlock1Ptr->pos.y + MAP_OFFSET);
+        TryUpdateMapLocation(gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET, gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET);
         UpdateCameraElevation();
         UpdateCameraBiome();
         UpdateObjectEventsForCameraUpdate(deltaX, deltaY);
