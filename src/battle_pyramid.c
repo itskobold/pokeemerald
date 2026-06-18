@@ -10,6 +10,7 @@
 #include "fieldmap.h"
 #include "party_menu.h"
 #include "palette.h"
+#include "field_camera.h"
 #include "field_screen_effect.h"
 #include "field_message_box.h"
 #include "random.h"
@@ -1561,7 +1562,7 @@ void GenerateBattlePyramidFloorLayout(u16 *backupMapData, bool8 setPlayerPositio
                     {
                         gSaveBlock1Ptr->playerPos.x = (mapLayout->width * (i % PYRAMID_FLOOR_SQUARES_WIDE)) + x;
                         gSaveBlock1Ptr->playerPos.y = (mapLayout->height * (i / PYRAMID_FLOOR_SQUARES_WIDE)) + y;
-                        gSaveBlock1Ptr->cameraPos = gSaveBlock1Ptr->playerPos;
+                        gCameraPos = gSaveBlock1Ptr->playerPos;
                     }
                     // Keep the layout's elevation and collision, but overwrite the metatile ID
                     map[x] = METATILE_BattlePyramid_Floor;

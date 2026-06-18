@@ -624,7 +624,7 @@ static void SetPlayerCoordsFromWarp(void)
     }
     // The camera spawns focused on the player. Seed the camera's focus tile from the
     // player's warp-in position; CameraMove takes over advancing it from here.
-    gSaveBlock1Ptr->cameraPos = gSaveBlock1Ptr->playerPos;
+    gCameraPos = gSaveBlock1Ptr->playerPos;
 }
 
 void WarpIntoMap(void)
@@ -1021,7 +1021,7 @@ static u8 GetAdjustedInitialDirection(struct InitialPlayerAvatarState *playerStr
 
 static u16 GetCenterScreenMetatileBehavior(void)
 {
-    return MapGridGetMetatileBehaviorAt(gSaveBlock1Ptr->cameraPos.x + MAP_OFFSET, gSaveBlock1Ptr->cameraPos.y + MAP_OFFSET);
+    return MapGridGetMetatileBehaviorAt(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
 }
 
 bool32 Overworld_IsBikingAllowed(void)

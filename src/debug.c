@@ -389,13 +389,19 @@ static void DebugAction_Camera_ToggleFreecam(u8 taskId)
         Debug_EnableFreecam(taskId);
 }
 
-// Detaches the camera from the player. The field is already frozen and the
-// player's controls locked (the menu did this when it opened with freecam off),
-// which is exactly the state freecam needs, so we just close the menu, flag the
-// camera as free and spawn the task that listens for the menu being reopened.
+// Detaches the camera from the player and lets the D-pad drive it. Freecam needs the field
+// frozen with controls locked; the menu set that up when it opened from normal play. But
+// when we open from NPC tracking the field is still running (object events unfrozen) and
+// the camera is anchored to that NPC, so freeze the field and drop the anchor here. Without
+// this the NPC keeps walking and the camera stays glued to it, so the D-pad can't move it.
 static void Debug_EnableFreecam(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
+    if (GetCameraTrackedLocalId() != 0)
+    {
+        FreezeObjectEvents();
+        StopCameraObjectTracking();
+    }
     SetFreecamActive(TRUE);
     Debug_StartDetachedInput();
 }

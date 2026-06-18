@@ -12,6 +12,10 @@ struct CameraObject
 };
 
 extern struct CameraObject gFieldCamera;
+// The camera's focus tile (map-relative), advanced by CameraMove. Usually equals the
+// player's tile, but diverges when the camera is detached from the player. Seeded from the
+// player's position on map entry (see SetPlayerCoordsFromWarp).
+extern struct Coords16 gCameraPos;
 extern u16 gTotalCameraPixelOffsetX;
 extern u16 gTotalCameraPixelOffsetY;
 extern u8 gCameraElevation;
@@ -31,6 +35,7 @@ bool8 IsFreecamActive(void);
 void SetFreecamActive(bool8 active);
 void SetFreecamPaused(bool8 paused);
 void RecenterCameraOnPlayer(void);
+void StopCameraObjectTracking(void);
 void SetCameraTrackedLocalId(u8 localId);
 u8 GetCameraTrackedLocalId(void);
 void SetCameraPanningCallback(void (*callback)(void));
