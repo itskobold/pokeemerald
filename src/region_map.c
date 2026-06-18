@@ -106,7 +106,6 @@ static void RegionMap_InitializeStateBasedOnSSTidalLocation(void);
 static u8 GetMapsecType(mapsec_u16_t mapSecId);
 static mapsec_u16_t CorrectSpecialMapSecId_Internal(mapsec_u16_t mapSecId);
 static mapsec_u16_t GetTerraOrMarineCaveMapSecId(void);
-static void GetMarineCaveCoords(u16 *x, u16 *y);
 static bool32 IsPlayerInAquaHideout(mapsec_u8_t mapSecId);
 static void GetPositionOfCursorWithinMapSec(void);
 static bool8 RegionMap_IsMapSecIdInNextRow(u16 y);
@@ -208,20 +207,6 @@ static const mapsec_u16_t sTerraOrMarineCaveMapSecIds[ABNORMAL_WEATHER_LOCATIONS
     [ABNORMAL_WEATHER_ROUTE_127_SOUTH - 1] = MAPSEC_ROUTE_127,
     [ABNORMAL_WEATHER_ROUTE_129_WEST  - 1] = MAPSEC_ROUTE_129,
     [ABNORMAL_WEATHER_ROUTE_129_EAST  - 1] = MAPSEC_ROUTE_129
-};
-
-#define MARINE_CAVE_COORD(location) (ABNORMAL_WEATHER_##location - MARINE_CAVE_LOCATIONS_START)
-
-static const struct UCoords16 sMarineCaveLocationCoords[MARINE_CAVE_LOCATIONS] =
-{
-    [MARINE_CAVE_COORD(ROUTE_105_NORTH)] = {0, 10},
-    [MARINE_CAVE_COORD(ROUTE_105_SOUTH)] = {0, 12},
-    [MARINE_CAVE_COORD(ROUTE_125_WEST)]  = {24, 3},
-    [MARINE_CAVE_COORD(ROUTE_125_EAST)]  = {25, 4},
-    [MARINE_CAVE_COORD(ROUTE_127_NORTH)] = {25, 6},
-    [MARINE_CAVE_COORD(ROUTE_127_SOUTH)] = {25, 7},
-    [MARINE_CAVE_COORD(ROUTE_129_WEST)]  = {24, 10},
-    [MARINE_CAVE_COORD(ROUTE_129_EAST)]  = {24, 10}
 };
 
 static const mapsec_u8_t sMapSecAquaHideoutOld[] =
@@ -1026,12 +1011,8 @@ static mapsec_u16_t GetMapSecIdAt(u16 x, u16 y)
 static void InitMapBasedOnPlayerLocation(void)
 {
     const struct MapHeader *mapHeader;
-    u16 mapWidth;
-    u16 mapHeight;
-    u16 x;
-    u16 y;
-    u16 dimensionScale;
-    u16 xOnMap;
+    u8 gridX;
+    u8 gridY;
     struct WarpData *warp;
 
     if (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SS_TIDAL_CORRIDOR)
@@ -1043,6 +1024,11 @@ static void InitMapBasedOnPlayerLocation(void)
         return;
     }
 
+    // The player's spot on the region map is the grid cell of the map they
+    // currently occupy. Overworld maps use their own header's grid position;
+    // interior maps borrow the grid position of the map they would exit to.
+    // Grid coords are playable-area relative with (0,0) at the bottom-left, so
+    // gridX maps left-to-right but gridY is flipped against MAP_HEIGHT below.
     switch (GetMapTypeByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum))
     {
     default:
@@ -1053,10 +1039,7 @@ static void InitMapBasedOnPlayerLocation(void)
     case MAP_TYPE_OCEAN_ROUTE:
         sRegionMap->mapSecId = GetActiveLocationData()->regionMapSectionId;
         sRegionMap->playerIsInCave = FALSE;
-        mapWidth = gMapHeader.mapLayout->width;
-        mapHeight = gMapHeader.mapLayout->height;
-        x = gSaveBlock1Ptr->pos.x;
-        y = gSaveBlock1Ptr->pos.y;
+        GetMapGridXY(&gridX, &gridY);
         if (sRegionMap->mapSecId == MAPSEC_UNDERWATER_SEAFLOOR_CAVERN || sRegionMap->mapSecId == MAPSEC_UNDERWATER_MARINE_CAVE)
             sRegionMap->playerIsInCave = TRUE;
         break;
@@ -1067,29 +1050,22 @@ static void InitMapBasedOnPlayerLocation(void)
             mapHeader = Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->escapeWarp.mapGroup, gSaveBlock1Ptr->escapeWarp.mapNum);
             sRegionMap->mapSecId = mapHeader->locations[0]->regionMapSectionId;
             sRegionMap->playerIsInCave = TRUE;
-            mapWidth = mapHeader->mapLayout->width;
-            mapHeight = mapHeader->mapLayout->height;
-            x = gSaveBlock1Ptr->escapeWarp.x;
-            y = gSaveBlock1Ptr->escapeWarp.y;
+            gridX = mapHeader->mapGridX;
+            gridY = mapHeader->mapGridY;
         }
         else
         {
             sRegionMap->mapSecId = GetActiveLocationData()->regionMapSectionId;
             sRegionMap->playerIsInCave = TRUE;
-            mapWidth = 1;
-            mapHeight = 1;
-            x = 1;
-            y = 1;
+            GetMapGridXY(&gridX, &gridY);
         }
         break;
     case MAP_TYPE_SECRET_BASE:
         mapHeader = Overworld_GetMapHeaderByGroupAndId((u16)gSaveBlock1Ptr->dynamicWarp.mapGroup, (u16)gSaveBlock1Ptr->dynamicWarp.mapNum);
         sRegionMap->mapSecId = mapHeader->locations[0]->regionMapSectionId;
         sRegionMap->playerIsInCave = TRUE;
-        mapWidth = mapHeader->mapLayout->width;
-        mapHeight = mapHeader->mapLayout->height;
-        x = gSaveBlock1Ptr->dynamicWarp.x;
-        y = gSaveBlock1Ptr->dynamicWarp.y;
+        gridX = mapHeader->mapGridX;
+        gridY = mapHeader->mapGridY;
         break;
     case MAP_TYPE_INDOOR:
         sRegionMap->mapSecId = GetActiveLocationData()->regionMapSectionId;
@@ -1110,72 +1086,13 @@ static void InitMapBasedOnPlayerLocation(void)
         else
             sRegionMap->playerIsInCave = FALSE;
 
-        mapWidth = mapHeader->mapLayout->width;
-        mapHeight = mapHeader->mapLayout->height;
-        x = warp->x;
-        y = warp->y;
+        gridX = mapHeader->mapGridX;
+        gridY = mapHeader->mapGridY;
         break;
     }
 
-    xOnMap = x;
-
-    dimensionScale = mapWidth / gRegionMapEntries[sRegionMap->mapSecId].width;
-    if (dimensionScale == 0)
-    {
-        dimensionScale = 1;
-    }
-    x /= dimensionScale;
-    if (x >= gRegionMapEntries[sRegionMap->mapSecId].width)
-    {
-        x = gRegionMapEntries[sRegionMap->mapSecId].width - 1;
-    }
-
-    dimensionScale = mapHeight / gRegionMapEntries[sRegionMap->mapSecId].height;
-    if (dimensionScale == 0)
-    {
-        dimensionScale = 1;
-    }
-    y /= dimensionScale;
-    if (y >= gRegionMapEntries[sRegionMap->mapSecId].height)
-    {
-        y = gRegionMapEntries[sRegionMap->mapSecId].height - 1;
-    }
-
-    switch (sRegionMap->mapSecId)
-    {
-    case MAPSEC_ROUTE_114:
-        if (y != 0)
-            x = 0;
-        break;
-    case MAPSEC_ROUTE_126:
-    case MAPSEC_UNDERWATER_126:
-        x = 0;
-        if (gSaveBlock1Ptr->pos.x > 32)
-            x++;
-        if (gSaveBlock1Ptr->pos.x > 51)
-            x++;
-
-        y = 0;
-        if (gSaveBlock1Ptr->pos.y > 37)
-            y++;
-        if (gSaveBlock1Ptr->pos.y > 56)
-            y++;
-        break;
-    case MAPSEC_ROUTE_121:
-        x = 0;
-        if (xOnMap > 14)
-            x++;
-        if (xOnMap > 28)
-            x++;
-        if (xOnMap > 54)
-            x++;
-        break;
-    case MAPSEC_UNDERWATER_MARINE_CAVE:
-        GetMarineCaveCoords(&sRegionMap->cursorPosX, &sRegionMap->cursorPosY);
-        return;
-    }
-    sRegionMap->cursorPosX = gRegionMapEntries[sRegionMap->mapSecId].x + x + MAPCURSOR_X_MIN;
-    sRegionMap->cursorPosY = gRegionMapEntries[sRegionMap->mapSecId].y + y + MAPCURSOR_Y_MIN;
+    sRegionMap->cursorPosX = gridX + MAPCURSOR_X_MIN;
+    sRegionMap->cursorPosY = (MAP_HEIGHT - 1 - gridY) + MAPCURSOR_Y_MIN;
 }
 
 static void RegionMap_InitializeStateBasedOnSSTidalLocation(void)
@@ -1313,21 +1230,6 @@ static mapsec_u16_t GetTerraOrMarineCaveMapSecId(void)
         idx = 0;
 
     return sTerraOrMarineCaveMapSecIds[idx];
-}
-
-static void GetMarineCaveCoords(u16 *x, u16 *y)
-{
-    u16 idx;
-
-    idx = VarGet(VAR_ABNORMAL_WEATHER_LOCATION);
-    if (idx < MARINE_CAVE_LOCATIONS_START || idx > ABNORMAL_WEATHER_LOCATIONS)
-    {
-        idx = MARINE_CAVE_LOCATIONS_START;
-    }
-    idx -= MARINE_CAVE_LOCATIONS_START;
-
-    *x = sMarineCaveLocationCoords[idx].x + MAPCURSOR_X_MIN;
-    *y = sMarineCaveLocationCoords[idx].y + MAPCURSOR_Y_MIN;
 }
 
 // Probably meant to be an "IsPlayerInIndoorDungeon" function, but in practice it only has the one mapsec

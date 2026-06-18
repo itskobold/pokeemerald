@@ -8,6 +8,9 @@
   "allow_escaping": false,
   "allow_running": true,
   "num_locations": 1,
+  "map_grid_x": 6,
+  "map_grid_y": 2,
+  "biome_group": "BIOME_GROUP_OVERWORLD",
   "locations": [
     {
       "secondary_tileset": "gTileset_Petalburg",

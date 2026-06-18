@@ -237,9 +237,11 @@ struct MapHeader
     /* 0x25 */ bool8 allowCycling:1;
                bool8 allowEscaping:1; // Escape Rope and Dig
                bool8 allowRunning:1;
-               // the remaining bits are unused
-    // Position of this map within the world map grid. Each coordinate is 0-31 (5 bits).
-    // Occupies struct padding at 0x26, so it does not grow sizeof(struct MapHeader).
+               bool8 filler_25:5; // pad the flags byte so the grid below starts cleanly at 0x26
+    // Position of this map within the world map grid, which spans the region map's
+    // playable area (MAP_WIDTH x MAP_HEIGHT = 22 x 18). X coord 0-21, Y coord 0-17,
+    // with (0,0) at the bottom-left (region_map.c flips Y when placing the icon).
+    // mapjson packs this as a .2byte at 0x26: mapGridX in bits 0-4, mapGridY in bits 5-9.
     /* 0x26 */ u16 mapGridX:5;
                u16 mapGridY:5;
                // the remaining 6 bits are unused
