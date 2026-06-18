@@ -231,7 +231,8 @@ struct MapHeader
     /* 0x22 */ u8 cave;
     /* 0x23 */ u8 weather;
     /* 0x24 */ u8 numLocations:2;
-               u8 filler_20:6;
+               u8 biomeGroup:3; // BIOME_GROUP_* (see constants/biome.h)
+               u8 filler_20:3;
                // fields correspond to the arguments in the map_header_flags macro
     /* 0x25 */ bool8 allowCycling:1;
                bool8 allowEscaping:1; // Escape Rope and Dig

@@ -17,6 +17,7 @@
 #include "tv.h"
 #include "constants/rgb.h"
 #include "constants/metatile_behaviors.h"
+#include "constants/biome.h"
 
 struct ConnectionFlags
 {
@@ -521,9 +522,44 @@ u8 MapGridGetMetatileLocationAt(int x, int y)
     return UNPACK_LOCATION(GetMapGridBlockAt(x, y));
 }
 
+// A tile's biome field is a per-group relative id. These tables convert a relative id to its
+// absolute biome id (BIOME_*) for the cave and underwater groups. The overworld group's
+// relative ids already match the biome ids, so it needs no table.
+static const u8 sCaveBiomes[BIOME_CV_COUNT] = {
+    [BIOME_CV_NONE]  = BIOME_NONE,
+    [BIOME_CV_CAVE]  = BIOME_CAVE,
+    [BIOME_CV_DRY]   = BIOME_CAVE_DRY,
+    [BIOME_CV_DAMP]  = BIOME_CAVE_DAMP,
+    [BIOME_CV_MOSSY] = BIOME_CAVE_MOSSY,
+    [BIOME_CV_SANDY] = BIOME_CAVE_SANDY,
+};
+
+static const u8 sUnderwaterBiomes[BIOME_UW_COUNT] = {
+    [BIOME_UW_NONE]    = BIOME_NONE,
+    [BIOME_UW_SHALLOW] = BIOME_UNDERWATER_SHALLOW,
+    [BIOME_UW_DEEP]    = BIOME_UNDERWATER_DEEP,
+    [BIOME_UW_ABYSS]   = BIOME_UNDERWATER_ABYSS,
+};
+
+// Resolves the absolute biome id (BIOME_*) for a tile from its per-group relative biome field
+// and the current map's biome group (see struct MapHeader.biomeGroup).
 u8 MapGridGetMetatileBiomeAt(int x, int y)
 {
-    return UNPACK_BIOME(GetMapGridBlockAt(x, y));
+    u8 relativeBiome = UNPACK_BIOME(GetMapGridBlockAt(x, y));
+
+    switch (gMapHeader.biomeGroup)
+    {
+    case BIOME_GROUP_OVERWORLD:
+        // Overworld relative ids are identical to the biome ids.
+        return relativeBiome;
+    case BIOME_GROUP_CAVE:
+        return relativeBiome < BIOME_CV_COUNT ? sCaveBiomes[relativeBiome] : BIOME_NONE;
+    case BIOME_GROUP_UNDERWATER:
+        return relativeBiome < BIOME_UW_COUNT ? sUnderwaterBiomes[relativeBiome] : BIOME_NONE;
+    case BIOME_GROUP_NONE:
+    default:
+        return BIOME_NONE;
+    }
 }
 
 u32 MapGridGetMetatileIdAt(int x, int y)

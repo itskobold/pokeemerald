@@ -1,4 +1,5 @@
 #include "constants/global.h"
+#include "constants/biome.h"
 #include "constants/layouts.h"
 #include "constants/map_types.h"
 #include "constants/maps.h"

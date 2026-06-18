@@ -213,9 +213,12 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
          << "\t.byte "  << json_to_string(map_data, "weather") << "\n";
 
     if (version != "firered") {
-        // numLocations (low 2 bits), stored as the location count minus 1
-        // (default 1 location -> 0).
-        text << "\t.byte " << (num_locations - 1) << "\n";
+        // 0x24 byte: numLocations in the low 2 bits (stored as the location count minus 1,
+        // default 1 location -> 0) and biomeGroup in bits 2-4 (BIOME_GROUP_*, default NONE).
+        string biome_group = json_to_string(map_data, "biome_group", true);
+        if (biome_group.empty())
+            biome_group = "BIOME_GROUP_NONE";
+        text << "\t.byte (" << (num_locations - 1) << ") | ((" << biome_group << ") << 2)\n";
     }
 
     if (version == "emerald" || version == "firered")
