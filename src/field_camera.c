@@ -64,16 +64,23 @@ static s16 sFreecamMoveY;
 // "Track NPC" tool.
 static u8 sCameraTrackedLocalId;
 
-// Debug "pan to NPC" state: when active the camera detaches from the player and auto-scrolls
-// toward the object event with local id sCameraPanLocalId (re-resolved at each tile so a moving,
-// or culled-then-spawned, target is chased), then locks onto it like SetCameraTrackedLocalId.
-// Mutually exclusive with freecam. See PanCameraToLocalId / UpdateCameraPanMovement.
+// Camera auto-pan state: when active the camera detaches from the player and auto-scrolls toward a
+// target, then comes to rest on it. The target is either an object event with local id
+// sCameraPanLocalId (re-resolved at each tile so a moving, or culled-then-spawned, target is chased,
+// then locked onto like SetCameraTrackedLocalId) or, when sCameraPanToTile is set, the fixed tile
+// (sCameraPanTargetX, sCameraPanTargetY) — a tile pan has nothing to follow, so on arrival it simply
+// rests there (sCameraPanArrived) with the camera still detached. Mutually exclusive with freecam.
+// See PanCameraToLocalId / PanCameraToTile / UpdateCameraPanMovement.
 // sCameraPanSpeed is a single constant scroll speed (px/frame) held for the whole pan: chosen from
 // the target distance and the requested duration so a far target travels faster, giving a roughly
 // distance-independent pan time. It is always a divisor of 16 so the camera lands cleanly on tile
 // boundaries, which is what keeps the motion smooth (constant speed, no per-frame jitter).
 static bool8 sCameraPanActive;
+static bool8 sCameraPanToTile;
+static bool8 sCameraPanArrived;
 static u8 sCameraPanLocalId;
+static s16 sCameraPanTargetX;
+static s16 sCameraPanTargetY;
 static s16 sCameraPanSpeed;
 static s16 sCameraPanMoveX;
 static s16 sCameraPanMoveY;
@@ -428,9 +435,13 @@ void SetFreecamActive(bool8 active)
     sFreecamMoveX = 0;
     sFreecamMoveY = 0;
     // Freecam and an auto-pan are mutually-exclusive ways to drive the camera; starting
-    // freecam takes over from a pan in progress.
+    // freecam takes over from a pan in progress (or one resting on its destination tile).
     if (active)
+    {
         sCameraPanActive = FALSE;
+        sCameraPanToTile = FALSE;
+        sCameraPanArrived = FALSE;
+    }
 }
 
 // The camera is "detached" from the player while freecam is running or while tracking
@@ -644,6 +655,8 @@ void StopCameraObjectTracking(void)
         gObjectEvents[i].trackedByCamera = FALSE;
     sCameraTrackedLocalId = TRACK_LOCAL_ID_PLAYER;
     sCameraPanActive = FALSE;
+    sCameraPanToTile = FALSE;
+    sCameraPanArrived = FALSE;
 }
 
 // Re-establishes the active debug camera mode after a return to the field (closing a menu or
@@ -687,6 +700,8 @@ void ResetCameraTracking(void)
     sFreecamMoveX = 0;
     sFreecamMoveY = 0;
     sCameraPanActive = FALSE;
+    sCameraPanToTile = FALSE;
+    sCameraPanArrived = FALSE;
     sCameraPanMoveX = 0;
     sCameraPanMoveY = 0;
     sCameraTrackedLocalId = TRACK_LOCAL_ID_PLAYER;
@@ -778,22 +793,52 @@ static s16 SnapPanSpeed(s32 ideal)
         return 16;
 }
 
-// Drives the camera toward the pan target while "Pan to NPC" is active, reusing CameraUpdate's
-// tile-stepping. Direction is only (re)evaluated on a tile boundary so each step finishes
-// grid-aligned, and the speed is the constant sCameraPanSpeed chosen up front from the distance and
-// requested duration (see PanCameraToLocalId) — holding one speed for the whole pan is what makes
-// the motion smooth, with no per-frame velocity jitter. The target tile is re-resolved every
-// boundary, so a moving NPC is chased and a culled target (headed for its default tile) is picked up
-// the moment the scroll brings it into view and spawns it. On arrival the camera locks onto the (now
-// spawned) object exactly like SetCameraTrackedLocalId and the pan ends; if the target stays culled
-// at its default tile (e.g. a flag-removed object that never spawns) the pan stays armed and the
-// camera simply rests there.
+// Chooses sCameraPanSpeed for a pan that has to reach (targetX, targetY) from the current focus tile
+// in `panFrames` frames: the longer of the two axis distances (the axis that takes longest) divided
+// by the frame budget gives the ideal px/frame, snapped to a tile divisor (see SnapPanSpeed). Call
+// after the camera is tile-aligned on its start tile so gCameraPos is the true origin.
+static void SetPanSpeedForReach(s16 targetX, s16 targetY, u8 panFrames)
+{
+    s16 dx = targetX - gCameraPos.x;
+    s16 dy = targetY - gCameraPos.y;
+    s16 reachTiles;
+    u16 frames = (panFrames == 0) ? 1 : panFrames;
+
+    if (dx < 0)
+        dx = -dx;
+    if (dy < 0)
+        dy = -dy;
+    reachTiles = (dx > dy) ? dx : dy;
+    sCameraPanSpeed = SnapPanSpeed((s32)reachTiles * 16 / frames);
+}
+
+// Drives the camera toward the pan target while a pan is active, reusing CameraUpdate's tile-stepping.
+// Direction is only (re)evaluated on a tile boundary so each step finishes grid-aligned, and the
+// speed is the constant sCameraPanSpeed chosen up front from the distance and requested duration
+// (see SetPanSpeedForReach) — holding one speed for the whole pan is what makes the motion smooth,
+// with no per-frame velocity jitter. For an object pan the target tile is re-resolved every boundary,
+// so a moving NPC is chased and a culled target (headed for its default tile) is picked up the moment
+// the scroll brings it into view and spawns it; on arrival the camera locks onto the (now spawned)
+// object exactly like SetCameraTrackedLocalId and the pan ends (a target that never spawns leaves the
+// pan armed, resting on its default tile). For a tile pan the target is the fixed sCameraPanTargetX/Y;
+// there is nothing to follow, so on arrival the pan stays armed and the camera simply rests on the
+// tile (sCameraPanArrived), detached from the player, until another camera mode takes over.
 static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
 {
     if (fieldCamera->x == 0 && fieldCamera->y == 0)
     {
         s16 targetX, targetY;
-        u8 objectEventId = GetPanTargetTile(sCameraPanLocalId, &targetX, &targetY);
+        u8 objectEventId = OBJECT_EVENTS_COUNT;
+
+        if (sCameraPanToTile)
+        {
+            targetX = sCameraPanTargetX;
+            targetY = sCameraPanTargetY;
+        }
+        else
+        {
+            objectEventId = GetPanTargetTile(sCameraPanLocalId, &targetX, &targetY);
+        }
 
         sCameraPanMoveX = 0;
         sCameraPanMoveY = 0;
@@ -809,17 +854,28 @@ static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
         // Focus tile now matches the target tile.
         if (sCameraPanMoveX == 0 && sCameraPanMoveY == 0)
         {
-            // A culled target may not be spawned yet. With the camera now at rest no further
-            // CameraMove runs the spawn pass, so force one here at the current focus (exactly as
-            // CenterCameraOnTile does on a jump). Without this the pan deadlocks on an empty tile
-            // and never locks on. The forced pass spawns the target if its tile is in view.
-            if (objectEventId >= OBJECT_EVENTS_COUNT)
+            if (sCameraPanToTile)
             {
-                UpdateObjectEventsForCameraUpdate(0, 0);
-                objectEventId = ResolveTrackedObjectEvent(sCameraPanLocalId);
+                // No object to follow: leave the pan armed and resting on the tile (the camera stays
+                // detached, player parked), latching arrival once so callers can react (the debug
+                // "Pan to Tile" test starts freecam here). The travelling CameraMoves already kept
+                // the map location/elevation/biome current, so nothing more to do.
+                sCameraPanArrived = TRUE;
             }
-            if (objectEventId < OBJECT_EVENTS_COUNT)
-                LockCameraOntoPanTarget(objectEventId);
+            else
+            {
+                // A culled target may not be spawned yet. With the camera now at rest no further
+                // CameraMove runs the spawn pass, so force one here at the current focus (exactly as
+                // CenterCameraOnTile does on a jump). Without this the pan deadlocks on an empty tile
+                // and never locks on. The forced pass spawns the target if its tile is in view.
+                if (objectEventId >= OBJECT_EVENTS_COUNT)
+                {
+                    UpdateObjectEventsForCameraUpdate(0, 0);
+                    objectEventId = ResolveTrackedObjectEvent(sCameraPanLocalId);
+                }
+                if (objectEventId < OBJECT_EVENTS_COUNT)
+                    LockCameraOntoPanTarget(objectEventId);
+            }
         }
     }
     fieldCamera->movementSpeedX = sCameraPanMoveX;
@@ -871,31 +927,79 @@ void PanCameraToLocalId(u8 localId, u8 panFrames)
     // player parked while it travels (and once it arrives, exactly as if Track NPC was used).
     sCameraTrackedLocalId = localId;
     sCameraPanLocalId = localId;
+    sCameraPanToTile = FALSE;
+    sCameraPanArrived = FALSE;
 
     // Pick the constant scroll speed from how far the target is and how long the pan should take, so
-    // distant targets travel faster and the pan time stays roughly the same regardless of distance.
-    // The speed snaps to a divisor of 16 (the requirement for smooth, boundary-aligned scrolling),
-    // so the resulting duration tracks `panFrames` in coarse steps rather than exactly. The reach is
-    // the larger of the two axis distances (the axis that takes longest), measured from the now
-    // tile-aligned focus to the target's current tile.
-    {
-        s16 dx, dy, reachTiles;
-        u16 frames = (panFrames == 0) ? 1 : panFrames;
-
-        GetPanTargetTile(localId, &targetX, &targetY);
-        dx = targetX - gCameraPos.x;
-        dy = targetY - gCameraPos.y;
-        if (dx < 0)
-            dx = -dx;
-        if (dy < 0)
-            dy = -dy;
-        reachTiles = (dx > dy) ? dx : dy;
-        sCameraPanSpeed = SnapPanSpeed((s32)reachTiles * 16 / frames);
-    }
+    // distant targets travel faster and the pan time stays roughly the same regardless of distance,
+    // measured from the now tile-aligned focus to the target's current tile.
+    GetPanTargetTile(localId, &targetX, &targetY);
+    SetPanSpeedForReach(targetX, targetY, panFrames);
 
     sCameraPanMoveX = 0;
     sCameraPanMoveY = 0;
     sCameraPanActive = TRUE;
+}
+
+// Smoothly pans the camera to a fixed tile (map coordinates, without MAP_OFFSET) in the current map,
+// using the same constant-speed glide as PanCameraToLocalId (see SnapPanSpeed for how `panFrames`
+// maps to speed). The target is clamped to the map bounds. Unlike the object pan there is nothing to
+// follow on arrival, so the camera comes to rest on the tile, detached from the player (player
+// parked), until another camera mode takes over (freecam, object tracking, or recentering on the
+// player); HasCameraPanArrived reports when it has settled there.
+void PanCameraToTile(s16 x, s16 y, u8 panFrames)
+{
+    int width = gMapHeader.mapLayout->width;
+    int height = gMapHeader.mapLayout->height;
+    u8 i;
+
+    if (x < 0)
+        x = 0;
+    else if (x > width - 1)
+        x = width - 1;
+    if (y < 0)
+        y = 0;
+    else if (y > height - 1)
+        y = height - 1;
+
+    // Take over from freecam or a track/pan already running: clear the freecam flag and drop every
+    // camera anchor so the upcoming scroll isn't resynced onto the old target (as PanCameraToLocalId).
+    sFreecamActive = FALSE;
+    sFreecamMoveX = 0;
+    sFreecamMoveY = 0;
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+        gObjectEvents[i].trackedByCamera = FALSE;
+
+    // Start from a clean, tile-aligned state so the boundary-driven scroll proceeds (see the longer
+    // note in PanCameraToLocalId).
+    CenterCameraOnTile(gCameraPos.x, gCameraPos.y);
+
+    // A tile pan has no object anchor; keep the tracked id as the player so leaving the pan behaves,
+    // while sCameraPanActive is what keeps the camera detached and parked on the tile meanwhile.
+    sCameraTrackedLocalId = TRACK_LOCAL_ID_PLAYER;
+    sCameraPanToTile = TRUE;
+    sCameraPanArrived = FALSE;
+    sCameraPanTargetX = x;
+    sCameraPanTargetY = y;
+    SetPanSpeedForReach(x, y, panFrames);
+
+    sCameraPanMoveX = 0;
+    sCameraPanMoveY = 0;
+    sCameraPanActive = TRUE;
+}
+
+// Whether an auto-pan (PanCameraToLocalId / PanCameraToTile) is currently running or resting.
+bool8 IsCameraPanActive(void)
+{
+    return sCameraPanActive;
+}
+
+// Whether a tile pan has reached its destination and is resting there. Stays FALSE for object pans
+// (which lock onto their target and end). Used by the debug "Pan to Tile" test to start freecam once
+// the camera has settled.
+bool8 HasCameraPanArrived(void)
+{
+    return sCameraPanArrived;
 }
 
 void ResetCameraUpdateInfo(void)

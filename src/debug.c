@@ -105,6 +105,7 @@ enum
 {
     DEBUG_CAMERA_ITEM_TOGGLE_FREECAM,
     DEBUG_CAMERA_ITEM_TRACK_NPC,
+    DEBUG_CAMERA_ITEM_PAN_TILE,
     DEBUG_CAMERA_ITEM_PAN_NPC,
     DEBUG_CAMERA_ITEM_CANCEL,
 };
@@ -117,9 +118,10 @@ enum
     DEBUG_NPC_BOX_MODE_PAN,
 };
 
-// Time budget (in frames) for the "Pan to NPC" glide: the camera reaches the chosen object in this
-// many frames regardless of distance (see PanCameraToLocalId), ~0.4s at 60fps.
-#define DEBUG_PAN_NPC_FRAMES 24
+// Time budget (in frames) for camera pans started from the debug menu: the camera reaches the target
+// in roughly this many frames regardless of distance (see PanCameraToLocalId / PanCameraToTile),
+// ~0.4s at 60fps.
+#define DEBUG_PAN_FRAMES 24
 
 #define tMenuTaskId  data[0]
 #define tWindowId    data[1]
@@ -150,8 +152,16 @@ static void DebugAction_OpenCameraMenu(u8 taskId);
 static void DebugAction_Cancel(u8 taskId);
 static void DebugAction_Camera_ToggleFreecam(u8 taskId);
 static void DebugAction_Camera_TrackNPC(u8 taskId);
+static void DebugAction_Camera_PanTile(u8 taskId);
 static void DebugAction_Camera_PanNPC(u8 taskId);
 static void DebugAction_Camera_Cancel(u8 taskId);
+static void Debug_OpenPanTileBox(void);
+static void Debug_DrawPanTileBox(void);
+static void Debug_TearDownPanTileBox(u8 taskId);
+static void Debug_CommitPanTileBox(u8 taskId);
+static void Debug_CancelPanTileBox(u8 taskId);
+static void DebugTask_PanTileInput(u8 taskId);
+static void DebugTask_WaitPanToTile(u8 taskId);
 
 // Tracks whether a debug menu window is currently displayed. While a debug menu/box is
 // open the player's field controls are locked so the D-pad drives the menu (and freecam
@@ -167,13 +177,22 @@ static u16 sTrackNpcOrder;  // position in the player+templates list
 static u8 sTrackNpcMaxOrder; // == object event count, for the scroll arrows
 static u8 sTrackNpcBoxMode; // DEBUG_NPC_BOX_MODE_*: track (live jump) vs pan (commit with A)
 
+// "Pan to tile" coordinate box state. The D-pad edits the destination tile (left/right = X,
+// up/down = Y); A commits the pan, B cancels back to the camera menu.
+static u8 sPanTileWindowId;
+static s16 sPanTileX;
+static s16 sPanTileY;
+
 static const u8 sDebugText_Camera[] = _("Camera");
 static const u8 sDebugText_Cancel[] = _("Cancel");
 static const u8 sDebugText_Camera_ToggleFreecam[] = _("Toggle freecam");
 static const u8 sDebugText_Camera_TrackNPC[] = _("Track NPC");
 static const u8 sDebugText_Camera_PanNPC[] = _("Pan to NPC");
+static const u8 sDebugText_Camera_PanTile[] = _("Pan to tile");
 static const u8 sDebugText_TrackNpc_Label[] = _("Track ");
 static const u8 sDebugText_PanNpc_Label[] = _("Pan ");
+static const u8 sDebugText_PanTile_X[] = _("X");
+static const u8 sDebugText_PanTile_Y[] = _(" Y");
 
 static const struct ListMenuItem sDebugMenuItems_Main[] =
 {
@@ -185,6 +204,7 @@ static const struct ListMenuItem sDebugMenuItems_Camera[] =
 {
     [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = {sDebugText_Camera_ToggleFreecam, DEBUG_CAMERA_ITEM_TOGGLE_FREECAM},
     [DEBUG_CAMERA_ITEM_TRACK_NPC]      = {sDebugText_Camera_TrackNPC, DEBUG_CAMERA_ITEM_TRACK_NPC},
+    [DEBUG_CAMERA_ITEM_PAN_TILE]       = {sDebugText_Camera_PanTile, DEBUG_CAMERA_ITEM_PAN_TILE},
     [DEBUG_CAMERA_ITEM_PAN_NPC]        = {sDebugText_Camera_PanNPC, DEBUG_CAMERA_ITEM_PAN_NPC},
     [DEBUG_CAMERA_ITEM_CANCEL]         = {sDebugText_Cancel, DEBUG_CAMERA_ITEM_CANCEL},
 };
@@ -199,6 +219,7 @@ static void (*const sDebugMenuActions_Camera[])(u8) =
 {
     [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = DebugAction_Camera_ToggleFreecam,
     [DEBUG_CAMERA_ITEM_TRACK_NPC]      = DebugAction_Camera_TrackNPC,
+    [DEBUG_CAMERA_ITEM_PAN_TILE]       = DebugAction_Camera_PanTile,
     [DEBUG_CAMERA_ITEM_PAN_NPC]        = DebugAction_Camera_PanNPC,
     [DEBUG_CAMERA_ITEM_CANCEL]         = DebugAction_Camera_Cancel,
 };
@@ -388,6 +409,142 @@ static void DebugAction_Camera_TrackNPC(u8 taskId)
     Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_TRACK);
 }
 
+// Tests PanCameraToTile: opens a box to enter a destination tile, then glides the camera there.
+// The box edits the X/Y tile with the D-pad and commits with A (see DebugTask_PanTileInput).
+static void DebugAction_Camera_PanTile(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenPanTileBox();
+}
+
+// Redraws the coordinate box as "Xnnn Ynnn" from the current sPanTileX/sPanTileY.
+static void Debug_DrawPanTileBox(void)
+{
+    u8 text[20];
+
+    StringCopy(text, sDebugText_PanTile_X);
+    ConvertIntToDecimalStringN(gStringVar1, sPanTileX, STR_CONV_MODE_LEADING_ZEROS, 3);
+    StringAppend(text, gStringVar1);
+    StringAppend(text, sDebugText_PanTile_Y);
+    ConvertIntToDecimalStringN(gStringVar1, sPanTileY, STR_CONV_MODE_LEADING_ZEROS, 3);
+    StringAppend(text, gStringVar1);
+
+    FillWindowPixelBuffer(sPanTileWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sPanTileWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sPanTileWindowId, COPYWIN_GFX);
+}
+
+// Opens the "Pan to tile" coordinate box. The destination starts on the camera's current focus tile
+// so you nudge outward from where you are. The menu already froze the field and locked controls when
+// it opened; that state holds while the D-pad drives the box.
+static void Debug_OpenPanTileBox(void)
+{
+    sPanTileX = gCameraPos.x;
+    sPanTileY = gCameraPos.y;
+
+    LoadMessageBoxAndBorderGfx();
+    sPanTileWindowId = CreateWindowFromRect(0, 1, 12, 2);
+    DrawStdWindowFrame(sPanTileWindowId, FALSE);
+    Debug_DrawPanTileBox();
+    CopyWindowToVram(sPanTileWindowId, COPYWIN_FULL);
+
+    CreateTask(DebugTask_PanTileInput, 3);
+    sDebugMenuOpen = TRUE;
+}
+
+// Tears down the coordinate box's window and input task. The caller decides what to do next.
+static void Debug_TearDownPanTileBox(u8 taskId)
+{
+    ClearStdWindowAndFrameToTransparent(sPanTileWindowId, TRUE);
+    RemoveWindow(sPanTileWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
+}
+
+// Commits the box (A): closes it and glides the camera to the chosen tile, then hands input back so
+// the camera travels while the world runs (the overworld keeps the player parked while detached,
+// exactly like committing a Pan to NPC). DebugTask_WaitPanToTile then drops into freecam once the
+// camera settles, so the result can be driven around.
+static void Debug_CommitPanTileBox(u8 taskId)
+{
+    s16 x = sPanTileX;
+    s16 y = sPanTileY;
+
+    Debug_TearDownPanTileBox(taskId);
+    PanCameraToTile(x, y, DEBUG_PAN_FRAMES);
+    UnlockPlayerFieldControls();
+    CreateTask(DebugTask_WaitPanToTile, 3);
+}
+
+// Backs out of the box (B) without moving the camera, returning to the camera submenu. The field
+// stays frozen and controls stay locked, which is the state the submenu expects.
+static void Debug_CancelPanTileBox(u8 taskId)
+{
+    Debug_TearDownPanTileBox(taskId);
+    Debug_ShowMenu(sDebugMenuItems_Camera, ARRAY_COUNT(sDebugMenuItems_Camera), DebugTask_HandleMenuInput_Camera);
+}
+
+// Drives the coordinate box: left/right edit the X tile, up/down edit the Y tile (held to repeat),
+// each clamped to the map bounds. A commits the pan, B cancels back to the camera menu.
+static void DebugTask_PanTileInput(u8 taskId)
+{
+    int width = gMapHeader.mapLayout->width;
+    int height = gMapHeader.mapLayout->height;
+    bool8 changed = FALSE;
+
+    if (JOY_REPEAT(DPAD_RIGHT) && sPanTileX < width - 1)
+    {
+        sPanTileX++;
+        changed = TRUE;
+    }
+    else if (JOY_REPEAT(DPAD_LEFT) && sPanTileX > 0)
+    {
+        sPanTileX--;
+        changed = TRUE;
+    }
+    if (JOY_REPEAT(DPAD_DOWN) && sPanTileY < height - 1)
+    {
+        sPanTileY++;
+        changed = TRUE;
+    }
+    else if (JOY_REPEAT(DPAD_UP) && sPanTileY > 0)
+    {
+        sPanTileY--;
+        changed = TRUE;
+    }
+
+    if (changed)
+    {
+        PlaySE(SE_SELECT);
+        Debug_DrawPanTileBox();
+    }
+    else if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CommitPanTileBox(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CancelPanTileBox(taskId);
+    }
+}
+
+// Polls the tile pan started by Debug_CommitPanTileBox. Once the camera has settled on the tile,
+// switch to freecam so the D-pad drives it from there (controls are already unlocked, so freecam
+// reads input immediately). If the pan is superseded before it arrives (e.g. the player reopens the
+// menu and starts tracking something), just stop waiting without touching the camera.
+static void DebugTask_WaitPanToTile(u8 taskId)
+{
+    if (!IsCameraPanActive())
+        DestroyTask(taskId);
+    else if (HasCameraPanArrived())
+    {
+        SetFreecamActive(TRUE);
+        DestroyTask(taskId);
+    }
+}
+
 // Opens the same selection box in "pan" mode: scrolling only previews the choice; pressing A
 // smoothly pans the camera to the picked object (see PanCameraToLocalId) and hands control
 // back, B steps back to the camera menu without moving the camera.
@@ -550,7 +707,7 @@ static void Debug_CommitPanNpcBox(u8 taskId)
     u8 localId = Debug_LocalIdForOrder(sTrackNpcOrder);
 
     Debug_TearDownNpcBox(taskId);
-    PanCameraToLocalId(localId, DEBUG_PAN_NPC_FRAMES);
+    PanCameraToLocalId(localId, DEBUG_PAN_FRAMES);
     UnlockPlayerFieldControls();
 }
 
