@@ -10,6 +10,7 @@
 #include "menu.h"
 #include "overworld.h"
 #include "rotating_gate.h"
+#include "script.h"
 #include "sprite.h"
 #include "text.h"
 
@@ -54,7 +55,6 @@ static void (*sFieldCameraPanningCallback)(void);
 // Debug freecam state: when active the camera detaches from the player and is
 // scrolled directly by the D-pad (see UpdateFreecamMovement).
 static bool8 sFreecamActive;
-static bool8 sFreecamPaused;
 static s16 sFreecamMoveX;
 static s16 sFreecamMoveY;
 
@@ -366,12 +366,14 @@ static void CameraUpdateCallback(struct CameraObject *fieldCamera)
 // finishes and the camera comes to rest grid-aligned (matching normal movement).
 // Movement is clamped to the current map's bounds, keeping the camera focus within
 // the same range the player can occupy so RecenterCameraOnPlayer can snap back with
-// a single CameraMove (no connection-crossing edge cases).
+// a single CameraMove (no connection-crossing edge cases). Scrolling halts whenever the
+// player's field controls are locked, so an open menu (the debug menu, or the start menu
+// reachable while detached) takes the D-pad without the camera drifting underneath it.
 static void UpdateFreecamMovement(struct CameraObject *fieldCamera)
 {
     if (fieldCamera->x == 0 && fieldCamera->y == 0)
     {
-        u16 keys = sFreecamPaused ? 0 : gMain.heldKeys;
+        u16 keys = ArePlayerFieldControlsLocked() ? 0 : gMain.heldKeys;
         int width = gMapHeader.mapLayout->width;
         int height = gMapHeader.mapLayout->height;
 
@@ -398,14 +400,16 @@ bool8 IsFreecamActive(void)
 void SetFreecamActive(bool8 active)
 {
     sFreecamActive = active;
-    sFreecamPaused = FALSE;
     sFreecamMoveX = 0;
     sFreecamMoveY = 0;
 }
 
-void SetFreecamPaused(bool8 paused)
+// The camera is "detached" from the player while freecam is running or while tracking
+// an object other than the player (local id 0). The overworld uses this to keep the
+// player parked (no walking, no field interactions) while still allowing menus.
+bool8 IsCameraDetachedFromPlayer(void)
 {
-    sFreecamPaused = paused;
+    return sFreecamActive || sCameraTrackedLocalId != TRACK_LOCAL_ID_PLAYER;
 }
 
 // Jumps the camera focus to a tile (map coordinates without MAP_OFFSET, clamped to the

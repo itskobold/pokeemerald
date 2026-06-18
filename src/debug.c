@@ -92,7 +92,7 @@ void SetDebugNewGameFlags()
     AddBagItem(ITEM_MACH_BIKE, 1);
 }
 
-// Shell debug menu, opened in the field by pressing Start + Select together.
+// Shell debug menu, opened in the field by pressing L + R + Select together.
 // The main menu is a list of categories, each opening its own submenu.
 
 // Main menu items
@@ -119,9 +119,6 @@ static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void 
 static void Debug_DestroyMenu(u8 taskId);
 static void Debug_CloseMenu(u8 taskId);
 static void Debug_OpenMainMenu(void);
-static bool8 Debug_IsCameraDetached(void);
-static void Debug_StartDetachedInput(void);
-static void Debug_StopDetachedInput(void);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_DisableFreecam(u8 taskId);
 static void Debug_OpenTrackNpcBox(void);
@@ -133,7 +130,6 @@ static u8 Debug_OrderForLocalId(u8 localId);
 
 static void DebugTask_HandleMenuInput_Main(u8 taskId);
 static void DebugTask_HandleMenuInput_Camera(u8 taskId);
-static void DebugTask_DetachedInput(u8 taskId);
 static void DebugTask_TrackNpcInput(u8 taskId);
 
 static void DebugAction_OpenCameraMenu(u8 taskId);
@@ -142,8 +138,9 @@ static void DebugAction_Camera_ToggleFreecam(u8 taskId);
 static void DebugAction_Camera_TrackNPC(u8 taskId);
 static void DebugAction_Camera_Cancel(u8 taskId);
 
-// Tracks whether a debug menu window is currently displayed, so the detached-camera
-// input task knows not to open a second one while it sits behind an open menu.
+// Tracks whether a debug menu window is currently displayed. While a debug menu/box is
+// open the player's field controls are locked so the D-pad drives the menu (and freecam
+// scrolling pauses); closing it hands input back.
 static bool8 sDebugMenuOpen;
 
 // "Track NPC" numeric scroll box state. sTrackNpcOrder walks the map's object-event
@@ -208,37 +205,23 @@ static const struct ListMenuTemplate sDebugMenuListTemplate =
     .cursorKind = CURSOR_BLACK_ARROW,
 };
 
-// The camera is "detached" from the player while freecam is running or while tracking
-// any object other than the player (local id 0). In those modes the player's controls
-// stay locked so they can't walk off, and a background task watches for Start + Select.
-static bool8 Debug_IsCameraDetached(void)
-{
-    return IsFreecamActive() || GetCameraTrackedLocalId() != 0;
-}
-
 void Debug_ShowMainMenu(void)
 {
     // Tear down any active map-name popup so its window/BG data is freed before the
     // menu draws its own window.
     HideMapNamePopUpWindow();
 
-    // Stop script execution
-    ScriptContext_Stop();
-
-    if (Debug_IsCameraDetached())
-    {
-        // The field is already locked; just halt freecam scrolling so the D-pad drives
-        // the menu instead of the camera.
-        if (IsFreecamActive())
-            SetFreecamPaused(TRUE);
-    }
-    else
+    // When opening from normal play, freeze the player and field. When opening from a
+    // detached camera (freecam/tracking) the player is already parked by the overworld and
+    // the world is in the state that mode wants, so leave it be. Either way lock controls so
+    // the D-pad drives the menu and freecam scrolling pauses while it is up.
+    if (!IsCameraDetachedFromPlayer())
     {
         FreezeObjectEvents();
         PlayerFreeze();
         StopPlayerAvatar();
-        LockPlayerFieldControls();
     }
+    LockPlayerFieldControls();
     Debug_OpenMainMenu();
 }
 
@@ -273,8 +256,8 @@ static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void 
     sDebugMenuOpen = TRUE;
 }
 
-// Tears down the current menu's list, window and input task, but leaves the
-// field locked so a different submenu (or freecam) can take over.
+// Tears down the current menu's list, window and input task, but leaves the field locked
+// so a different submenu (or a terminal close action) can take over.
 static void Debug_DestroyMenu(u8 taskId)
 {
     DestroyListMenuTask(gTasks[taskId].tMenuTaskId, NULL, NULL);
@@ -284,40 +267,16 @@ static void Debug_DestroyMenu(u8 taskId)
     sDebugMenuOpen = FALSE;
 }
 
-// Closes the menu entirely. If the camera is detached (freecam, or tracking an NPC)
-// the field stays locked and the camera mode resumes; otherwise control returns to
-// the player.
+// Closes the menu entirely and hands input back. Object events are unfrozen unless freecam
+// is running (which wants a still world to pan over); tracking and normal play both want
+// them moving. Controls are always unlocked: while the camera is still detached the
+// overworld keeps the player parked, but the start menu and L+R+Select stay reachable.
 static void Debug_CloseMenu(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
-    if (Debug_IsCameraDetached())
-    {
-        if (IsFreecamActive())
-            SetFreecamPaused(FALSE);
-    }
-    else
-    {
+    if (!IsFreecamActive())
         ScriptUnfreezeObjectEvents();
-        UnlockPlayerFieldControls();
-    }
-
-    ScriptContext_Enable();
-}
-
-// Starts/stops the background task that lets Start + Select reopen the menu while the
-// camera is detached and the player's field controls are locked.
-static void Debug_StartDetachedInput(void)
-{
-    if (!FuncIsActiveTask(DebugTask_DetachedInput))
-        CreateTask(DebugTask_DetachedInput, 3);
-}
-
-static void Debug_StopDetachedInput(void)
-{
-    u8 taskId = FindTaskIdByFunc(DebugTask_DetachedInput);
-
-    if (taskId != TASK_NONE)
-        DestroyTask(taskId);
+    UnlockPlayerFieldControls();
 }
 
 static void DebugTask_HandleMenuInput_Main(u8 taskId)
@@ -356,20 +315,6 @@ static void DebugTask_HandleMenuInput_Camera(u8 taskId)
     }
 }
 
-// Runs while the camera is detached (freecam or tracking an NPC) so L + R + Select can
-// reopen the menu, since the player's field input handler is disabled in those modes.
-static void DebugTask_DetachedInput(u8 taskId)
-{
-    if (sDebugMenuOpen)
-        return;
-
-    if (JOY_HELD(L_BUTTON) && JOY_HELD(R_BUTTON) && JOY_HELD(SELECT_BUTTON) && JOY_NEW(L_BUTTON | R_BUTTON | SELECT_BUTTON))
-    {
-        PlaySE(SE_WIN_OPEN);
-        Debug_ShowMainMenu();
-    }
-}
-
 static void DebugAction_OpenCameraMenu(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -403,7 +348,9 @@ static void Debug_EnableFreecam(u8 taskId)
         StopCameraObjectTracking();
     }
     SetFreecamActive(TRUE);
-    Debug_StartDetachedInput();
+    // Hand input back: the overworld keeps the player parked while detached, and freecam
+    // scrolls the camera from the D-pad now that controls are unlocked.
+    UnlockPlayerFieldControls();
 }
 
 // Reattaches the camera to the player and hands control back. RecenterCameraOnPlayer
@@ -414,7 +361,6 @@ static void Debug_DisableFreecam(u8 taskId)
     Debug_DestroyMenu(taskId);
     RecenterCameraOnPlayer();
     SetFreecamActive(FALSE);
-    Debug_StopDetachedInput();
     ScriptUnfreezeObjectEvents();
     UnlockPlayerFieldControls();
 }
@@ -546,8 +492,8 @@ static void Debug_OpenTrackNpcBox(void)
 
 // Closes the box but leaves the camera tracking the selected object. Object events are
 // unfrozen so the tracked NPC moves and the camera follows it. When tracking the player
-// (id 0) the player regains control; when tracking an NPC the player's controls stay
-// locked (so they can't walk off-camera) and Start + Select still reopens the box to
+// (id 0) the player regains control; when tracking an NPC the overworld keeps the player
+// parked (so they can't walk off-camera) while L + R + Select still reopens the box to
 // change or stop tracking.
 static void Debug_CloseTrackNpcBox(u8 taskId)
 {
@@ -557,16 +503,10 @@ static void Debug_CloseTrackNpcBox(u8 taskId)
     DestroyTask(taskId);
     sDebugMenuOpen = FALSE;
     ScriptUnfreezeObjectEvents();
-
-    if (Debug_IsCameraDetached())
-    {
-        Debug_StartDetachedInput();
-    }
-    else
-    {
-        Debug_StopDetachedInput();
-        UnlockPlayerFieldControls();
-    }
+    // Hand input back either way. When still tracking an NPC the overworld keeps the player
+    // parked (and the start menu / L+R+Select stay reachable); when tracking the player
+    // (id 0) this simply returns normal control.
+    UnlockPlayerFieldControls();
 }
 
 static void DebugTask_TrackNpcInput(u8 taskId)

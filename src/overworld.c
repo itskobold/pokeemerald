@@ -6,6 +6,7 @@
 #include "bg.h"
 #include "cable_club.h"
 #include "clock.h"
+#include "debug.h"
 #include "event_data.h"
 #include "event_object_movement.h"
 #include "event_scripts.h"
@@ -1514,17 +1515,36 @@ static void DoCB1_Overworld(u16 newKeys, u16 heldKeys)
     UpdatePlayerAvatarTransitionState();
     FieldClearPlayerInput(&inputStruct);
     FieldGetPlayerInput(&inputStruct, newKeys, heldKeys);
-    if (!ArePlayerFieldControlsLocked())
+    if (ArePlayerFieldControlsLocked())
+        return;
+
+    // While the camera is detached from the player (debug freecam or NPC tracking) the
+    // player stays parked: walking and field interactions are suppressed so they can't
+    // wander off-camera. The start menu and the debug menu are still reachable, so the
+    // game can be operated while the camera is looking elsewhere.
+    if (IsCameraDetachedFromPlayer())
     {
-        if (ProcessPlayerFieldInput(&inputStruct) == 1)
+        if (inputStruct.pressedLRSelect)
         {
-            LockPlayerFieldControls();
-            HideMapNamePopUpWindow();
+            PlaySE(SE_WIN_OPEN);
+            Debug_ShowMainMenu();
         }
-        else
+        else if (inputStruct.pressedStartButton)
         {
-            PlayerStep(inputStruct.dpadDirection, newKeys, heldKeys);
+            PlaySE(SE_WIN_OPEN);
+            ShowStartMenu();
         }
+        return;
+    }
+
+    if (ProcessPlayerFieldInput(&inputStruct) == 1)
+    {
+        LockPlayerFieldControls();
+        HideMapNamePopUpWindow();
+    }
+    else
+    {
+        PlayerStep(inputStruct.dpadDirection, newKeys, heldKeys);
     }
 }
 

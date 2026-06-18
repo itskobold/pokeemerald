@@ -33,7 +33,7 @@ void UpdateCameraElevation(void);
 void UpdateCameraBiome(void);
 bool8 IsFreecamActive(void);
 void SetFreecamActive(bool8 active);
-void SetFreecamPaused(bool8 paused);
+bool8 IsCameraDetachedFromPlayer(void);
 void RecenterCameraOnPlayer(void);
 void StopCameraObjectTracking(void);
 void SetCameraTrackedLocalId(u8 localId);

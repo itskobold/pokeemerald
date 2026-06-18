@@ -135,6 +135,11 @@ void InitMap(void)
 
 void InitMapFromSavedGame(void)
 {
+    // Continuing a saved game doesn't warp in, so seed the camera's focus tile from the
+    // saved player position here (a warp would do this in SetPlayerCoordsFromWarp). Without
+    // this gCameraPos stays at its zero-initialised value and the camera loads off in the
+    // map's corner.
+    gCameraPos = gSaveBlock1Ptr->playerPos;
     InitMapLayoutData(&gMapHeader);
     InitSecretBaseAppearance(FALSE);
     SetOccupiedSecretBaseEntranceMetatiles(gMapHeader.events);
@@ -640,21 +645,28 @@ u16 GetMetatileAttributesById(u16 metatile)
     }
 }
 
-void SaveMapView(void)
+// Captures the on-screen metatile view (the MAP_OFFSET_W x MAP_OFFSET_H window whose
+// top-left map tile is x,y) into gSaveBlock1Ptr->mapView.
+static void SaveMapViewAt(int x, int y)
 {
     int i, j;
-    int x, y;
-    u16 *mapView;
-    int width;
-    mapView = gSaveBlock1Ptr->mapView;
-    width = gBackupMapLayout.width;
-    x = gCameraPos.x;
-    y = gCameraPos.y;
+    u16 *mapView = gSaveBlock1Ptr->mapView;
+    int width = gBackupMapLayout.width;
+
     for (i = y; i < y + MAP_OFFSET_H; i++)
     {
         for (j = x; j < x + MAP_OFFSET_W; j++)
             *mapView++ = sBackupMapData[width * i + j];
     }
+}
+
+void SaveMapView(void)
+{
+    // Persisted with the save and reloaded around the player's tile (see LoadSavedMapView),
+    // so anchor on the player, not the camera: the camera can be detached from the player
+    // (debug freecam / NPC tracking), and capturing the view around it would reload
+    // distorted. During normal play the camera sits on the player, so this is unchanged.
+    SaveMapViewAt(gSaveBlock1Ptr->playerPos.x, gSaveBlock1Ptr->playerPos.y);
 }
 
 static bool32 SavedMapViewIsEmpty(void)
@@ -695,8 +707,10 @@ static void LoadSavedMapView(void)
     if (!SavedMapViewIsEmpty())
     {
         width = gBackupMapLayout.width;
-        x = gCameraPos.x;
-        y = gCameraPos.y;
+        // Restore around the player, matching how SaveMapView captured it (the camera may
+        // have been detached when the game was saved).
+        x = gSaveBlock1Ptr->playerPos.x;
+        y = gSaveBlock1Ptr->playerPos.y;
         for (i = y; i < y + MAP_OFFSET_H; i++)
         {
             if (i == y && i != 0)
@@ -875,7 +889,10 @@ bool8 CameraMove(int x, int y)
     }
     else
     {
-        SaveMapView();
+        // Connection transition: this captured strip is re-stitched into the destination map
+        // by MoveMapViewToBackup using the camera's tile, so it must be camera-anchored (the
+        // camera is what crosses the border). This is transient and cleared before any save.
+        SaveMapViewAt(gCameraPos.x, gCameraPos.y);
         ClearMirageTowerPulseBlendEffect();
         old_x = gCameraPos.x;
         old_y = gCameraPos.y;

@@ -7,6 +7,7 @@
 #include "event_object_movement.h"
 #include "event_object_lock.h"
 #include "event_scripts.h"
+#include "field_camera.h"
 #include "fieldmap.h"
 #include "field_effect.h"
 #include "field_player_avatar.h"
@@ -1422,7 +1423,11 @@ static void HideStartMenuWindow(void)
 {
     ClearStdWindowAndFrame(GetStartMenuWindowId(), TRUE);
     RemoveStartMenuWindow();
-    ScriptUnfreezeObjectEvents();
+    // Freecam keeps a still world to pan over, so don't let closing the start menu wake the
+    // object events back up. The player can't move regardless (the overworld parks them
+    // while the camera is detached), so unlocking controls here is harmless.
+    if (!IsFreecamActive())
+        ScriptUnfreezeObjectEvents();
     UnlockPlayerFieldControls();
 }
 
