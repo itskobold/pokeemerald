@@ -107,6 +107,7 @@ enum
     DEBUG_CAMERA_ITEM_TRACK_NPC,
     DEBUG_CAMERA_ITEM_PAN_TILE,
     DEBUG_CAMERA_ITEM_PAN_NPC,
+    DEBUG_CAMERA_ITEM_RESET,
     DEBUG_CAMERA_ITEM_CANCEL,
 };
 
@@ -132,6 +133,7 @@ static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void 
 static void Debug_DestroyMenu(u8 taskId);
 static void Debug_CloseMenu(u8 taskId);
 static void Debug_OpenMainMenu(void);
+static void Debug_ShowCameraMenu(void);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_DisableFreecam(u8 taskId);
 static void Debug_OpenNpcBox(u8 mode);
@@ -154,6 +156,7 @@ static void DebugAction_Camera_ToggleFreecam(u8 taskId);
 static void DebugAction_Camera_TrackNPC(u8 taskId);
 static void DebugAction_Camera_PanTile(u8 taskId);
 static void DebugAction_Camera_PanNPC(u8 taskId);
+static void DebugAction_Camera_Reset(u8 taskId);
 static void DebugAction_Camera_Cancel(u8 taskId);
 static void Debug_OpenPanTileBox(void);
 static void Debug_DrawPanTileBox(void);
@@ -183,16 +186,24 @@ static u8 sPanTileWindowId;
 static s16 sPanTileX;
 static s16 sPanTileY;
 
+// Writable copy of the camera submenu items, filled from the const template each time the menu is
+// shown (see Debug_ShowCameraMenu). debug.o's .data section is discarded by the linker, so the
+// template stays const (.rodata) and only this uninitialized .bss copy holds the swapped freecam
+// label.
+static struct ListMenuItem sCameraMenuItems[DEBUG_CAMERA_ITEM_CANCEL + 1];
+
 static const u8 sDebugText_Camera[] = _("Camera");
 static const u8 sDebugText_Cancel[] = _("Cancel");
-static const u8 sDebugText_Camera_ToggleFreecam[] = _("Toggle freecam");
+static const u8 sDebugText_Camera_EnableFreecam[] = _("Enable freecam");
+static const u8 sDebugText_Camera_DisableFreecam[] = _("Disable freecam");
 static const u8 sDebugText_Camera_TrackNPC[] = _("Track NPC");
 static const u8 sDebugText_Camera_PanNPC[] = _("Pan to NPC");
 static const u8 sDebugText_Camera_PanTile[] = _("Pan to tile");
+static const u8 sDebugText_Camera_Reset[] = _("Reset camera");
 static const u8 sDebugText_TrackNpc_Label[] = _("Track ");
 static const u8 sDebugText_PanNpc_Label[] = _("Pan ");
-static const u8 sDebugText_PanTile_X[] = _("X");
-static const u8 sDebugText_PanTile_Y[] = _(" Y");
+static const u8 sDebugText_PanTile_X[] = _("X: ");
+static const u8 sDebugText_PanTile_Y[] = _(", Y: ");
 
 static const struct ListMenuItem sDebugMenuItems_Main[] =
 {
@@ -202,10 +213,11 @@ static const struct ListMenuItem sDebugMenuItems_Main[] =
 
 static const struct ListMenuItem sDebugMenuItems_Camera[] =
 {
-    [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = {sDebugText_Camera_ToggleFreecam, DEBUG_CAMERA_ITEM_TOGGLE_FREECAM},
+    [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = {sDebugText_Camera_EnableFreecam, DEBUG_CAMERA_ITEM_TOGGLE_FREECAM},
     [DEBUG_CAMERA_ITEM_TRACK_NPC]      = {sDebugText_Camera_TrackNPC, DEBUG_CAMERA_ITEM_TRACK_NPC},
     [DEBUG_CAMERA_ITEM_PAN_TILE]       = {sDebugText_Camera_PanTile, DEBUG_CAMERA_ITEM_PAN_TILE},
     [DEBUG_CAMERA_ITEM_PAN_NPC]        = {sDebugText_Camera_PanNPC, DEBUG_CAMERA_ITEM_PAN_NPC},
+    [DEBUG_CAMERA_ITEM_RESET]          = {sDebugText_Camera_Reset, DEBUG_CAMERA_ITEM_RESET},
     [DEBUG_CAMERA_ITEM_CANCEL]         = {sDebugText_Cancel, DEBUG_CAMERA_ITEM_CANCEL},
 };
 
@@ -221,6 +233,7 @@ static void (*const sDebugMenuActions_Camera[])(u8) =
     [DEBUG_CAMERA_ITEM_TRACK_NPC]      = DebugAction_Camera_TrackNPC,
     [DEBUG_CAMERA_ITEM_PAN_TILE]       = DebugAction_Camera_PanTile,
     [DEBUG_CAMERA_ITEM_PAN_NPC]        = DebugAction_Camera_PanNPC,
+    [DEBUG_CAMERA_ITEM_RESET]          = DebugAction_Camera_Reset,
     [DEBUG_CAMERA_ITEM_CANCEL]         = DebugAction_Camera_Cancel,
 };
 
@@ -353,10 +366,25 @@ static void DebugTask_HandleMenuInput_Camera(u8 taskId)
     }
 }
 
+// Shows the camera submenu, first setting the freecam entry's label to reflect what selecting it
+// will do: "Disable freecam" while freecam is running, "Enable freecam" otherwise. Used by every
+// path that (re)opens the camera menu. The const template is copied into sCameraMenuItems so the
+// label can be swapped without a writable global in debug.o (whose .data the linker discards).
+static void Debug_ShowCameraMenu(void)
+{
+    u32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sDebugMenuItems_Camera); i++)
+        sCameraMenuItems[i] = sDebugMenuItems_Camera[i];
+    sCameraMenuItems[DEBUG_CAMERA_ITEM_TOGGLE_FREECAM].name =
+        IsFreecamActive() ? sDebugText_Camera_DisableFreecam : sDebugText_Camera_EnableFreecam;
+    Debug_ShowMenu(sCameraMenuItems, ARRAY_COUNT(sCameraMenuItems), DebugTask_HandleMenuInput_Camera);
+}
+
 static void DebugAction_OpenCameraMenu(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
-    Debug_ShowMenu(sDebugMenuItems_Camera, ARRAY_COUNT(sDebugMenuItems_Camera), DebugTask_HandleMenuInput_Camera);
+    Debug_ShowCameraMenu();
 }
 
 static void DebugAction_Cancel(u8 taskId)
@@ -423,10 +451,10 @@ static void Debug_DrawPanTileBox(void)
     u8 text[20];
 
     StringCopy(text, sDebugText_PanTile_X);
-    ConvertIntToDecimalStringN(gStringVar1, sPanTileX, STR_CONV_MODE_LEADING_ZEROS, 3);
+    ConvertIntToDecimalStringN(gStringVar1, sPanTileX, STR_CONV_MODE_LEFT_ALIGN, 3);
     StringAppend(text, gStringVar1);
     StringAppend(text, sDebugText_PanTile_Y);
-    ConvertIntToDecimalStringN(gStringVar1, sPanTileY, STR_CONV_MODE_LEADING_ZEROS, 3);
+    ConvertIntToDecimalStringN(gStringVar1, sPanTileY, STR_CONV_MODE_LEFT_ALIGN, 3);
     StringAppend(text, gStringVar1);
 
     FillWindowPixelBuffer(sPanTileWindowId, PIXEL_FILL(1));
@@ -443,7 +471,7 @@ static void Debug_OpenPanTileBox(void)
     sPanTileY = gCameraPos.y;
 
     LoadMessageBoxAndBorderGfx();
-    sPanTileWindowId = CreateWindowFromRect(0, 1, 12, 2);
+    sPanTileWindowId = CreateWindowFromRect(0, 1, 14, 2);
     DrawStdWindowFrame(sPanTileWindowId, FALSE);
     Debug_DrawPanTileBox();
     CopyWindowToVram(sPanTileWindowId, COPYWIN_FULL);
@@ -481,7 +509,7 @@ static void Debug_CommitPanTileBox(u8 taskId)
 static void Debug_CancelPanTileBox(u8 taskId)
 {
     Debug_TearDownPanTileBox(taskId);
-    Debug_ShowMenu(sDebugMenuItems_Camera, ARRAY_COUNT(sDebugMenuItems_Camera), DebugTask_HandleMenuInput_Camera);
+    Debug_ShowCameraMenu();
 }
 
 // Drives the coordinate box: left/right edit the X tile, up/down edit the Y tile (held to repeat),
@@ -552,6 +580,18 @@ static void DebugAction_Camera_PanNPC(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
     Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_PAN);
+}
+
+// Returns the camera to the player from any detached state (freecam, NPC tracking, or a pan/tile
+// rest) and hands control back. RecenterCameraOnPlayer snaps the focus onto the player and re-anchors
+// (also ending any pan); running it before clearing the freecam flag keeps the location's graphics
+// swap silent, exactly as Debug_DisableFreecam does.
+static void DebugAction_Camera_Reset(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    RecenterCameraOnPlayer();
+    SetFreecamActive(FALSE);
+    UnlockPlayerFieldControls();
 }
 
 static void DebugAction_Camera_Cancel(u8 taskId)
@@ -661,9 +701,26 @@ static void Debug_OpenNpcBox(u8 mode)
     Debug_DrawTrackNpcBox();
     CopyWindowToVram(sTrackNpcWindowId, COPYWIN_FULL);
 
-    sTrackNpcArrowTaskId = AddScrollIndicatorArrowPairParameterized(
-        SCROLL_ARROW_UP, 44, 12, 36, sTrackNpcMaxOrder,
-        TAG_TRACK_NPC_SCROLL_ARROW, TAG_TRACK_NPC_SCROLL_ARROW, &sTrackNpcOrder);
+    // Build the arrow pair by hand rather than via AddScrollIndicatorArrowPairParameterized so the
+    // hide-at-bounds thresholds can be swapped for the reversed controls (up increases the value,
+    // down decreases it): the top/up arrow hides at the max and the bottom/down arrow hides at 0, so
+    // each shows only while its direction can still change the value. (See DebugTask_TrackNpcInput.)
+    {
+        struct ScrollArrowsTemplate arrows;
+
+        arrows.firstArrowType = SCROLL_ARROW_UP;
+        arrows.firstX = 44;
+        arrows.firstY = 12;
+        arrows.secondArrowType = SCROLL_ARROW_DOWN;
+        arrows.secondX = 44;
+        arrows.secondY = 36;
+        arrows.fullyUpThreshold = sTrackNpcMaxOrder;
+        arrows.fullyDownThreshold = 0;
+        arrows.tileTag = TAG_TRACK_NPC_SCROLL_ARROW;
+        arrows.palTag = TAG_TRACK_NPC_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sTrackNpcArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sTrackNpcOrder);
+    }
 
     CreateTask(DebugTask_TrackNpcInput, 3);
     sDebugMenuOpen = TRUE;
@@ -717,14 +774,14 @@ static void Debug_CommitPanNpcBox(u8 taskId)
 static void Debug_CancelPanNpcBox(u8 taskId)
 {
     Debug_TearDownNpcBox(taskId);
-    Debug_ShowMenu(sDebugMenuItems_Camera, ARRAY_COUNT(sDebugMenuItems_Camera), DebugTask_HandleMenuInput_Camera);
+    Debug_ShowCameraMenu();
 }
 
 static void DebugTask_TrackNpcInput(u8 taskId)
 {
     bool8 trackMode = (sTrackNpcBoxMode == DEBUG_NPC_BOX_MODE_TRACK);
 
-    if (JOY_REPEAT(DPAD_DOWN) && sTrackNpcOrder < sTrackNpcMaxOrder)
+    if (JOY_REPEAT(DPAD_UP) && sTrackNpcOrder < sTrackNpcMaxOrder)
     {
         sTrackNpcOrder++;
         PlaySE(SE_SELECT);
@@ -732,7 +789,7 @@ static void DebugTask_TrackNpcInput(u8 taskId)
         if (trackMode)
             Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
     }
-    else if (JOY_REPEAT(DPAD_UP) && sTrackNpcOrder > 0)
+    else if (JOY_REPEAT(DPAD_DOWN) && sTrackNpcOrder > 0)
     {
         sTrackNpcOrder--;
         PlaySE(SE_SELECT);
