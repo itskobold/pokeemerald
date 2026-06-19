@@ -45,6 +45,13 @@ static void DrawMetatile(s32, const u16 *, u16);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
 static void UpdateCameraPanMovement(struct CameraObject *);
+static void ClearCameraAnchors(void);
+static void AnchorCameraToObject(struct ObjectEvent *);
+static void DetachCameraForPan(void);
+static void ClearFreecam(void);
+static void ClearPanState(void);
+static void ClampTileToMap(s16 *, s16 *);
+static void CenterCameraOnTile(s16, s16);
 
 static struct FieldCameraOffset sFieldCameraOffset;
 static s16 sHorizontalCameraPan;
@@ -421,11 +428,7 @@ void SetFreecamActive(bool8 active)
     sFreecamMoveY = 0;
     // Freecam takes over from any pan in progress (or one resting on its destination tile).
     if (active)
-    {
-        sCameraPanActive = FALSE;
-        sCameraPanToTile = FALSE;
-        sCameraPanArrived = FALSE;
-    }
+        ClearPanState();
 }
 
 // The camera is "detached" from the player while freecam is running or while tracking
@@ -436,25 +439,75 @@ bool8 IsCameraDetachedFromPlayer(void)
     return sFreecamActive || sCameraPanActive || sCameraTrackedLocalId != TRACK_LOCAL_ID_PLAYER;
 }
 
-// Jumps the camera focus to a tile (map coordinates without MAP_OFFSET, clamped to the current
-// map) and rebuilds a clean, tile-aligned view there: sub-tile scroll offsets zeroed, scene
-// reculled/respawned, and every object sprite snapped into the new frame.
-static void CenterCameraOnTile(int x, int y)
+// Drops the camera's object anchor from every object event. The trackedByCamera object is the one
+// the culling/redraw scrolls around, so clearing it before a rebuild stops the camera resyncing
+// onto the object it is about to stop following.
+static void ClearCameraAnchors(void)
+{
+    u8 i;
+
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+        gObjectEvents[i].trackedByCamera = FALSE;
+}
+
+// Makes a spawned object the camera's anchor and follows its sprite. It must be live and moving for
+// the camera to track it, so clear any half-finished step and unfreeze it (an on-screen target was
+// frozen when the menu opened). The location swap is silent (a deliberate repoint, not the player
+// walking; a popup would corrupt the open debug box).
+static void AnchorCameraToObject(struct ObjectEvent *tracked)
+{
+    tracked->trackedByCamera = TRUE;
+    tracked->singleMovementActive = FALSE;
+    ObjectEventClearHeldMovement(tracked);
+    UnfreezeObjectEvent(tracked);
+    CameraObjectSetFollowedSpriteId(tracked->spriteId);
+    TryUpdateMapLocationSilent(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
+}
+
+// Clears freecam back to inactive and stationary.
+static void ClearFreecam(void)
+{
+    sFreecamActive = FALSE;
+    sFreecamMoveX = 0;
+    sFreecamMoveY = 0;
+}
+
+// Clears all auto-pan state.
+static void ClearPanState(void)
+{
+    sCameraPanActive = FALSE;
+    sCameraPanToTile = FALSE;
+    sCameraPanArrived = FALSE;
+    sCameraPanMoveX = 0;
+    sCameraPanMoveY = 0;
+}
+
+// Clamps a tile (map coordinates without MAP_OFFSET) to the current map's bounds.
+static void ClampTileToMap(s16 *x, s16 *y)
 {
     int width = gMapHeader.mapLayout->width;
     int height = gMapHeader.mapLayout->height;
+
+    if (*x < 0)
+        *x = 0;
+    else if (*x > width - 1)
+        *x = width - 1;
+    if (*y < 0)
+        *y = 0;
+    else if (*y > height - 1)
+        *y = height - 1;
+}
+
+// Jumps the camera focus to a tile (map coordinates without MAP_OFFSET, clamped to the current
+// map) and rebuilds a clean, tile-aligned view there: sub-tile scroll offsets zeroed, scene
+// reculled/respawned, and every object sprite snapped into the new frame.
+static void CenterCameraOnTile(s16 x, s16 y)
+{
     bool8 cameraMoved;
     bool8 gfxReloaded;
     u8 i;
 
-    if (x < 0)
-        x = 0;
-    else if (x > width - 1)
-        x = width - 1;
-    if (y < 0)
-        y = 0;
-    else if (y > height - 1)
-        y = height - 1;
+    ClampTileToMap(&x, &y);
 
     // Only rebuild the view when the focus actually moves (or the camera is mid-step). Re-centring
     // on the tile the camera already rests on must not zero the offset and redraw: that would
@@ -540,7 +593,6 @@ void SetCameraTrackedLocalId(u8 localId)
 {
     u8 objectEventId = ResolveTrackedObjectEvent(localId);
     s16 targetX, targetY;
-    u8 i;
 
     // An instant track-jump supersedes any auto-pan in progress.
     sCameraPanActive = FALSE;
@@ -564,8 +616,7 @@ void SetCameraTrackedLocalId(u8 localId)
 
     // Drop the previous anchor before the rebuild, so snapping sprites into the new frame
     // doesn't resync the camera onto the object we're about to stop following.
-    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
-        gObjectEvents[i].trackedByCamera = FALSE;
+    ClearCameraAnchors();
 
     // Jump to the target, rebuilding a clean tile-aligned scene around it (also respawns it
     // if it was culled).
@@ -576,25 +627,7 @@ void SetCameraTrackedLocalId(u8 localId)
     // simply rests on its default position with nothing to follow.
     objectEventId = ResolveTrackedObjectEvent(localId);
     if (objectEventId < OBJECT_EVENTS_COUNT)
-    {
-        struct ObjectEvent *tracked = &gObjectEvents[objectEventId];
-
-        // Make the tracked object the camera's anchor, as the engine does for the player: the
-        // trackedByCamera object is the one the culling/redraw scrolls around.
-        tracked->trackedByCamera = TRUE;
-
-        // The camera follows the object's sprite, so it must be live and moving. An on-screen
-        // target was frozen when the menu opened; clear any half-finished step and unfreeze it so
-        // its sprite moves again instead of leaving the camera stuck on its start position.
-        tracked->singleMovementActive = FALSE;
-        ObjectEventClearHeldMovement(tracked);
-        UnfreezeObjectEvent(tracked);
-
-        CameraObjectSetFollowedSpriteId(tracked->spriteId);
-        // A deliberate repoint, not the player walking: swap the location graphics silently (a
-        // popup would slip past the player-facing gate and corrupt the open debug box).
-        TryUpdateMapLocationSilent(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
-    }
+        AnchorCameraToObject(&gObjectEvents[objectEventId]);
 }
 
 u8 GetCameraTrackedLocalId(void)
@@ -613,14 +646,9 @@ void RecenterCameraOnPlayer(void)
 // starts at the tracked object's position with nothing pulling the camera back to it.
 void StopCameraObjectTracking(void)
 {
-    u8 i;
-
-    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
-        gObjectEvents[i].trackedByCamera = FALSE;
+    ClearCameraAnchors();
     sCameraTrackedLocalId = TRACK_LOCAL_ID_PLAYER;
-    sCameraPanActive = FALSE;
-    sCameraPanToTile = FALSE;
-    sCameraPanArrived = FALSE;
+    ClearPanState();
 }
 
 // Re-establishes the active debug camera mode after a return to the field, which routes through
@@ -629,8 +657,6 @@ void StopCameraObjectTracking(void)
 // tracking: it re-anchors a spawned target or jumps to and respawns a culled one.
 void RestoreCameraTracking(void)
 {
-    u8 i;
-
     // A field move is about to play; its animation is player-centred, so snap the camera onto the
     // player instead of restoring tracking (SetCameraToTrackPlayer only re-anchors, it doesn't move
     // the focus, which was sitting on the tracked object).
@@ -645,8 +671,7 @@ void RestoreCameraTracking(void)
     {
         // Freecam is D-pad driven and ignores the followed sprite; drop the player anchor
         // SetCameraToTrackPlayer just added so nothing pulls the camera.
-        for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
-            gObjectEvents[i].trackedByCamera = FALSE;
+        ClearCameraAnchors();
         return;
     }
     if (sCameraTrackedLocalId != TRACK_LOCAL_ID_PLAYER)
@@ -657,14 +682,8 @@ void RestoreCameraTracking(void)
 // where any tracked object belonged to the old map.
 void ResetCameraTracking(void)
 {
-    sFreecamActive = FALSE;
-    sFreecamMoveX = 0;
-    sFreecamMoveY = 0;
-    sCameraPanActive = FALSE;
-    sCameraPanToTile = FALSE;
-    sCameraPanArrived = FALSE;
-    sCameraPanMoveX = 0;
-    sCameraPanMoveY = 0;
+    ClearFreecam();
+    ClearPanState();
     sCameraTrackedLocalId = TRACK_LOCAL_ID_PLAYER;
     sResetCameraToPlayerOnFieldReturn = FALSE;
 }
@@ -712,23 +731,11 @@ static u8 GetPanTargetTile(u8 localId, s16 *x, s16 *y)
     return OBJECT_EVENTS_COUNT;
 }
 
-// Hands the camera off from the pan to ordinary sprite-following of the object it arrived at,
-// mirroring the tail of SetCameraTrackedLocalId, and ends the pan.
+// Ends the pan and hands the camera off to ordinary sprite-following of the object it arrived at.
 static void LockCameraOntoPanTarget(u8 objectEventId)
 {
-    struct ObjectEvent *tracked = &gObjectEvents[objectEventId];
-
-    tracked->trackedByCamera = TRUE;
-    tracked->singleMovementActive = FALSE;
-    ObjectEventClearHeldMovement(tracked);
-    UnfreezeObjectEvent(tracked);
-    CameraObjectSetFollowedSpriteId(tracked->spriteId);
-
-    sCameraPanActive = FALSE;
-    sCameraPanMoveX = 0;
-    sCameraPanMoveY = 0;
-    // Silent: a popup would be wrong for an automatic lock-on.
-    TryUpdateMapLocationSilent(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
+    ClearPanState();
+    AnchorCameraToObject(&gObjectEvents[objectEventId]);
 }
 
 // Picks the pan scroll speed: the divisor of 16 (1, 2, 4, 8 or 16 px/frame) nearest to `ideal`.
@@ -827,6 +834,19 @@ static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
     fieldCamera->movementSpeedY = sCameraPanMoveY;
 }
 
+// Takes the camera over from freecam or a track/pan already running, ready to start a new pan:
+// clears freecam and drops every anchor so the upcoming scroll isn't resynced onto the old target,
+// then re-centres on the current focus tile. The camera is often mid-step when a pan is triggered
+// (still following the previously-tracked object, whose sprite isn't input-gated to tile
+// boundaries); UpdateCameraPanMovement only (re)evaluates direction on a boundary, so a held
+// sub-tile offset would never return to 0 and the camera would stall. Re-centring zeroes the offset.
+static void DetachCameraForPan(void)
+{
+    ClearFreecam();
+    ClearCameraAnchors();
+    CenterCameraOnTile(gCameraPos.x, gCameraPos.y);
+}
+
 // Smoothly pans the camera to an object event (0 = the player), as an alternative to
 // SetCameraTrackedLocalId's instant jump; on arrival it locks on the same way. `panFrames` is the
 // target duration, mapped to a constant scroll speed by the distance (see SnapPanSpeed); a budget of
@@ -835,7 +855,6 @@ static void UpdateCameraPanMovement(struct CameraObject *fieldCamera)
 void PanCameraToLocalId(u8 localId, u8 panFrames)
 {
     s16 targetX, targetY;
-    u8 i;
 
     // Reject a target the current map doesn't have (neither spawned nor a template), matching
     // SetCameraTrackedLocalId.
@@ -844,20 +863,7 @@ void PanCameraToLocalId(u8 localId, u8 panFrames)
         && !GetObjectEventTemplateCoordsByLocalId(localId, &targetX, &targetY))
         return;
 
-    // Take over from freecam or a track/pan already running: clear the freecam flag and drop
-    // every camera anchor so the upcoming scroll isn't resynced onto the old target.
-    sFreecamActive = FALSE;
-    sFreecamMoveX = 0;
-    sFreecamMoveY = 0;
-    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
-        gObjectEvents[i].trackedByCamera = FALSE;
-
-    // Start the pan from a clean, tile-aligned state. The camera is often mid-step when the pan is
-    // triggered (it is still following the previously-tracked object, whose sprite isn't input-gated
-    // to tile boundaries). UpdateCameraPanMovement only (re)evaluates direction on a boundary, so a
-    // held sub-tile offset would never return to 0 and the camera would stall; re-centring on the
-    // current focus tile zeroes the offset so the first boundary eval runs.
-    CenterCameraOnTile(gCameraPos.x, gCameraPos.y);
+    DetachCameraForPan();
 
     // Track the new id for the whole pan, so the overworld keeps the player parked while it travels.
     sCameraTrackedLocalId = localId;
@@ -879,28 +885,8 @@ void PanCameraToLocalId(u8 localId, u8 panFrames)
 // tile, detached, until another mode takes over; HasCameraPanArrived reports when it has settled.
 void PanCameraToTile(s16 x, s16 y, u8 panFrames)
 {
-    int width = gMapHeader.mapLayout->width;
-    int height = gMapHeader.mapLayout->height;
-    u8 i;
-
-    if (x < 0)
-        x = 0;
-    else if (x > width - 1)
-        x = width - 1;
-    if (y < 0)
-        y = 0;
-    else if (y > height - 1)
-        y = height - 1;
-
-    // Take over from freecam or a track/pan already running (as PanCameraToLocalId).
-    sFreecamActive = FALSE;
-    sFreecamMoveX = 0;
-    sFreecamMoveY = 0;
-    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
-        gObjectEvents[i].trackedByCamera = FALSE;
-
-    // Start from a clean, tile-aligned state so the boundary-driven scroll proceeds.
-    CenterCameraOnTile(gCameraPos.x, gCameraPos.y);
+    ClampTileToMap(&x, &y);
+    DetachCameraForPan();
 
     // A tile pan has no object anchor; keep the tracked id as the player, while sCameraPanActive is
     // what keeps the camera detached and parked on the tile meanwhile.

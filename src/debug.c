@@ -133,7 +133,7 @@ static void Debug_CloseMenu(u8 taskId);
 static void Debug_OpenMainMenu(void);
 static void Debug_ShowCameraMenu(void);
 static void Debug_EnableFreecam(u8 taskId);
-static void Debug_DisableFreecam(u8 taskId);
+static void Debug_ReturnCameraToPlayer(u8 taskId);
 static void Debug_OpenNpcBox(u8 mode);
 static void Debug_TearDownNpcBox(u8 taskId);
 static void Debug_CloseTrackNpcBox(u8 taskId);
@@ -386,7 +386,7 @@ static void DebugAction_Cancel(u8 taskId)
 static void DebugAction_Camera_ToggleFreecam(u8 taskId)
 {
     if (IsFreecamActive())
-        Debug_DisableFreecam(taskId);
+        Debug_ReturnCameraToPlayer(taskId);
     else
         Debug_EnableFreecam(taskId);
 }
@@ -402,9 +402,10 @@ static void Debug_EnableFreecam(u8 taskId)
     UnlockPlayerFieldControls();
 }
 
-// Reattaches the camera to the player and hands control back. RecenterCameraOnPlayer runs before
-// clearing the freecam flag so the location's graphics swap stays silent.
-static void Debug_DisableFreecam(u8 taskId)
+// Returns the camera to the player from any detached state (freecam, NPC tracking, or a pan/tile
+// rest) and hands control back. RecenterCameraOnPlayer runs before clearing the freecam flag so the
+// location's graphics swap stays silent. Shared by the freecam toggle and the Reset action.
+static void Debug_ReturnCameraToPlayer(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
     RecenterCameraOnPlayer();
@@ -557,14 +558,9 @@ static void DebugAction_Camera_PanNPC(u8 taskId)
     Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_PAN);
 }
 
-// Returns the camera to the player from any detached state (freecam, NPC tracking, or a pan/tile
-// rest) and hands control back, keeping the graphics swap silent as Debug_DisableFreecam does.
 static void DebugAction_Camera_Reset(u8 taskId)
 {
-    Debug_DestroyMenu(taskId);
-    RecenterCameraOnPlayer();
-    SetFreecamActive(FALSE);
-    UnlockPlayerFieldControls();
+    Debug_ReturnCameraToPlayer(taskId);
 }
 
 static void DebugAction_Camera_Cancel(u8 taskId)
