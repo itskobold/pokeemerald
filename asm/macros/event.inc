@@ -1782,6 +1782,33 @@
 	.2byte \quantity
 	.endm
 
+	@ Smoothly pans the camera to the object event 'localId', detaching it from the player, and waits
+	@ for the pan to finish. 'speed' is the pan's duration budget (smaller = faster).
+	.macro pantoentity localId:req, speed:req
+	.byte SCR_OP_PANTOENTITY
+	.2byte \localId
+	.byte \speed
+	.endm
+
+	@ Smoothly pans the camera back to the player, reattaching it, and waits for the pan to finish.
+	.macro pantoplayer speed:req
+	.byte SCR_OP_PANTOPLAYER
+	.byte \speed
+	.endm
+
+	@ Quickly fades the screen out (to black, or to white if 'white' is TRUE), switches the camera to
+	@ track the object event 'localId', then fades back in.
+	.macro trackentity localId:req, white=FALSE
+	.byte SCR_OP_TRACKENTITY
+	.2byte \localId
+	.byte \white
+	.endm
+
+	@ Quickly fades the screen out to black, reattaches the camera to the player, then fades back in.
+	.macro trackplayer
+	.byte SCR_OP_TRACKPLAYER
+	.endm
+
 
 @ Supplementary
 

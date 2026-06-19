@@ -11,6 +11,7 @@
 #include "decoration.h"
 #include "decoration_inventory.h"
 #include "event_data.h"
+#include "field_camera.h"
 #include "field_door.h"
 #include "field_effect.h"
 #include "event_object_lock.h"
@@ -60,6 +61,11 @@ static EWRAM_DATA u16 sMovingNpcId = 0;
 static EWRAM_DATA u16 sMovingNpcMapGroup = 0;
 static EWRAM_DATA u16 sMovingNpcMapNum = 0;
 static EWRAM_DATA u16 sFieldEffectScriptId = 0;
+
+// State for the trackentity/trackplayer fade sequence (fade out -> switch camera tracking -> fade in).
+static EWRAM_DATA u16 sCameraTrackLocalId = 0;
+static EWRAM_DATA bool8 sCameraTrackFadeWhite = 0;
+static EWRAM_DATA u8 sCameraTrackFadeStage = 0;
 
 static u8 sBrailleWindowId;
 
@@ -660,6 +666,83 @@ bool8 ScrCmd_fadescreenswapbuffers(struct ScriptContext *ctx)
     }
 
     SetupNativeScript(ctx, IsPaletteNotActive);
+    return TRUE;
+}
+
+// Blocks the script until an in-progress camera pan has finished. An object pan ends by locking onto
+// its target (IsCameraPanActive then returns FALSE); a pan rejected for an absent target never
+// started, so this falls straight through.
+static bool8 WaitForCameraPanFinish(void)
+{
+    return !IsCameraPanActive();
+}
+
+// Smoothly pans the camera to an object event (its local id), detaching it from the player, and
+// waits for the pan to finish. The second argument is the pan's duration budget (smaller = faster),
+// passed straight to the camera.
+bool8 ScrCmd_pantoentity(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    u8 speed = ScriptReadByte(ctx);
+
+    PanCameraToLocalId(localId, speed);
+    SetupNativeScript(ctx, WaitForCameraPanFinish);
+    return TRUE;
+}
+
+// Smoothly pans the camera back to the player (local id 0), reattaching it, and waits for the pan to
+// finish.
+bool8 ScrCmd_pantoplayer(struct ScriptContext *ctx)
+{
+    u8 speed = ScriptReadByte(ctx);
+
+    PanCameraToLocalId(0, speed);
+    SetupNativeScript(ctx, WaitForCameraPanFinish);
+    return TRUE;
+}
+
+// Drives the trackentity/trackplayer fade: once the fade-out finishes, switch the camera's tracked
+// object and start the fade back in; finish when that completes.
+static bool8 RunCameraTrackFade(void)
+{
+    if (gPaletteFade.active)
+        return FALSE;
+
+    if (sCameraTrackFadeStage == 0)
+    {
+        SetCameraTrackedLocalId(sCameraTrackLocalId);
+        FadeScreen(sCameraTrackFadeWhite ? FADE_FROM_WHITE : FADE_FROM_BLACK, 0);
+        sCameraTrackFadeStage = 1;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static void StartCameraTrackFade(u16 localId, bool8 white)
+{
+    sCameraTrackLocalId = localId;
+    sCameraTrackFadeWhite = white;
+    sCameraTrackFadeStage = 0;
+    FadeScreen(white ? FADE_TO_WHITE : FADE_TO_BLACK, 0);
+}
+
+// Quickly fades the screen out (black, or white if the flag is set), instantly switches the camera
+// to track an object event, then fades back in.
+bool8 ScrCmd_trackentity(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    bool8 white = ScriptReadByte(ctx);
+
+    StartCameraTrackFade(localId, white);
+    SetupNativeScript(ctx, RunCameraTrackFade);
+    return TRUE;
+}
+
+// Quickly fades the screen out to black, reattaches the camera to the player, then fades back in.
+bool8 ScrCmd_trackplayer(struct ScriptContext *ctx)
+{
+    StartCameraTrackFade(0, FALSE);
+    SetupNativeScript(ctx, RunCameraTrackFade);
     return TRUE;
 }
 
