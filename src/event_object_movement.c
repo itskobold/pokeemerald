@@ -1668,10 +1668,15 @@ u8 CreateVirtualObject(u8 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevatio
     return spriteId;
 }
 
+static struct ObjectEventWander *FindObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup);
+static bool8 GetMapToActiveFrameOffset(u8 mapGroup, u8 mapNum, s16 *dx, s16 *dy);
+
 // Spawn the subset of an object template array that currently falls within the spawn window
 // around the camera. Each object is placed at its template coords plus (dx, dy) — the offset that
 // maps the source map's frame into the active (camera) object frame. (dx, dy) are (0, 0) for the
 // active map; for a connected map they are the connection delta (see GetConnectionObjectCoordOffset).
+// If an object has wandered onto another map (a wander-store entry keyed by its home identity), it
+// is placed at that displaced position instead, provided the map it now stands on is in view.
 static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate *templates, u8 count, u8 mapNum, u8 mapGroup, s16 dx, s16 dy, s16 cameraX, s16 cameraY)
 {
     u8 i;
@@ -1683,12 +1688,40 @@ static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate 
     for (i = 0; i < count; i++)
     {
         const struct ObjectEventTemplate *template = &templates[i];
-        s16 npcX = template->x + MAP_OFFSET + dx;
-        s16 npcY = template->y + MAP_OFFSET + dy;
+        struct ObjectEventWander *wander = FindObjectEventWander(template->localId, mapNum, mapGroup);
+        s16 npcX, npcY;
+
+        if (wander != NULL)
+        {
+            // Object has wandered off this (its home) map. Place it where it now stands, if that
+            // map is currently in view; otherwise it isn't visible from here, so skip it.
+            s16 odx, ody;
+            if (!GetMapToActiveFrameOffset(wander->curMapGroup, wander->curMapNum, &odx, &ody))
+                continue;
+            npcX = wander->x + MAP_OFFSET + odx;
+            npcY = wander->y + MAP_OFFSET + ody;
+        }
+        else
+        {
+            npcX = template->x + MAP_OFFSET + dx;
+            npcY = template->y + MAP_OFFSET + dy;
+        }
 
         if (top <= npcY && bottom >= npcY && left <= npcX && right >= npcX
             && !FlagGet(template->flagId))
-            TrySpawnObjectEventTemplateAt(template, mapNum, mapGroup, cameraX, cameraY, npcX, npcY);
+        {
+            u8 objectEventId = TrySpawnObjectEventTemplateAt(template, mapNum, mapGroup, cameraX, cameraY, npcX, npcY);
+
+            // A displaced object is placed at its wandered position, but its movement-range anchor
+            // (initialCoords) must stay at its true origin on its home map — the template position
+            // in the active frame (home-map offset dx/dy). Otherwise each cull/respawn re-centres
+            // the range on the wandered spot and the object drifts across the seam over time.
+            if (wander != NULL && objectEventId != OBJECT_EVENTS_COUNT)
+            {
+                gObjectEvents[objectEventId].initialCoords.x = template->x + MAP_OFFSET + dx;
+                gObjectEvents[objectEventId].initialCoords.y = template->y + MAP_OFFSET + dy;
+            }
+        }
     }
 }
 
@@ -1721,6 +1754,136 @@ static bool8 GetConnectionObjectCoordOffset(const struct MapConnection *connecti
         return TRUE;
     }
     return FALSE;
+}
+
+// Return the offset (dx, dy) that maps tile coordinates of map (mapGroup, mapNum) into the active
+// (camera) object frame: (0, 0) if it is the active map, the connection delta if it is laterally
+// connected to the active map, or FALSE if it is neither (not currently in view).
+static bool8 GetMapToActiveFrameOffset(u8 mapGroup, u8 mapNum, s16 *dx, s16 *dy)
+{
+    s32 i, count;
+    const struct MapConnection *connection;
+
+    if (mapGroup == gSaveBlock1Ptr->location.mapGroup && mapNum == gSaveBlock1Ptr->location.mapNum)
+    {
+        *dx = 0;
+        *dy = 0;
+        return TRUE;
+    }
+    if (gMapHeader.connections == NULL)
+        return FALSE;
+
+    count = gMapHeader.connections->count;
+    connection = gMapHeader.connections->connections;
+    for (i = 0; i < count; i++, connection++)
+    {
+        if (connection->mapGroup == mapGroup && connection->mapNum == mapNum)
+        {
+            const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
+            if (connHeader != NULL)
+                return GetConnectionObjectCoordOffset(connection, connHeader, dx, dy);
+            return FALSE;
+        }
+    }
+    return FALSE;
+}
+
+// --- Object-event wander store ---
+// Persisted record of objects that have walked off their home map onto an adjacent one. Each entry
+// is keyed by the object's home identity (localId + home map) and records the map it now stands on
+// plus its tile there (see struct ObjectEventWander). The spawner consults it so a displaced object
+// respawns where it wandered rather than at its template, and isn't double-spawned by its home map.
+
+static struct ObjectEventWander *FindObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    u8 i;
+
+    if (localId == 0)
+        return NULL;
+    for (i = 0; i < OBJECT_EVENT_WANDER_COUNT; i++)
+    {
+        struct ObjectEventWander *w = &gSaveBlock1Ptr->objectEventWanderStore[i];
+        if (w->localId == localId && w->homeMapNum == mapNum && w->homeMapGroup == mapGroup)
+            return w;
+    }
+    return NULL;
+}
+
+static void SetObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup, u8 curMapNum, u8 curMapGroup, s16 x, s16 y)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w == NULL)
+    {
+        u8 i;
+        for (i = 0; i < OBJECT_EVENT_WANDER_COUNT; i++)
+        {
+            if (gSaveBlock1Ptr->objectEventWanderStore[i].localId == 0)
+            {
+                w = &gSaveBlock1Ptr->objectEventWanderStore[i];
+                break;
+            }
+        }
+        if (w == NULL)
+            return; // store full; the object will reset to its home position on respawn
+        w->localId = localId;
+        w->homeMapNum = mapNum;
+        w->homeMapGroup = mapGroup;
+    }
+    w->curMapNum = curMapNum;
+    w->curMapGroup = curMapGroup;
+    w->x = x;
+    w->y = y;
+}
+
+static void ClearObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w != NULL)
+        w->localId = 0;
+}
+
+// Track which map an active object currently stands on. If it has crossed a seam onto a map other
+// than its home, record the displacement so it persists; once it returns to its home map, drop the
+// record. Called per active non-player object from ObjectEventUpdateElevation.
+static void UpdateObjectEventWanderTracking(struct ObjectEvent *objEvent)
+{
+    const struct MapConnection *connection;
+    u8 curMapNum, curMapGroup;
+    s16 localX, localY;
+
+    // Only template-owned NPCs wander; skip the player and special/anonymous objects. Also skip
+    // while the debug camera is detached, since objects then live in an abroad frame, not the
+    // player's, and GetMapConnectionAtPos would mislabel them.
+    if (objEvent->isPlayer || objEvent->localId == 0 || IsCameraDetachedFromPlayer())
+        return;
+
+    connection = GetMapConnectionAtPos(objEvent->currentCoords.x, objEvent->currentCoords.y);
+    if (connection == NULL)
+    {
+        curMapNum = gSaveBlock1Ptr->location.mapNum;
+        curMapGroup = gSaveBlock1Ptr->location.mapGroup;
+        localX = objEvent->currentCoords.x - MAP_OFFSET;
+        localY = objEvent->currentCoords.y - MAP_OFFSET;
+    }
+    else
+    {
+        const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
+        s16 dx, dy;
+
+        if (connHeader == NULL || !GetConnectionObjectCoordOffset(connection, connHeader, &dx, &dy))
+            return; // dive/emerge/diagonal — not a lateral displacement we track
+        curMapNum = connection->mapNum;
+        curMapGroup = connection->mapGroup;
+        localX = objEvent->currentCoords.x - MAP_OFFSET - dx;
+        localY = objEvent->currentCoords.y - MAP_OFFSET - dy;
+    }
+
+    if (curMapNum == objEvent->mapNum && curMapGroup == objEvent->mapGroup)
+        ClearObjectEventWander(objEvent->localId, objEvent->mapNum, objEvent->mapGroup);
+    else
+        SetObjectEventWander(objEvent->localId, objEvent->mapNum, objEvent->mapGroup, curMapNum, curMapGroup, localX, localY);
 }
 
 // Spawn object events that belong to maps laterally connected to the active map but whose tiles are
@@ -7887,6 +8050,12 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
         gPlayerBiome = MapGridGetMetatileBiomeAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
         gSaveBlock1Ptr->playerPos.x = objEvent->currentCoords.x - MAP_OFFSET;
         gSaveBlock1Ptr->playerPos.y = objEvent->currentCoords.y - MAP_OFFSET;
+    }
+    else
+    {
+        // Keep the wander store in sync with where this NPC currently stands, so a cross-seam
+        // displacement persists across culling, map reloads and saves (see the wander store above).
+        UpdateObjectEventWanderTracking(objEvent);
     }
 
     if (curElevation == ELEVATION_MULTI_LEVEL || prevElevation == ELEVATION_MULTI_LEVEL)

@@ -1064,7 +1064,8 @@ struct SaveBlock1
     /*0x31DC*/ struct Roamer roamer;
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
-    /*0x3598*/ u8 unused_3598[0x180]; // The camera's focus tile lived here; it is now general RAM (see gCameraPos).
+    /*0x3598*/ struct ObjectEventWander objectEventWanderStore[OBJECT_EVENT_WANDER_COUNT]; // 0x140 bytes
+    /*0x36D8*/ u8 unused_3598[0x40]; // Remaining filler from the old camera-focus slot (now gCameraPos).
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

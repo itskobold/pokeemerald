@@ -44,6 +44,9 @@
 #define DAYCARE_MON_COUNT 2
 #define POKEBLOCKS_COUNT 40
 #define OBJECT_EVENTS_COUNT 16
+// Max number of object events that can be simultaneously displaced onto a map other than their
+// home map (see SaveBlock1.objectEventWanderStore / struct ObjectEventWander).
+#define OBJECT_EVENT_WANDER_COUNT 32
 #define MAIL_COUNT (10 + PARTY_SIZE)
 #define SECRET_BASES_COUNT 20
 #define POKE_NEWS_COUNT 16
