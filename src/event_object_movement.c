@@ -1284,19 +1284,26 @@ static u8 GetObjectEventIdByLocalId(u8 localId)
     return OBJECT_EVENTS_COUNT;
 }
 
+static u8 InitObjectEventStateFromTemplateAt(const struct ObjectEventTemplate *template, u8 mapNum, u8 mapGroup, s16 x, s16 y);
+
 static u8 InitObjectEventStateFromTemplate(const struct ObjectEventTemplate *template, u8 mapNum, u8 mapGroup)
+{
+    return InitObjectEventStateFromTemplateAt(template, mapNum, mapGroup, template->x + MAP_OFFSET, template->y + MAP_OFFSET);
+}
+
+// As InitObjectEventStateFromTemplate, but the object's coordinates in the active (camera) frame
+// are supplied explicitly rather than derived from the template. Used to spawn an object that
+// belongs to a connected map: its template (x,y) are in that map's frame and must be transformed
+// into the active frame (see ConnectionTemplateToActiveCoords) before placement.
+static u8 InitObjectEventStateFromTemplateAt(const struct ObjectEventTemplate *template, u8 mapNum, u8 mapGroup, s16 x, s16 y)
 {
     struct ObjectEvent *objectEvent;
     u8 objectEventId;
-    s16 x;
-    s16 y;
 
     if (GetAvailableObjectEventId(template->localId, mapNum, mapGroup, &objectEventId))
         return OBJECT_EVENTS_COUNT;
     objectEvent = &gObjectEvents[objectEventId];
     ClearObjectEvent(objectEvent);
-    x = template->x + MAP_OFFSET;
-    y = template->y + MAP_OFFSET;
     objectEvent->active = TRUE;
     objectEvent->triggerGroundEffectsOnMove = TRUE;
     objectEvent->graphicsId = template->graphicsId;
@@ -1415,7 +1422,18 @@ void RemoveAllObjectEventsExceptPlayer(void)
     }
 }
 
+static u8 TrySetupObjectEventSpriteAt(const struct ObjectEventTemplate *objectEventTemplate, struct SpriteTemplate *spriteTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY, s16 x, s16 y);
+static u8 TrySpawnObjectEventTemplateAt(const struct ObjectEventTemplate *objectEventTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY, s16 x, s16 y);
+
 static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEventTemplate, struct SpriteTemplate *spriteTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY)
+{
+    return TrySetupObjectEventSpriteAt(objectEventTemplate, spriteTemplate, mapNum, mapGroup, cameraX, cameraY,
+                                       objectEventTemplate->x + MAP_OFFSET, objectEventTemplate->y + MAP_OFFSET);
+}
+
+// As TrySetupObjectEventSprite, but the active-frame coords (x,y) are supplied explicitly so an
+// object belonging to a connected map can be placed at its transformed position.
+static u8 TrySetupObjectEventSpriteAt(const struct ObjectEventTemplate *objectEventTemplate, struct SpriteTemplate *spriteTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY, s16 x, s16 y)
 {
     u8 spriteId;
     u8 paletteSlot;
@@ -1424,7 +1442,7 @@ static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEven
     struct ObjectEvent *objectEvent;
     const struct ObjectEventGraphicsInfo *graphicsInfo;
 
-    objectEventId = InitObjectEventStateFromTemplate(objectEventTemplate, mapNum, mapGroup);
+    objectEventId = InitObjectEventStateFromTemplateAt(objectEventTemplate, mapNum, mapGroup, x, y);
     if (objectEventId == OBJECT_EVENTS_COUNT)
         return OBJECT_EVENTS_COUNT;
 
@@ -1477,6 +1495,14 @@ static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEven
 
 static u8 TrySpawnObjectEventTemplate(const struct ObjectEventTemplate *objectEventTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY)
 {
+    return TrySpawnObjectEventTemplateAt(objectEventTemplate, mapNum, mapGroup, cameraX, cameraY,
+                                         objectEventTemplate->x + MAP_OFFSET, objectEventTemplate->y + MAP_OFFSET);
+}
+
+// As TrySpawnObjectEventTemplate, but the active-frame coords (x,y) are supplied explicitly. Used
+// to spawn a connected map's object after transforming its template coords into the active frame.
+static u8 TrySpawnObjectEventTemplateAt(const struct ObjectEventTemplate *objectEventTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY, s16 x, s16 y)
+{
     u8 objectEventId;
     struct SpriteTemplate spriteTemplate;
     struct SpriteFrameImage spriteFrameImage;
@@ -1487,7 +1513,7 @@ static u8 TrySpawnObjectEventTemplate(const struct ObjectEventTemplate *objectEv
     MakeSpriteTemplateFromObjectEventTemplate(objectEventTemplate, &spriteTemplate, &subspriteTables);
     spriteFrameImage.size = graphicsInfo->size;
     spriteTemplate.images = &spriteFrameImage;
-    objectEventId = TrySetupObjectEventSprite(objectEventTemplate, &spriteTemplate, mapNum, mapGroup, cameraX, cameraY);
+    objectEventId = TrySetupObjectEventSpriteAt(objectEventTemplate, &spriteTemplate, mapNum, mapGroup, cameraX, cameraY, x, y);
     if (objectEventId == OBJECT_EVENTS_COUNT)
         return OBJECT_EVENTS_COUNT;
 
@@ -1642,18 +1668,96 @@ u8 CreateVirtualObject(u8 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevatio
     return spriteId;
 }
 
-void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
+// Spawn the subset of an object template array that currently falls within the spawn window
+// around the camera. Each object is placed at its template coords plus (dx, dy) — the offset that
+// maps the source map's frame into the active (camera) object frame. (dx, dy) are (0, 0) for the
+// active map; for a connected map they are the connection delta (see GetConnectionObjectCoordOffset).
+static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate *templates, u8 count, u8 mapNum, u8 mapGroup, s16 dx, s16 dy, s16 cameraX, s16 cameraY)
 {
     u8 i;
+    s16 left = gCameraPos.x - 2;
+    s16 right = gCameraPos.x + MAP_OFFSET_W + 2;
+    s16 top = gCameraPos.y;
+    s16 bottom = gCameraPos.y + MAP_OFFSET_H + 2;
+
+    for (i = 0; i < count; i++)
+    {
+        const struct ObjectEventTemplate *template = &templates[i];
+        s16 npcX = template->x + MAP_OFFSET + dx;
+        s16 npcY = template->y + MAP_OFFSET + dy;
+
+        if (top <= npcY && bottom >= npcY && left <= npcX && right >= npcX
+            && !FlagGet(template->flagId))
+            TrySpawnObjectEventTemplateAt(template, mapNum, mapGroup, cameraX, cameraY, npcX, npcY);
+    }
+}
+
+// Compute the offset (dx, dy) that maps a connected map's template coordinates into the active
+// (camera) object frame, mirroring the placement geometry of SetPositionFromConnection /
+// FillConnection (src/fieldmap.c). Returns FALSE for connection kinds that aren't lateral border
+// crossings (dive/emerge) or aren't handled here (diagonals are corner-only fills the camera never
+// crosses into as a primary map, matching SetPositionFromConnection which also handles cardinals only).
+static bool8 GetConnectionObjectCoordOffset(const struct MapConnection *connection, const struct MapHeader *connHeader, s16 *dx, s16 *dy)
+{
+    s32 offset = connection->offset;
+
+    switch (connection->direction)
+    {
+    case CONNECTION_SOUTH:
+        *dx = offset;
+        *dy = gMapHeader.mapLayout->height;
+        return TRUE;
+    case CONNECTION_NORTH:
+        *dx = offset;
+        *dy = -connHeader->mapLayout->height;
+        return TRUE;
+    case CONNECTION_EAST:
+        *dx = gMapHeader.mapLayout->width;
+        *dy = offset;
+        return TRUE;
+    case CONNECTION_WEST:
+        *dx = -connHeader->mapLayout->width;
+        *dy = offset;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+// Spawn object events that belong to maps laterally connected to the active map but whose tiles are
+// currently visible to the player. This is what lets NPCs render across map connections: each
+// connected map's templates are transformed into the active frame and spawned with that map's
+// (mapNum, mapGroup) identity, so they remain logically owned by their home map. Already-spawned
+// objects are de-duplicated by (localId, mapNum, mapGroup) in InitObjectEventStateFromTemplateAt.
+static void TrySpawnConnectedMapObjectEvents(s16 cameraX, s16 cameraY)
+{
+    s32 i, count;
+    const struct MapConnection *connection;
+
+    if (gMapHeader.connections == NULL)
+        return;
+
+    count = gMapHeader.connections->count;
+    connection = gMapHeader.connections->connections;
+    for (i = 0; i < count; i++, connection++)
+    {
+        const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
+        s16 dx, dy;
+
+        if (connHeader == NULL || connHeader->events == NULL)
+            continue;
+        if (!GetConnectionObjectCoordOffset(connection, connHeader, &dx, &dy))
+            continue;
+        TrySpawnObjectEventTemplatesInView(connHeader->events->objectEvents, connHeader->events->objectEventCount,
+                                           connection->mapNum, connection->mapGroup, dx, dy, cameraX, cameraY);
+    }
+}
+
+void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
+{
     u8 objectCount;
 
     if (gMapHeader.events != NULL)
     {
-        s16 left = gCameraPos.x - 2;
-        s16 right = gCameraPos.x + MAP_OFFSET_W + 2;
-        s16 top = gCameraPos.y;
-        s16 bottom = gCameraPos.y + MAP_OFFSET_H + 2;
-
         if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
             objectCount = GetNumBattlePyramidObjectEvents();
         else if (InTrainerHill())
@@ -1661,16 +1765,16 @@ void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
         else
             objectCount = gMapHeader.events->objectEventCount;
 
-        for (i = 0; i < objectCount; i++)
-        {
-            struct ObjectEventTemplate *template = &gSaveBlock1Ptr->objectEventTemplates[i];
-            s16 npcX = template->x + MAP_OFFSET;
-            s16 npcY = template->y + MAP_OFFSET;
+        // Active map: spawn from the saveblock template copy (which carries script/flag/movement
+        // edits) at zero offset (already in the active frame).
+        TrySpawnObjectEventTemplatesInView(gSaveBlock1Ptr->objectEventTemplates, objectCount,
+                                           gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup,
+                                           0, 0, cameraX, cameraY);
 
-            if (top <= npcY && bottom >= npcY && left <= npcX && right >= npcX
-                && !FlagGet(template->flagId))
-                TrySpawnObjectEventTemplate(template, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, cameraX, cameraY);
-        }
+        // Connected maps: spawn the NPCs whose tiles are visible across a seam. Skip for the
+        // special interior modes, which have no overworld connections.
+        if (CurrentBattlePyramidLocation() == PYRAMID_LOCATION_NONE && !InTrainerHill())
+            TrySpawnConnectedMapObjectEvents(cameraX, cameraY);
     }
 }
 

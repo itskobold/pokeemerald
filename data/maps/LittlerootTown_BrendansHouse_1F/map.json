@@ -8,6 +8,9 @@
   "allow_escaping": false,
   "allow_running": false,
   "num_locations": 1,
+  "map_grid_x": 0,
+  "map_grid_y": 0,
+  "biome_group": "",
   "locations": [
     {
       "secondary_tileset": "gTileset_BrendansMaysHouse",
