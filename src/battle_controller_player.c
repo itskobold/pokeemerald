@@ -20,7 +20,6 @@
 #include "pokeball.h"
 #include "pokemon.h"
 #include "random.h"
-#include "recorded_battle.h"
 #include "reshow_battle_screen.h"
 #include "sound.h"
 #include "string_util.h"
@@ -3096,7 +3095,6 @@ static void PlayerHandleBattleAnimation(void)
 
 static void PlayerHandleLinkStandbyMsg(void)
 {
-    RecordedBattle_RecordAllBattlerData(&gBattleBufferA[gActiveBattler][2]);
     switch (gBattleBufferA[gActiveBattler][1])
     {
     case LINK_STANDBY_MSG_STOP_BOUNCE:
@@ -3133,7 +3131,6 @@ static void PlayerHandleResetActionMoveSelection(void)
 
 static void PlayerHandleEndLinkBattle(void)
 {
-    RecordedBattle_RecordAllBattlerData(&gBattleBufferA[gActiveBattler][4]);
     gBattleOutcome = gBattleBufferA[gActiveBattler][1];
     gSaveBlock2Ptr->frontier.disableRecordBattle = gBattleBufferA[gActiveBattler][2];
     FadeOutMapMusic(5);

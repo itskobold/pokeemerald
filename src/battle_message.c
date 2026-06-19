@@ -14,7 +14,6 @@
 #include "link.h"
 #include "menu.h"
 #include "palette.h"
-#include "recorded_battle.h"
 #include "string_util.h"
 #include "strings.h"
 #include "text.h"
@@ -1954,8 +1953,6 @@ static const struct BattleWindowText *const sBattleTextOnWindowsInfo[] =
     [B_WIN_TYPE_ARENA]  = sTextOnWindowsInfo_Arena
 };
 
-static const u8 sRecordedBattleTextSpeeds[] = {8, 4, 1, 0};
-
 void BufferStringBattle(u16 stringID)
 {
     s32 i;
@@ -3008,8 +3005,6 @@ void BattlePutTextOnWindow(const u8 *text, u8 windowId)
     {
         if (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED_LINK))
             speed = 1;
-        else if (gBattleTypeFlags & BATTLE_TYPE_RECORDED)
-            speed = sRecordedBattleTextSpeeds[GetTextSpeedInRecordedBattle()];
         else
             speed = GetPlayerTextSpeedDelay();
 

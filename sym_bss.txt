@@ -42,7 +42,6 @@
 	.include "src/pokedex_area_screen.o"
 	.include "src/battle_transition.o"
 	.include "src/pokemon_animation.o"
-	.include "src/recorded_battle.o"
 	.include "src/battle_factory_screen.o"
 	.include "src/battle_factory.o"
 	.include "src/battle_pike.o"

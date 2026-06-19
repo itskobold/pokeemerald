@@ -283,9 +283,6 @@ SECTIONS {
         src/fldeff_teleport.o(.text);
         src/battle_tv.o(.text);
         src/pokemon_animation.o(.text);
-        src/recorded_battle.o(.text);
-        src/battle_controller_recorded_opponent.o(.text);
-        src/battle_controller_recorded_player.o(.text);
         src/trainer_pokemon_sprites.o(.text);
         src/lilycove_lady.o(.text);
         src/battle_dome.o(.text);
@@ -645,8 +642,6 @@ SECTIONS {
         src/bard_music.o(.rodata);
         src/battle_tv.o(.rodata);
         src/pokemon_animation.o(.rodata);
-        src/battle_controller_recorded_opponent.o(.rodata);
-        src/battle_controller_recorded_player.o(.rodata);
         src/trainer_pokemon_sprites.o(.rodata);
         src/lilycove_lady.o(.rodata);
         src/battle_dome.o(.rodata);

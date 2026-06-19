@@ -16,7 +16,6 @@
 #include "palette.h"
 #include "pokeball.h"
 #include "pokemon.h"
-#include "recorded_battle.h"
 #include "reshow_battle_screen.h"
 #include "sound.h"
 #include "string_util.h"
@@ -27,7 +26,6 @@
 #include "constants/battle_anim.h"
 #include "constants/songs.h"
 #include "constants/trainers.h"
-#include "recorded_battle.h"
 
 static void LinkOpponentHandleGetMonData(void);
 static void LinkOpponentHandleGetRawMonData(void);
@@ -1821,7 +1819,6 @@ static void LinkOpponentHandleBattleAnimation(void)
 
 static void LinkOpponentHandleLinkStandbyMsg(void)
 {
-    RecordedBattle_RecordAllBattlerData(&gBattleBufferA[gActiveBattler][2]);
     LinkOpponentBufferExecCompleted();
 }
 
@@ -1832,7 +1829,6 @@ static void LinkOpponentHandleResetActionMoveSelection(void)
 
 static void LinkOpponentHandleEndLinkBattle(void)
 {
-    RecordedBattle_RecordAllBattlerData(&gBattleBufferA[gActiveBattler][4]);
 
     if (gBattleBufferA[gActiveBattler][1] == B_OUTCOME_DREW)
         gBattleOutcome = gBattleBufferA[gActiveBattler][1];

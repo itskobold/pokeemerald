@@ -13,7 +13,6 @@
 #include "text.h"
 #include "sound.h"
 #include "pokedex.h"
-#include "recorded_battle.h"
 #include "window.h"
 #include "reshow_battle_screen.h"
 #include "main.h"
@@ -5167,7 +5166,6 @@ static void Cmd_switchhandleorder(void)
                 *(gBattleStruct->monToSwitchIntoId + i) = gBattleBufferB[i][1];
                 if (!(gBattleStruct->field_93 & gBitTable[i]))
                 {
-                    RecordedBattle_SetBattlerAction(i, gBattleBufferB[i][1]);
                     gBattleStruct->field_93 |= gBitTable[i];
                 }
             }
@@ -5180,7 +5178,6 @@ static void Cmd_switchhandleorder(void)
     case 2:
         if (!(gBattleStruct->field_93 & gBitTable[gActiveBattler]))
         {
-            RecordedBattle_SetBattlerAction(gActiveBattler, gBattleBufferB[gActiveBattler][1]);
             gBattleStruct->field_93 |= gBitTable[gActiveBattler];
         }
         // fall through

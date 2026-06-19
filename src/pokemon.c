@@ -26,7 +26,6 @@
 #include "pokemon_summary_screen.h"
 #include "pokemon_storage_system.h"
 #include "random.h"
-#include "recorded_battle.h"
 #include "rtc.h"
 #include "sound.h"
 #include "string_util.h"
