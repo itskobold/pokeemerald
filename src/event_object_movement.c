@@ -1862,7 +1862,10 @@ static struct ObjectEventWander *FindObjectEventWander(u8 localId, u8 mapNum, u8
     return NULL;
 }
 
-static void SetObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup, u8 curMapNum, u8 curMapGroup, s16 x, s16 y)
+// Create or update the wander entry for an object's home identity, recording the map it now stands
+// on and its tile there. Returns the entry, or NULL if the store is full (the object then resets to
+// its home position on respawn).
+static struct ObjectEventWander *SetObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup, u8 curMapNum, u8 curMapGroup, s16 x, s16 y)
 {
     struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
 
@@ -1878,7 +1881,7 @@ static void SetObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup, u8 curMapNu
             }
         }
         if (w == NULL)
-            return; // store full; the object will reset to its home position on respawn
+            return NULL; // store full; the object will reset to its home position on respawn
         w->localId = localId;
         w->homeMapNum = mapNum;
         w->homeMapGroup = mapGroup;
@@ -1889,49 +1892,50 @@ static void SetObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup, u8 curMapNu
     w->curMapGroup = curMapGroup;
     w->x = x;
     w->y = y;
+    return w;
+}
+
+// Return the wander entry for an object's home identity, anchoring a new one at its home template
+// position if none exists, so a permanent override (movement type / spawn position) can attach to it.
+// An existing (possibly displaced) entry is returned unchanged. NULL if the object has no template or
+// the store is full.
+static struct ObjectEventWander *FindOrAnchorObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w == NULL)
+    {
+        const struct ObjectEventTemplate *template = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
+        if (template == NULL)
+            return NULL;
+        w = SetObjectEventWander(localId, mapNum, mapGroup, mapNum, mapGroup, template->x, template->y);
+    }
+    return w;
 }
 
 // Record a permanent movement-type override for a cross-map object (set by setobjectmovementtype
-// targeting a map other than the active one). If the object has no entry yet (not displaced), anchor
-// one at its home template position so the spawner applies the override without treating it as
-// displaced; an existing (possibly displaced) entry keeps its position and just gains the override.
+// targeting a map other than the active one). Anchored at the home template position if the object
+// has no entry yet (so the spawner applies the override without treating it as displaced).
 static void SetObjectEventWanderMovementType(u8 localId, u8 mapNum, u8 mapGroup, u8 movementType)
 {
-    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+    struct ObjectEventWander *w = FindOrAnchorObjectEventWander(localId, mapNum, mapGroup);
 
-    if (w == NULL)
-    {
-        const struct ObjectEventTemplate *template = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
-        if (template == NULL)
-            return;
-        SetObjectEventWander(localId, mapNum, mapGroup, mapNum, mapGroup, template->x, template->y);
-        w = FindObjectEventWander(localId, mapNum, mapGroup);
-        if (w == NULL)
-            return; // store full
-    }
-    w->movementType = movementType;
+    if (w != NULL)
+        w->movementType = movementType;
 }
 
 // Record a permanent home-map spawn-position override for a cross-map object (set by setobjectxyperm
-// targeting a connected map, whose template is read-only ROM). Anchors a new entry at home if needed;
-// an existing (possibly displaced) entry keeps its displacement and just gains the override. The
-// spawner uses (permX, permY) for the object's home-map spawn whenever it isn't displaced.
+// targeting a connected map, whose template is read-only ROM). The spawner uses (permX, permY) for
+// the object's home-map spawn whenever it isn't displaced.
 static void SetObjectEventWanderPermCoords(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y)
 {
-    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+    struct ObjectEventWander *w = FindOrAnchorObjectEventWander(localId, mapNum, mapGroup);
 
-    if (w == NULL)
+    if (w != NULL)
     {
-        const struct ObjectEventTemplate *template = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
-        if (template == NULL)
-            return;
-        SetObjectEventWander(localId, mapNum, mapGroup, mapNum, mapGroup, template->x, template->y);
-        w = FindObjectEventWander(localId, mapNum, mapGroup);
-        if (w == NULL)
-            return; // store full
+        w->permX = x;
+        w->permY = y;
     }
-    w->permX = x;
-    w->permY = y;
 }
 
 // Set an object's movement type, addressing it by its home map. On the active map this edits the
