@@ -204,6 +204,18 @@ struct MapConnections
     const struct MapConnection *connections;
 };
 
+// A map that overlaps the camera window, with the offset (dx, dy) that places its local (0,0) tile
+// into the home (active) frame. Built by the view-frame resolver in event_object_movement.c and
+// consumed by the tile-window stitcher in fieldmap.c.
+#define MAX_MAPS_IN_VIEW 8 // home + 4 cardinals + the corners straddled at once
+struct ViewMap
+{
+    u8 mapGroup;
+    u8 mapNum;
+    s16 dx;
+    s16 dy;
+};
+
 // Properties that apply per in-map location. A map's per-tile location attribute
 // (see MAPGRID_LOCATION_MASK) is intended to select which set of these properties
 // is active. Each set is stored as its own const instance in ROM and referenced

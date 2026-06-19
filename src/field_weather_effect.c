@@ -2623,6 +2623,14 @@ void SetSavedWeatherFromCurrMapHeader(void)
     UpdateRainCounter(gSaveBlock1Ptr->weather, oldWeather);
 }
 
+// Transitions the DISPLAYED weather to a map's weather without persisting it to the saveblock. Used by
+// the roaming camera to preview a connected map's weather across a boundary while the saved weather
+// stays the player's home-map weather.
+void SetNextWeatherFromMapHeader(const struct MapHeader *mapHeader)
+{
+    SetNextWeather(TranslateWeatherNum(mapHeader->weather));
+}
+
 void SetWeather(u32 weather)
 {
     SetSavedWeather(weather);

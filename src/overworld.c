@@ -835,16 +835,35 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
 // (music change + map-name popup): see the two wrappers below.
 static void UpdateMapLocation(s16 x, s16 y, bool8 allowPlayerFacing)
 {
+    // The focus tile may belong to a connected map the camera has roamed onto; its location index is
+    // an index into THAT map, so validate and resolve against the focus map, not always home.
+    const struct MapHeader *focusHeader = GetCameraFocusMapHeader();
+    struct ViewMap anchor;
     u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
-    // Where the visible map is headed: a swap already queued is aiming for its latched target
-    // (data[0]); with nothing queued we're settled in the active location.
-    u8 currentTarget = (taskId == TASK_NONE) ? GetActiveMapLocation() : gTasks[taskId].data[0];
+    u8 curGroup, curNum, curLocation;
 
-    if (newLocation == currentTarget)
+    GetCameraViewAnchor(&anchor);
+
+    // Ignore tiles tagged with a location the focus map doesn't actually define.
+    if (newLocation >= MAX_MAP_LOCATIONS || focusHeader->locations[newLocation] == NULL)
         return;
-    // Ignore tiles tagged with a location the map doesn't actually define.
-    if (newLocation >= MAX_MAP_LOCATIONS || gMapHeader.locations[newLocation] == NULL)
+
+    // Where the visible map is headed: a queued swap aims for its latched (map, location); with
+    // nothing queued we're settled in the active (map, location). Skip if the focus already targets
+    // it — keyed on the map too, so a same-index tile on a different map still triggers a reload.
+    if (taskId == TASK_NONE)
+    {
+        GetActiveLocationMap(&curGroup, &curNum);
+        curLocation = GetActiveMapLocation();
+    }
+    else
+    {
+        curGroup = gTasks[taskId].data[2];
+        curNum = gTasks[taskId].data[3];
+        curLocation = gTasks[taskId].data[0];
+    }
+    if (newLocation == curLocation && anchor.mapGroup == curGroup && anchor.mapNum == curNum)
         return;
 
     // Defer the whole switch — active-location pointer, tileset graphics, music and map-name popup
@@ -854,6 +873,8 @@ static void UpdateMapLocation(s16 x, s16 y, bool8 allowPlayerFacing)
     if (taskId == TASK_NONE)
         taskId = CreateTask(Task_UpdateMapLocationGfx, 80);
     gTasks[taskId].data[0] = newLocation;
+    gTasks[taskId].data[2] = anchor.mapGroup;
+    gTasks[taskId].data[3] = anchor.mapNum;
 
     // The music and map-name popup are player-facing, so only trigger them for a player-driven
     // crossing with the camera attached to and following the player. The IsCameraDetachedFromPlayer
@@ -909,7 +930,7 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
     if (gFieldCamera.x != 0 || gFieldCamera.y != 0)
         return;
 
-    SetActiveMapLocation(gTasks[taskId].data[0]);
+    SetActiveMapLocationForMap(gTasks[taskId].data[2], gTasks[taskId].data[3], gTasks[taskId].data[0]);
     ApplyActiveLocationSecondaryTileset();
     DrawWholeMapView();
 
@@ -931,8 +952,11 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
 // knows it must redraw the map); FALSE if nothing changed.
 bool8 UpdateMapLocationGfxImmediate(s16 x, s16 y)
 {
+    const struct MapHeader *focusHeader = GetCameraFocusMapHeader();
+    struct ViewMap anchor;
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
     u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
+    u8 curGroup, curNum;
     // A deferred swap in flight means the active-location pointer was already advanced but its
     // tileset hasn't been loaded into VRAM yet. The jump cancels that task, so its pending load must
     // happen here — even if the location index ends up unchanged below — or the redraw shows the
@@ -945,12 +969,15 @@ bool8 UpdateMapLocationGfxImmediate(s16 x, s16 y)
     if (taskId != TASK_NONE)
         DestroyTask(taskId);
 
-    // Adopt the destination tile's location when the map defines it (ignoring undefined-location
-    // tiles, like TryUpdateMapLocation); a real change is its own reason to reload.
-    if (newLocation < MAX_MAP_LOCATIONS && gMapHeader.locations[newLocation] != NULL
-     && newLocation != GetActiveMapLocation())
+    GetCameraViewAnchor(&anchor);
+    GetActiveLocationMap(&curGroup, &curNum);
+
+    // Adopt the destination tile's (map, location) when the focus map defines it (ignoring undefined-
+    // location tiles, like TryUpdateMapLocation); a change in either map or location index reloads.
+    if (newLocation < MAX_MAP_LOCATIONS && focusHeader->locations[newLocation] != NULL
+     && (newLocation != GetActiveMapLocation() || anchor.mapGroup != curGroup || anchor.mapNum != curNum))
     {
-        SetActiveMapLocation(newLocation);
+        SetActiveMapLocationForMap(anchor.mapGroup, anchor.mapNum, newLocation);
         mustReload = TRUE;
     }
 

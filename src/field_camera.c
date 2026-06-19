@@ -398,18 +398,19 @@ static void UpdateFreecamMovement(struct CameraObject *fieldCamera)
     if (fieldCamera->x == 0 && fieldCamera->y == 0)
     {
         u16 keys = ArePlayerFieldControlsLocked() ? 0 : gMain.heldKeys;
-        int width = gMapHeader.mapLayout->width;
-        int height = gMapHeader.mapLayout->height;
 
         sFreecamMoveX = 0;
         sFreecamMoveY = 0;
-        if ((keys & DPAD_RIGHT) && gCameraPos.x < width - 1)
+        // Roam onto any tile backed by real map data (the home map or a stitched connection), and stop
+        // at the edge of the connected plane instead of drifting into empty space. No longer clamped to
+        // the home map's own bounds, so the camera crosses connection seams (diagonally too).
+        if ((keys & DPAD_RIGHT) && IsCameraTileDefined(gCameraPos.x + 1, gCameraPos.y))
             sFreecamMoveX = FREECAM_SPEED;
-        else if ((keys & DPAD_LEFT) && gCameraPos.x > 0)
+        else if ((keys & DPAD_LEFT) && IsCameraTileDefined(gCameraPos.x - 1, gCameraPos.y))
             sFreecamMoveX = -FREECAM_SPEED;
-        if ((keys & DPAD_DOWN) && gCameraPos.y < height - 1)
+        if ((keys & DPAD_DOWN) && IsCameraTileDefined(gCameraPos.x, gCameraPos.y + 1))
             sFreecamMoveY = FREECAM_SPEED;
-        else if ((keys & DPAD_UP) && gCameraPos.y > 0)
+        else if ((keys & DPAD_UP) && IsCameraTileDefined(gCameraPos.x, gCameraPos.y - 1))
             sFreecamMoveY = -FREECAM_SPEED;
     }
     fieldCamera->movementSpeedX = sFreecamMoveX;
@@ -531,6 +532,9 @@ static void CenterCameraOnTile(s16 x, s16 y)
     // left at a stale sub-tile position. UpdateObjectEventsForCameraUpdate culls before it spawns,
     // so a far jump frees the old view's slots before filling them with the new context's objects.
     UpdateObjectEventsForCameraUpdate(0, 0);
+    // Re-align the tile buffer with the (possibly jumped) focus before the gfx update and redraw below
+    // read it: on a jump back onto the home map this restores the canonical buffer, undoing any roam.
+    StitchCameraView();
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         if (gObjectEvents[i].active)
@@ -1010,12 +1014,16 @@ void CameraUpdate(void)
     if (deltaX != 0 || deltaY != 0)
     {
         CameraMove(deltaX, deltaY);
+        UpdateObjectEventsForCameraUpdate(deltaX, deltaY);
+        // Rebuild the in-view set/anchor (above) then re-center the tile buffer on the camera BEFORE
+        // the focus tile is read below, so location/elevation/biome and the slice redraw all see the
+        // stitched foreign-map data as the camera crosses a connection seam.
+        StitchCameraView();
         // Location is driven by the camera, not the player: re-evaluate the active map location from
         // the camera's new focus tile, so transitions stay correct even while detached.
         TryUpdateMapLocation(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
         UpdateCameraElevation();
         UpdateCameraBiome();
-        UpdateObjectEventsForCameraUpdate(deltaX, deltaY);
         RotatingGatePuzzleCameraUpdate(deltaX, deltaY);
         SetBerryTreesSeen();
         AddCameraTileOffset(&sFieldCameraOffset, deltaX * 2, deltaY * 2);

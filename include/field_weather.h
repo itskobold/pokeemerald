@@ -226,6 +226,7 @@ bool8 Bubbles_Finish(void);
 u8 GetSavedWeather(void);
 void SetSavedWeather(u32 weather);
 void SetSavedWeatherFromCurrMapHeader(void);
+void SetNextWeatherFromMapHeader(const struct MapHeader *mapHeader);
 void SetWeather(u32 weather);
 void DoCurrentWeather(void);
 void UpdateWeatherPerDay(u16 increment);

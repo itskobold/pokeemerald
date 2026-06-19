@@ -1,7 +1,9 @@
 #include "global.h"
 #include "battle_pyramid.h"
 #include "bg.h"
+#include "event_object_movement.h"
 #include "field_camera.h"
+#include "field_weather.h"
 #include "fieldmap.h"
 #include "fldeff.h"
 #include "fldeff_misc.h"
@@ -62,23 +64,48 @@ static const struct MapConnection *GetIncomingConnection(u8 direction, int x, in
 static bool8 IsPosInIncomingConnectingMap(u8 direction, int x, int y, const struct MapConnection *connection);
 static bool8 IsCoordInIncomingConnectingMap(int coord, int srcMax, int destMax, int offset);
 
+// Border (void) tiles use the focus map's border, not always home's, so the empty space past a
+// roamed connection's edge shows that map's border — and stays consistent with its secondary tileset,
+// which ActiveLocationHeader() also drives.
 #define GetBorderBlockAt(x, y) ({                                                                  \
     u16 block;                                                                                     \
     int i;                                                                                         \
-    const u16 *border = gMapHeader.mapLayout->border; /* Unused, they read it again below */       \
+    const u16 *border = ActiveLocationHeader()->mapLayout->border; /* Unused, they read it again below */ \
                                                                                                    \
     i = (x + 1) & 1;                                                                               \
     i += ((y + 1) & 1) * 2;                                                                        \
                                                                                                    \
-    block = gMapHeader.mapLayout->border[i];                                                       \
+    block = ActiveLocationHeader()->mapLayout->border[i];                                          \
 })
 
-#define AreCoordsWithinMapGridBounds(x, y) (x >= 0 && x < gBackupMapLayout.width && y >= 0 && y < gBackupMapLayout.height)
+// The backup buffer slides with the camera's anchor map (the map currently under the camera). A
+// tile's buffer cell is its passed coordinate (home-frame + MAP_OFFSET, the convention every caller
+// already uses) minus the anchor's home-frame offset. Both shifts are 0 while the camera is on the
+// home map, so normal play indexes the buffer exactly as before. See StitchCameraView.
+static s16 sCameraViewShiftX;
+static s16 sCameraViewShiftY;
 
-#define GetMapGridBlockAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.map[x + gBackupMapLayout.width * y] : GetBorderBlockAt(x, y))
+#define MapGridBufX(x) ((x) - sCameraViewShiftX)
+#define MapGridBufY(y) ((y) - sCameraViewShiftY)
+
+#define AreCoordsWithinMapGridBounds(x, y) (MapGridBufX(x) >= 0 && MapGridBufX(x) < gBackupMapLayout.width && MapGridBufY(y) >= 0 && MapGridBufY(y) < gBackupMapLayout.height)
+
+#define GetMapGridBlockAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.map[MapGridBufX(x) + gBackupMapLayout.width * MapGridBufY(y)] : GetBorderBlockAt(x, y))
 
 // Out-of-bounds (border) tiles have no attributes; treat them as impassable.
-#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[x + gBackupMapLayout.width * y] : MAPATTR_COLLISION)
+#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[MapGridBufX(x) + gBackupMapLayout.width * MapGridBufY(y)] : MAPATTR_COLLISION)
+
+// Whether the buffer currently holds a roamed (non-home) anchor, plus the view it was last stitched
+// from, so a re-stitch only runs when the anchor or in-view set actually changes and the return to
+// the home map restores the canonical buffer exactly once.
+static bool8 sCameraViewRoaming;
+static struct ViewMap sLastStitchAnchor;
+static struct ViewMap sLastStitchMaps[MAX_MAPS_IN_VIEW];
+static u8 sLastStitchCount;
+// The map whose weather is currently applied, so weather transitions once each time the camera roams
+// onto a different map rather than every frame.
+static u8 sCameraWeatherMapGroup;
+static u8 sCameraWeatherMapNum;
 
 const struct MapHeader *const GetMapHeaderFromConnection(const struct MapConnection *connection)
 {
@@ -97,21 +124,76 @@ void GetMapGridXY(u8 *outX, u8 *outY)
     *outY = gMapHeader.mapGridY;
 }
 
+// The map whose locations[] array the active location index refers to. While the camera roams onto a
+// connected map (which never becomes gMapHeader), the focus tile's location index belongs to that
+// map, so its properties — secondary tileset above all — must resolve against its header, not home's.
+// sActiveLocationHeader NULL means the home map (&gMapHeader); the group/num identify it for the
+// camera location-update's change detection.
+static const struct MapHeader *sActiveLocationHeader;
+static u8 sActiveLocationMapGroup;
+static u8 sActiveLocationMapNum;
+
+static const struct MapHeader *ActiveLocationHeader(void)
+{
+    return sActiveLocationHeader != NULL ? sActiveLocationHeader : &gMapHeader;
+}
+
 // Returns the location property set the rest of the game should read for the
 // current map. Falls back to slot 0 if the requested slot is undefined (NULL).
 const struct MapHeaderLocationData *GetActiveLocationData(void)
 {
-    const struct MapHeaderLocationData *data = gMapHeader.locations[sActiveMapLocation];
+    const struct MapHeader *header = ActiveLocationHeader();
+    const struct MapHeaderLocationData *data = header->locations[sActiveMapLocation];
     if (data == NULL)
-        data = gMapHeader.locations[0];
+        data = header->locations[0];
     return data;
 }
 
 void SetActiveMapLocation(u8 location)
 {
+    // Index-only setter for home-map contexts (map load, scripts): the active location belongs to home.
+    sActiveLocationHeader = &gMapHeader;
+    sActiveLocationMapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sActiveLocationMapNum = gSaveBlock1Ptr->location.mapNum;
     if (location >= MAX_MAP_LOCATIONS || gMapHeader.locations[location] == NULL)
         location = 0;
     sActiveMapLocation = location;
+}
+
+// As SetActiveMapLocation, but binds the index to a specific (connected) map — used by the camera's
+// location update so that map's location indices resolve against it.
+void SetActiveMapLocationForMap(u8 mapGroup, u8 mapNum, u8 location)
+{
+    const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum);
+
+    if (header == NULL)
+        header = &gMapHeader;
+    if (location >= MAX_MAP_LOCATIONS || header->locations[location] == NULL)
+        location = 0;
+    sActiveLocationHeader = header;
+    sActiveLocationMapGroup = mapGroup;
+    sActiveLocationMapNum = mapNum;
+    sActiveMapLocation = location;
+}
+
+// The (group, num) of the map the active location index belongs to (home, or a roamed connection).
+void GetActiveLocationMap(u8 *mapGroup, u8 *mapNum)
+{
+    *mapGroup = sActiveLocationMapGroup;
+    *mapNum = sActiveLocationMapNum;
+}
+
+// The map header the camera's focus tile belongs to: the anchor map while roaming, else the home map.
+const struct MapHeader *GetCameraFocusMapHeader(void)
+{
+    struct ViewMap anchor;
+    const struct MapHeader *header;
+
+    GetCameraViewAnchor(&anchor);
+    if (anchor.mapGroup == gSaveBlock1Ptr->location.mapGroup && anchor.mapNum == gSaveBlock1Ptr->location.mapNum)
+        return &gMapHeader;
+    header = Overworld_GetMapHeaderByGroupAndId(anchor.mapGroup, anchor.mapNum);
+    return header != NULL ? header : &gMapHeader;
 }
 
 // Selects the active location from the camera's focus tile, on map load, so the initial
@@ -170,6 +252,15 @@ static void InitMapLayoutData(struct MapHeader *mapHeader)
     struct MapLayout const *mapLayout;
     int width;
     int height;
+    // A fresh map load (including a player connection transition) re-bases the buffer on the new home
+    // map at zero shift; clear any roaming offset left by the camera so this build is canonical.
+    sCameraViewShiftX = 0;
+    sCameraViewShiftY = 0;
+    sCameraViewRoaming = FALSE;
+    // The load path applies this map's weather; align the tracker so roaming only re-transitions on a
+    // genuine map change (and the player's own transitions don't double-trigger it).
+    sCameraWeatherMapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sCameraWeatherMapNum = gSaveBlock1Ptr->location.mapNum;
     mapLayout = mapHeader->mapLayout;
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
     CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
@@ -184,6 +275,159 @@ static void InitMapLayoutData(struct MapHeader *mapHeader)
         InitBackupMapLayoutData(mapLayout->map, mapLayout->mapAttributes, mapLayout->width, mapLayout->height);
         InitBackupMapLayoutConnections(mapHeader);
     }
+}
+
+// Copy a whole map's tiles + attributes into the backup buffer at buffer cell (destX, destY) (the
+// position of the map's local (0,0)), clipped to the buffer. Generalises FillConnection: the stitcher
+// lays every in-view map into the anchor-centered buffer this way, including diagonal corners.
+static void BlitMapIntoBuffer(const struct MapLayout *src, int destX, int destY)
+{
+    int srcX = 0, srcY = 0;
+    int w = src->width, h = src->height;
+    int y;
+
+    if (destX < 0) { srcX = -destX; w += destX; destX = 0; }
+    if (destY < 0) { srcY = -destY; h += destY; destY = 0; }
+    if (destX + w > gBackupMapLayout.width)
+        w = gBackupMapLayout.width - destX;
+    if (destY + h > gBackupMapLayout.height)
+        h = gBackupMapLayout.height - destY;
+    if (w <= 0 || h <= 0)
+        return;
+
+    for (y = 0; y < h; y++)
+    {
+        const u16 *srcRow = &src->map[(srcY + y) * src->width + srcX];
+        const u8 *attrSrcRow = &src->mapAttributes[(srcY + y) * src->width + srcX];
+        u16 *dstRow = &gBackupMapLayout.map[(destY + y) * gBackupMapLayout.width + destX];
+        u8 *attrDstRow = &gBackupMapLayout.attributes[(destY + y) * gBackupMapLayout.width + destX];
+
+        CpuCopy16(srcRow, dstRow, w * 2);
+        memcpy(attrDstRow, attrSrcRow, w);
+    }
+}
+
+// Rebuild the backup buffer centered on the anchor map (placed at MAP_OFFSET, like a normal map),
+// filling its border ring from every in-view map at its anchor-relative offset. Sets the buffer
+// shift so MapGrid lookups in the home frame land in the right cell.
+static bool8 StitchAnchorBuffer(const struct ViewMap *anchor, const struct ViewMap *maps, u8 count)
+{
+    const struct MapHeader *anchorHeader = Overworld_GetMapHeaderByGroupAndId(anchor->mapGroup, anchor->mapNum);
+    int width, height;
+    u8 i;
+
+    if (anchorHeader == NULL || anchorHeader->mapLayout == NULL)
+        return FALSE;
+    width = anchorHeader->mapLayout->width + MAP_OFFSET_W;
+    height = anchorHeader->mapLayout->height + MAP_OFFSET_H;
+    if (width * height > MAX_MAP_DATA_SIZE)
+        return FALSE; // anchor map too large to stitch; leave the current buffer in place
+
+    CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
+    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    gBackupMapLayout.map = sBackupMapData;
+    gBackupMapLayout.attributes = sBackupMapAttrData;
+    gBackupMapLayout.width = width;
+    gBackupMapLayout.height = height;
+
+    for (i = 0; i < count; i++)
+    {
+        const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(maps[i].mapGroup, maps[i].mapNum);
+
+        if (header == NULL || header->mapLayout == NULL)
+            continue;
+        // The map's local (0,0) in home-frame coords is maps[i].dx/dy; its buffer cell is that minus
+        // the anchor's offset, plus the MAP_OFFSET that frames the anchor map.
+        BlitMapIntoBuffer(header->mapLayout,
+                          (maps[i].dx - anchor->dx) + MAP_OFFSET,
+                          (maps[i].dy - anchor->dy) + MAP_OFFSET);
+    }
+
+    sCameraViewShiftX = anchor->dx;
+    sCameraViewShiftY = anchor->dy;
+    return TRUE;
+}
+
+// Whether the in-view set (anchor + member maps with their offsets) differs from what is currently
+// stitched, so we only rebuild the buffer when it would actually change.
+static bool8 ViewChangedSinceLastStitch(const struct ViewMap *anchor, const struct ViewMap *maps, u8 count)
+{
+    u8 i;
+
+    if (!sCameraViewRoaming || count != sLastStitchCount
+     || anchor->mapGroup != sLastStitchAnchor.mapGroup || anchor->mapNum != sLastStitchAnchor.mapNum
+     || anchor->dx != sLastStitchAnchor.dx || anchor->dy != sLastStitchAnchor.dy)
+        return TRUE;
+
+    for (i = 0; i < count; i++)
+    {
+        if (maps[i].mapGroup != sLastStitchMaps[i].mapGroup || maps[i].mapNum != sLastStitchMaps[i].mapNum
+         || maps[i].dx != sLastStitchMaps[i].dx || maps[i].dy != sLastStitchMaps[i].dy)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// Keep the backup buffer aligned with the camera as it roams across map connections. While the camera
+// is on the home map this is a no-op (the buffer is the canonical one InitMap built); once it crosses
+// onto another map the buffer re-centers on that anchor, and on return home the canonical buffer is
+// restored. Driven from CameraUpdate, after the in-view set is rebuilt and before the slice redraw.
+void StitchCameraView(void)
+{
+    struct ViewMap anchor;
+    const struct ViewMap *maps;
+    u8 count, i;
+    bool8 onHome;
+
+    GetCameraViewAnchor(&anchor);
+    count = GetMapsInView(&maps);
+    onHome = (anchor.mapGroup == gSaveBlock1Ptr->location.mapGroup
+           && anchor.mapNum == gSaveBlock1Ptr->location.mapNum
+           && anchor.dx == 0 && anchor.dy == 0);
+
+    // Weather follows the camera across boundaries, but only the DISPLAYED weather — the saved weather
+    // (gSaveBlock1Ptr->weather) must stay the player's home-map weather so a save while roaming records
+    // the player's weather, not the camera's. Preview the roamed map's weather, and on return restore
+    // the player's saved weather (which scripts may have changed during play, so use DoCurrentWeather).
+    if (anchor.mapGroup != sCameraWeatherMapGroup || anchor.mapNum != sCameraWeatherMapNum)
+    {
+        if (onHome)
+        {
+            DoCurrentWeather();
+            sCameraWeatherMapGroup = anchor.mapGroup;
+            sCameraWeatherMapNum = anchor.mapNum;
+        }
+        else
+        {
+            const struct MapHeader *anchorHeader = Overworld_GetMapHeaderByGroupAndId(anchor.mapGroup, anchor.mapNum);
+            if (anchorHeader != NULL)
+            {
+                SetNextWeatherFromMapHeader(anchorHeader);
+                sCameraWeatherMapGroup = anchor.mapGroup;
+                sCameraWeatherMapNum = anchor.mapNum;
+            }
+        }
+    }
+
+    if (onHome)
+    {
+        // Restore the canonical full-ring buffer once, the first frame back on the home map.
+        if (sCameraViewRoaming)
+            InitMapLayoutData(&gMapHeader);
+        return;
+    }
+
+    if (!ViewChangedSinceLastStitch(&anchor, maps, count))
+        return;
+
+    if (!StitchAnchorBuffer(&anchor, maps, count))
+        return;
+
+    sCameraViewRoaming = TRUE;
+    sLastStitchAnchor = anchor;
+    sLastStitchCount = count;
+    for (i = 0; i < count; i++)
+        sLastStitchMaps[i] = maps[i];
 }
 
 static void InitBackupMapLayoutData(const u16 *map, const u8 *attributes, u16 width, u16 height)
@@ -660,11 +904,28 @@ static void SaveMapViewAt(int x, int y)
 
 void SaveMapView(void)
 {
-    // Persisted with the save and reloaded around the player's tile (see LoadSavedMapView),
-    // so anchor on the player, not the camera: the camera can be detached from the player
-    // (debug freecam / NPC tracking), and capturing the view around it would reload
-    // distorted. During normal play the camera sits on the player, so this is unchanged.
-    SaveMapViewAt(gSaveBlock1Ptr->playerPos.x, gSaveBlock1Ptr->playerPos.y);
+    // Persisted with the save and reloaded around the player's tile (see LoadSavedMapView), so the
+    // capture must be the player's surroundings on the home map. The camera can be detached on another
+    // map (debug freecam), leaving the backup buffer stitched around the camera rather than the player;
+    // rebuild the canonical home buffer for the capture, then restore the camera's stitched view. During
+    // normal play — and while the camera is detached but still on the home map — the buffer already is
+    // the home one, so this is a plain capture.
+    if (sCameraViewRoaming)
+    {
+        u8 weatherMapGroup = sCameraWeatherMapGroup;
+        u8 weatherMapNum = sCameraWeatherMapNum;
+
+        InitMapLayoutData(&gMapHeader);
+        SaveMapViewAt(gSaveBlock1Ptr->playerPos.x, gSaveBlock1Ptr->playerPos.y);
+        // Restore the weather tracker so re-stitching doesn't re-transition to the (unchanged) weather.
+        sCameraWeatherMapGroup = weatherMapGroup;
+        sCameraWeatherMapNum = weatherMapNum;
+        StitchCameraView();
+    }
+    else
+    {
+        SaveMapViewAt(gSaveBlock1Ptr->playerPos.x, gSaveBlock1Ptr->playerPos.y);
+    }
 }
 
 static bool32 SavedMapViewIsEmpty(void)
@@ -873,12 +1134,29 @@ static void SetPositionFromConnection(const struct MapConnection *connection, in
     }
 }
 
+// Whether the home-frame tile (x, y) has real map data in the current view buffer (i.e. some in-view
+// map covers it), as opposed to empty space past the edge of the connected world. The freecam uses
+// this to stop roaming at the boundary of the stitched plane instead of drifting into the void.
+bool8 IsCameraTileDefined(s16 x, s16 y)
+{
+    return GetMapGridBlockAt(x + MAP_OFFSET, y + MAP_OFFSET) != MAPGRID_UNDEFINED;
+}
+
 bool8 CameraMove(int x, int y)
 {
     int direction;
     const struct MapConnection *connection;
     int old_x, old_y;
     gCamera.active = FALSE;
+    // The freecam roams in the home frame without ever making a connected map "current": it just
+    // advances the camera tile and lets StitchCameraView slide the render buffer across the seam. The
+    // full connection transition (with its music/script/warp side effects) is reserved for the player.
+    if (IsFreecamActive())
+    {
+        gCameraPos.x += x;
+        gCameraPos.y += y;
+        return gCamera.active;
+    }
     direction = GetPostCameraMoveMapBorderId(x, y);
     if (direction == CONNECTION_NONE || direction == CONNECTION_INVALID)
     {

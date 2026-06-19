@@ -1778,6 +1778,278 @@ static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate 
     }
 }
 
+// --- Multi-map view frame ---
+// gMapHeader stays pinned to the player's home map; the camera never swaps the "current" map. Every
+// map that overlaps the camera window is instead resolved relative to the home frame by walking the
+// cardinal-connection graph and accumulating the tile offset that places that map's local (0,0) into
+// the home frame. Corners (diagonals) are reached by composing two cardinal hops, so diagonal camera
+// motion needs no special handling and no diagonal connection data. To keep the walk cheap as the
+// camera roams far from home, it is seeded from an anchor map (the one currently under the camera)
+// that is advanced incrementally each step, not re-derived from home every time.
+
+// MAX_MAPS_IN_VIEW is defined alongside struct ViewMap in include/global.fieldmap.h.
+#define MAX_VIEW_TRAVERSAL 16  // BFS/anchor-walk node cap (the in-view set is local and small)
+#define VIEW_MARGIN        2   // slack tiles around the screen, matches the object spawn window
+
+// struct ViewMap is shared with the tile-window stitcher; see include/global.fieldmap.h.
+
+// Maps overlapping the current camera window, with their home-frame offsets. Rebuilt by
+// BuildMapsInView on each camera tile step; read by the object spawner and (later) the tile stitcher.
+static struct ViewMap sMapsInView[MAX_MAPS_IN_VIEW];
+static u8 sMapsInViewCount;
+
+// The map currently under the camera, with its home-frame offset, advanced incrementally so the view
+// walk only has to explore 1-2 hops from here instead of all the way from home.
+static struct ViewMap sCameraAnchor;
+static u8 sAnchorFrameMapGroup; // the home map sCameraAnchor's offsets are measured against
+static u8 sAnchorFrameMapNum;
+static bool8 sCameraFrameInitialized;
+
+// Tile offset from a parent map's frame to a cardinally-connected child's frame, mirroring
+// SetPositionFromConnection / FillConnection. Generalises GetConnectionObjectCoordOffset (which is
+// hard-wired to gMapHeader as the parent) so deltas can be chained across multiple hops.
+static bool8 GetConnectionFrameDelta(const struct MapHeader *parent, const struct MapConnection *connection, const struct MapHeader *child, s16 *dx, s16 *dy)
+{
+    s32 offset = connection->offset;
+
+    switch (connection->direction)
+    {
+    case CONNECTION_SOUTH:
+        *dx = offset;
+        *dy = parent->mapLayout->height;
+        return TRUE;
+    case CONNECTION_NORTH:
+        *dx = offset;
+        *dy = -child->mapLayout->height;
+        return TRUE;
+    case CONNECTION_EAST:
+        *dx = parent->mapLayout->width;
+        *dy = offset;
+        return TRUE;
+    case CONNECTION_WEST:
+        *dx = -child->mapLayout->width;
+        *dy = offset;
+        return TRUE;
+    }
+    // Dive/emerge and corner-only diagonal connections are never traversed: the camera stays on the
+    // contiguous cardinal plane, and corners come from composing cardinal hops above.
+    return FALSE;
+}
+
+// How far a tile rect [lo, hi] sits outside the span [winLo, winHi] on one axis (0 = overlap).
+static s32 WindowGapAxis(s16 lo, s16 hi, s16 winLo, s16 winHi)
+{
+    if (hi < winLo)
+        return winLo - hi;
+    if (lo > winHi)
+        return lo - winHi;
+    return 0;
+}
+
+// How far a single tile coordinate p sits outside the span [lo, hi] (0 = inside).
+static s32 PointGapAxis(s16 lo, s16 hi, s16 p)
+{
+    if (p < lo)
+        return lo - p;
+    if (p > hi)
+        return p - hi;
+    return 0;
+}
+
+// Reseat the anchor on the home origin (the active map at offset 0,0) and record the frame it is
+// measured against, so a later home swap is detected.
+static void ResetAnchorToHome(void)
+{
+    sCameraAnchor.mapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sCameraAnchor.mapNum   = gSaveBlock1Ptr->location.mapNum;
+    sCameraAnchor.dx = 0;
+    sCameraAnchor.dy = 0;
+    sAnchorFrameMapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sAnchorFrameMapNum   = gSaveBlock1Ptr->location.mapNum;
+    sCameraFrameInitialized = TRUE;
+}
+
+// Whether the camera-frame point (px, py) lies inside the anchor map's tile rect.
+static bool8 AnchorContains(s16 px, s16 py)
+{
+    const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(sCameraAnchor.mapGroup, sCameraAnchor.mapNum);
+
+    if (header == NULL || header->mapLayout == NULL)
+        return FALSE;
+    return PointGapAxis(sCameraAnchor.dx, sCameraAnchor.dx + header->mapLayout->width - 1, px) == 0
+        && PointGapAxis(sCameraAnchor.dy, sCameraAnchor.dy + header->mapLayout->height - 1, py) == 0;
+}
+
+// Step the anchor toward the camera-frame point (px, py) along cardinal connections, each hop picking
+// the neighbour that most reduces the gap to the point. The gap shrinks monotonically along a
+// cardinal chain, so this reaches the map containing the point (or stops at the connected region's
+// edge) in a few steps.
+static void AdvanceAnchorToward(s16 px, s16 py)
+{
+    u8 steps;
+
+    for (steps = 0; steps < MAX_VIEW_TRAVERSAL; steps++)
+    {
+        const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(sCameraAnchor.mapGroup, sCameraAnchor.mapNum);
+        const struct MapConnection *connection;
+        struct ViewMap best = sCameraAnchor;
+        s32 i, count, anchorGap, bestGap;
+        bool8 stepped = FALSE;
+
+        if (header == NULL || header->mapLayout == NULL || header->connections == NULL)
+            return;
+
+        anchorGap = PointGapAxis(sCameraAnchor.dx, sCameraAnchor.dx + header->mapLayout->width - 1, px)
+                  + PointGapAxis(sCameraAnchor.dy, sCameraAnchor.dy + header->mapLayout->height - 1, py);
+        if (anchorGap == 0)
+            return; // the point is inside the anchor map
+
+        bestGap = anchorGap;
+        count = header->connections->count;
+        connection = header->connections->connections;
+        for (i = 0; i < count; i++, connection++)
+        {
+            const struct MapHeader *childHeader = GetMapHeaderFromConnection(connection);
+            s16 ddx, ddy;
+            s32 gap;
+
+            if (childHeader == NULL || childHeader->mapLayout == NULL)
+                continue;
+            if (!GetConnectionFrameDelta(header, connection, childHeader, &ddx, &ddy))
+                continue;
+
+            gap = PointGapAxis(sCameraAnchor.dx + ddx, sCameraAnchor.dx + ddx + childHeader->mapLayout->width - 1, px)
+                + PointGapAxis(sCameraAnchor.dy + ddy, sCameraAnchor.dy + ddy + childHeader->mapLayout->height - 1, py);
+            if (gap < bestGap)
+            {
+                bestGap = gap;
+                best.mapGroup = connection->mapGroup;
+                best.mapNum   = connection->mapNum;
+                best.dx = sCameraAnchor.dx + ddx;
+                best.dy = sCameraAnchor.dy + ddy;
+                stepped = TRUE;
+            }
+        }
+        if (!stepped)
+            return; // no neighbour gets closer; the point is past the connected region's edge
+        sCameraAnchor = best;
+    }
+}
+
+// Keep the anchor on the map under the camera. Reseat it on a home swap (the player walked across a
+// connection and the active map reloaded), advance it to the camera, and if it still can't reach the
+// camera (a far jump, or frame drift) re-derive it from the known-good home origin.
+static void UpdateCameraFrameAnchor(void)
+{
+    // gCameraPos is the screen's center (focus) tile in the home frame; the anchor is the map under it.
+    s16 px = gCameraPos.x;
+    s16 py = gCameraPos.y;
+
+    if (!sCameraFrameInitialized
+     || sAnchorFrameMapGroup != gSaveBlock1Ptr->location.mapGroup
+     || sAnchorFrameMapNum   != gSaveBlock1Ptr->location.mapNum)
+        ResetAnchorToHome();
+
+    AdvanceAnchorToward(px, py);
+
+    if (!AnchorContains(px, py))
+    {
+        ResetAnchorToHome();
+        AdvanceAnchorToward(px, py);
+    }
+}
+
+// Rebuild sMapsInView: a BFS seeded at the anchor that collects every map whose tile rect overlaps
+// the camera window, recording each one's home-frame offset. Traversed-through maps that don't
+// overlap are still followed to reach ones that do; the directed gap prune confines the walk to a
+// cone toward the window so it stays local.
+static void BuildMapsInView(void)
+{
+    struct ViewMap traversal[MAX_VIEW_TRAVERSAL]; // doubles as the BFS queue and the visited set
+    u8 traversedCount;
+    u8 head;
+    s16 winLeft, winTop, winRight, winBottom;
+
+    UpdateCameraFrameAnchor();
+
+    // The visible area is centered on gCameraPos (the focus tile): MAP_OFFSET tiles back toward the
+    // top-left, MAP_OFFSET_W/H - MAP_OFFSET forward toward the bottom-right. Earlier this window was
+    // anchored at gCameraPos's top-left, which under-reached up/left and over-reached down/right.
+    winLeft   = gCameraPos.x - MAP_OFFSET - VIEW_MARGIN;
+    winTop    = gCameraPos.y - MAP_OFFSET - VIEW_MARGIN;
+    winRight  = gCameraPos.x + (MAP_OFFSET_W - MAP_OFFSET) + VIEW_MARGIN;
+    winBottom = gCameraPos.y + (MAP_OFFSET_H - MAP_OFFSET) + VIEW_MARGIN;
+
+    sMapsInViewCount = 0;
+    traversal[0] = sCameraAnchor;
+    traversedCount = 1;
+    head = 0;
+
+    while (head < traversedCount)
+    {
+        struct ViewMap node = traversal[head++];
+        const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(node.mapGroup, node.mapNum);
+        const struct MapConnection *connection;
+        s32 i, count, nodeGap;
+
+        if (header == NULL || header->mapLayout == NULL)
+            continue;
+
+        nodeGap = WindowGapAxis(node.dx, node.dx + header->mapLayout->width - 1, winLeft, winRight)
+                + WindowGapAxis(node.dy, node.dy + header->mapLayout->height - 1, winTop, winBottom);
+
+        if (nodeGap == 0 && sMapsInViewCount < MAX_MAPS_IN_VIEW)
+            sMapsInView[sMapsInViewCount++] = node;
+
+        if (header->connections == NULL)
+            continue;
+
+        count = header->connections->count;
+        connection = header->connections->connections;
+        for (i = 0; i < count; i++, connection++)
+        {
+            const struct MapHeader *childHeader = GetMapHeaderFromConnection(connection);
+            struct ViewMap child;
+            s16 ddx, ddy;
+            s32 childGap;
+            bool8 seen = FALSE;
+            u8 j;
+
+            if (childHeader == NULL || childHeader->mapLayout == NULL)
+                continue;
+            if (!GetConnectionFrameDelta(header, connection, childHeader, &ddx, &ddy))
+                continue;
+
+            child.mapGroup = connection->mapGroup;
+            child.mapNum   = connection->mapNum;
+            child.dx = node.dx + ddx;
+            child.dy = node.dy + ddy;
+
+            // A connection graph can loop, and a corner is reachable two ways; first path wins.
+            for (j = 0; j < traversedCount; j++)
+            {
+                if (traversal[j].mapGroup == child.mapGroup && traversal[j].mapNum == child.mapNum)
+                {
+                    seen = TRUE;
+                    break;
+                }
+            }
+            if (seen)
+                continue;
+
+            // Directed prune: the window gap shrinks monotonically along a cardinal chain until it
+            // hits 0, so a child no closer than its parent can't lead to an in-view map.
+            childGap = WindowGapAxis(child.dx, child.dx + childHeader->mapLayout->width - 1, winLeft, winRight)
+                     + WindowGapAxis(child.dy, child.dy + childHeader->mapLayout->height - 1, winTop, winBottom);
+            if (childGap > nodeGap)
+                continue;
+
+            if (traversedCount < MAX_VIEW_TRAVERSAL)
+                traversal[traversedCount++] = child;
+        }
+    }
+}
+
 // Compute the offset (dx, dy) that maps a connected map's template coordinates into the active
 // (camera) object frame, mirroring the placement geometry of SetPositionFromConnection /
 // FillConnection (src/fieldmap.c). Returns FALSE for connection kinds that aren't lateral border
@@ -1810,12 +2082,12 @@ static bool8 GetConnectionObjectCoordOffset(const struct MapConnection *connecti
 }
 
 // Return the offset (dx, dy) that maps tile coordinates of map (mapGroup, mapNum) into the active
-// (camera) object frame: (0, 0) if it is the active map, the connection delta if it is laterally
-// connected to the active map, or FALSE if it is neither (not currently in view).
+// (camera) object frame: (0, 0) if it is the active map, the accumulated connection delta if it is
+// currently within the camera window (any number of hops from home, including diagonal corners), or
+// FALSE if it is not in view. Backed by the multi-hop set rebuilt by BuildMapsInView.
 static bool8 GetMapToActiveFrameOffset(u8 mapGroup, u8 mapNum, s16 *dx, s16 *dy)
 {
-    s32 i, count;
-    const struct MapConnection *connection;
+    u8 i;
 
     if (mapGroup == gSaveBlock1Ptr->location.mapGroup && mapNum == gSaveBlock1Ptr->location.mapNum)
     {
@@ -1823,22 +2095,31 @@ static bool8 GetMapToActiveFrameOffset(u8 mapGroup, u8 mapNum, s16 *dx, s16 *dy)
         *dy = 0;
         return TRUE;
     }
-    if (gMapHeader.connections == NULL)
-        return FALSE;
-
-    count = gMapHeader.connections->count;
-    connection = gMapHeader.connections->connections;
-    for (i = 0; i < count; i++, connection++)
+    for (i = 0; i < sMapsInViewCount; i++)
     {
-        if (connection->mapGroup == mapGroup && connection->mapNum == mapNum)
+        if (sMapsInView[i].mapGroup == mapGroup && sMapsInView[i].mapNum == mapNum)
         {
-            const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
-            if (connHeader != NULL)
-                return GetConnectionObjectCoordOffset(connection, connHeader, dx, dy);
-            return FALSE;
+            *dx = sMapsInView[i].dx;
+            *dy = sMapsInView[i].dy;
+            return TRUE;
         }
     }
     return FALSE;
+}
+
+// Hand the current in-view map set to the tile-window stitcher. Returns the entry count and points
+// `maps` at the internal array (valid until the next BuildMapsInView).
+u8 GetMapsInView(const struct ViewMap **maps)
+{
+    *maps = sMapsInView;
+    return sMapsInViewCount;
+}
+
+// The map currently under the camera, with its home-frame offset. The stitcher centers the buffer on
+// this map.
+void GetCameraViewAnchor(struct ViewMap *anchor)
+{
+    *anchor = sCameraAnchor;
 }
 
 // --- Object-event wander store ---
@@ -2069,31 +2350,34 @@ static void UpdateObjectEventWanderTracking(struct ObjectEvent *objEvent)
 // objects are de-duplicated by (localId, mapNum, mapGroup) in InitObjectEventStateFromTemplateAt.
 static void TrySpawnConnectedMapObjectEvents(s16 cameraX, s16 cameraY)
 {
-    s32 i, count;
-    const struct MapConnection *connection;
+    u8 i;
 
-    if (gMapHeader.connections == NULL)
-        return;
-
-    count = gMapHeader.connections->count;
-    connection = gMapHeader.connections->connections;
-    for (i = 0; i < count; i++, connection++)
+    // Iterate every map currently in view (built by BuildMapsInView), skipping the active map whose
+    // own objects are spawned separately. This reaches maps several hops from home and diagonal
+    // corners, not just home's direct connections.
+    for (i = 0; i < sMapsInViewCount; i++)
     {
-        const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
-        s16 dx, dy;
+        const struct ViewMap *view = &sMapsInView[i];
+        const struct MapHeader *connHeader;
 
+        if (view->mapGroup == gSaveBlock1Ptr->location.mapGroup && view->mapNum == gSaveBlock1Ptr->location.mapNum)
+            continue;
+
+        connHeader = Overworld_GetMapHeaderByGroupAndId(view->mapGroup, view->mapNum);
         if (connHeader == NULL || connHeader->events == NULL)
             continue;
-        if (!GetConnectionObjectCoordOffset(connection, connHeader, &dx, &dy))
-            continue;
         TrySpawnObjectEventTemplatesInView(connHeader->events->objectEvents, connHeader->events->objectEventCount,
-                                           connection->mapNum, connection->mapGroup, dx, dy, cameraX, cameraY);
+                                           view->mapNum, view->mapGroup, view->dx, view->dy, cameraX, cameraY);
     }
 }
 
 void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
 {
     u8 objectCount;
+
+    // Resolve which maps overlap the camera window (home + connected, multi-hop) before spawning, so
+    // the connected-map pass and GetMapToActiveFrameOffset see a set matching the current camera tile.
+    BuildMapsInView();
 
     if (gMapHeader.events != NULL)
     {
