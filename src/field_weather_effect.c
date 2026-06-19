@@ -2664,7 +2664,11 @@ void DoCurrentWeather(void)
 
 void ResumePausedWeather(void)
 {
-    u8 weather = GetSavedWeather();
+    // Returning to the field while the camera roams a connected map should resume THAT map's weather,
+    // not the player's saved weather — display only, the saveblock keeps the player's. On the home map
+    // (and on a fresh game/save load, where the camera sits on the player) this is the saved weather.
+    const struct MapHeader *roamingMap = GetRoamingCameraMapHeader();
+    u8 weather = (roamingMap != NULL) ? TranslateWeatherNum(roamingMap->weather) : GetSavedWeather();
 
     if (weather == WEATHER_ABNORMAL)
     {

@@ -196,6 +196,19 @@ const struct MapHeader *GetCameraFocusMapHeader(void)
     return header != NULL ? header : &gMapHeader;
 }
 
+// The connected map the camera is roaming on, or NULL when it's on the home map. Lets the field resume
+// the camera's map weather (display only) instead of the player's saved weather when returning from a
+// menu/battle while roaming, without anything in the saveblock deriving from the camera.
+const struct MapHeader *GetRoamingCameraMapHeader(void)
+{
+    struct ViewMap anchor;
+
+    if (!sCameraViewRoaming)
+        return NULL;
+    GetCameraViewAnchor(&anchor);
+    return Overworld_GetMapHeaderByGroupAndId(anchor.mapGroup, anchor.mapNum);
+}
+
 // Selects the active location from the camera's focus tile, on map load, so the initial
 // tileset/music/map name reflect the spawn location; thereafter TryUpdateMapLocation updates it.
 void SetActiveMapLocationFromCamera(void)

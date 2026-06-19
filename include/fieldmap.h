@@ -52,6 +52,7 @@ void SetActiveMapLocation(u8 location);
 void SetActiveMapLocationForMap(u8 mapGroup, u8 mapNum, u8 location);
 void GetActiveLocationMap(u8 *mapGroup, u8 *mapNum);
 const struct MapHeader *GetCameraFocusMapHeader(void);
+const struct MapHeader *GetRoamingCameraMapHeader(void);
 void SetActiveMapLocationFromCamera(void);
 void InitTrainerHillMap(void);
 void InitBattlePyramidMap(bool8 setPlayerPosition);
