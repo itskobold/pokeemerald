@@ -311,6 +311,32 @@ struct ObjectEvent
     /*size = 0x24*/
 };
 
+// Persisted record of an object event that has wandered off its home map onto an adjacent
+// (laterally connected) map. Keyed by the object's home identity (localId + home map); records the
+// map it now stands on and its tile there (map-local, without MAP_OFFSET) so it respawns at the
+// displaced position instead of its template position and is not double-spawned by its home map.
+// An entry with localId == 0 is empty. See event_object_movement.c wander-store functions.
+struct ObjectEventWander
+{
+    /*0x0*/ u8 localId;       // home localId (0 = empty slot)
+    /*0x1*/ u8 homeMapNum;
+    /*0x2*/ u8 homeMapGroup;
+    /*0x3*/ u8 curMapNum;     // map the object currently stands on
+    /*0x4*/ u8 curMapGroup;
+    /*0x5*/ u8 movementType;  // permanent movement-type override set by script (0xFF = none)
+    /*0x6*/ s16 x;            // current tile on curMap (map-local, no MAP_OFFSET)
+    /*0x8*/ s16 y;
+    /*0xA*/ s16 permX;        // permanent home-map spawn tile set by script (-1 = none)
+    /*0xC*/ s16 permY;
+}; // size = 0xE
+
+// "No movement-type override" sentinel for struct ObjectEventWander.movementType (no real
+// movement type uses 0xFF).
+#define OBJ_EVENT_WANDER_NO_MOVEMENT_TYPE 0xFF
+// "No permanent-position override" sentinel for struct ObjectEventWander.permX (no real map tile
+// is negative).
+#define OBJ_EVENT_WANDER_NO_PERM_POS ((s16)-1)
+
 struct ObjectEventGraphicsInfo
 {
     /*0x00*/ u16 tileTag;

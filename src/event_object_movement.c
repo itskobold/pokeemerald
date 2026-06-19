@@ -137,6 +137,10 @@ static bool8 MovementType_Buried_Callback(struct ObjectEvent *, struct Sprite *)
 static void CreateReflectionEffectSprites(void);
 static u8 GetObjectEventIdByLocalId(u8);
 static u8 GetObjectEventIdByLocalIdAndMapInternal(u8, u8, u8);
+static u8 GetDisplacedObjectEventIdOnMap(u8, u8, u8);
+static struct ObjectEventWander *FindObjectEventWander(u8, u8, u8);
+static void ClearObjectEventWander(u8, u8, u8);
+static bool8 GetObjectEventCurrentMapTile(struct ObjectEvent *, u8 *, u8 *, s16 *, s16 *);
 static bool8 GetAvailableObjectEventId(u16, u8, u8, u8 *);
 static void SetObjectEventDynamicGraphicsId(struct ObjectEvent *);
 static void RemoveObjectEventInternal(struct ObjectEvent *);
@@ -1231,12 +1235,42 @@ u8 GetFirstInactiveObjectEventId(void)
     return i;
 }
 
+// Find an active object with this localId that has wandered onto map (mapNum, mapGroup) but whose
+// home (identity) map is elsewhere. A displaced object keeps its home identity, so a by-localId
+// lookup against the map it now stands on (as script commands do) would otherwise miss it. Returns
+// only genuinely displaced objects — native objects at home are found by the exact match instead.
+static u8 GetDisplacedObjectEventIdOnMap(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    u8 i;
+
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+    {
+        struct ObjectEvent *objectEvent = &gObjectEvents[i];
+        struct ObjectEventWander *wander;
+
+        if (!objectEvent->active || objectEvent->isPlayer || objectEvent->localId != localId)
+            continue;
+        wander = FindObjectEventWander(objectEvent->localId, objectEvent->mapNum, objectEvent->mapGroup);
+        if (wander != NULL && wander->curMapNum == mapNum && wander->curMapGroup == mapGroup)
+            return i;
+    }
+    return OBJECT_EVENTS_COUNT;
+}
+
 u8 GetObjectEventIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroupId)
 {
-    if (localId < LOCALID_PLAYER)
-        return GetObjectEventIdByLocalIdAndMapInternal(localId, mapNum, mapGroupId);
+    u8 objectEventId;
 
-    return GetObjectEventIdByLocalId(localId);
+    if (localId >= LOCALID_PLAYER)
+        return GetObjectEventIdByLocalId(localId);
+
+    objectEventId = GetObjectEventIdByLocalIdAndMapInternal(localId, mapNum, mapGroupId);
+    // Cross-map fallback: an object that has wandered onto this map keeps its home identity, so the
+    // exact match above misses it. Resolve it by localId + the map it now stands on so script
+    // commands (applymovement / removeobject / setobjectxy / VAR_LAST_TALKED, ...) still reach it.
+    if (objectEventId == OBJECT_EVENTS_COUNT)
+        objectEventId = GetDisplacedObjectEventIdOnMap(localId, mapNum, mapGroupId);
+    return objectEventId;
 }
 
 bool8 TryGetObjectEventIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroupId, u8 *objectEventId)
@@ -1398,8 +1432,14 @@ void RemoveObjectEventByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
     u8 objectEventId;
     if (!TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
     {
+        struct ObjectEvent *objectEvent = &gObjectEvents[objectEventId];
+
+        // Drop any wander record for this object (keyed by its home identity, which may differ from
+        // the passed map if it was resolved via the displaced fallback) so the slot is freed; the
+        // flag set below keeps it from respawning anyway.
+        ClearObjectEventWander(objectEvent->localId, objectEvent->mapNum, objectEvent->mapGroup);
         FlagSet(GetObjectEventFlagIdByObjectEventId(objectEventId));
-        RemoveObjectEvent(&gObjectEvents[objectEventId]);
+        RemoveObjectEvent(objectEvent);
     }
 }
 
@@ -1668,10 +1708,14 @@ u8 CreateVirtualObject(u8 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevatio
     return spriteId;
 }
 
+static bool8 GetMapToActiveFrameOffset(u8 mapGroup, u8 mapNum, s16 *dx, s16 *dy);
+
 // Spawn the subset of an object template array that currently falls within the spawn window
 // around the camera. Each object is placed at its template coords plus (dx, dy) — the offset that
 // maps the source map's frame into the active (camera) object frame. (dx, dy) are (0, 0) for the
 // active map; for a connected map they are the connection delta (see GetConnectionObjectCoordOffset).
+// If an object has wandered onto another map (a wander-store entry keyed by its home identity), it
+// is placed at that displaced position instead, provided the map it now stands on is in view.
 static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate *templates, u8 count, u8 mapNum, u8 mapGroup, s16 dx, s16 dy, s16 cameraX, s16 cameraY)
 {
     u8 i;
@@ -1683,12 +1727,54 @@ static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate 
     for (i = 0; i < count; i++)
     {
         const struct ObjectEventTemplate *template = &templates[i];
-        s16 npcX = template->x + MAP_OFFSET + dx;
-        s16 npcY = template->y + MAP_OFFSET + dy;
+        struct ObjectEventWander *wander = FindObjectEventWander(template->localId, mapNum, mapGroup);
+        // An entry whose curMap differs from this home map means the object is displaced onto another
+        // map; one whose curMap equals home only carries a permanent override (movement type / position).
+        bool8 displaced = (wander != NULL && !(wander->curMapNum == mapNum && wander->curMapGroup == mapGroup));
+        // The object's home-map spawn tile: a script-set permanent position override, else its template.
+        bool8 hasPermPos = (wander != NULL && wander->permX != OBJ_EVENT_WANDER_NO_PERM_POS);
+        s16 homeX = (hasPermPos ? wander->permX : template->x);
+        s16 homeY = (hasPermPos ? wander->permY : template->y);
+        s16 npcX, npcY;
+
+        if (displaced)
+        {
+            // Place it where it now stands, if that map is currently in view; otherwise it isn't
+            // visible from here, so skip it.
+            s16 odx, ody;
+            if (!GetMapToActiveFrameOffset(wander->curMapGroup, wander->curMapNum, &odx, &ody))
+                continue;
+            npcX = wander->x + MAP_OFFSET + odx;
+            npcY = wander->y + MAP_OFFSET + ody;
+        }
+        else
+        {
+            npcX = homeX + MAP_OFFSET + dx;
+            npcY = homeY + MAP_OFFSET + dy;
+        }
 
         if (top <= npcY && bottom >= npcY && left <= npcX && right >= npcX
             && !FlagGet(template->flagId))
-            TrySpawnObjectEventTemplateAt(template, mapNum, mapGroup, cameraX, cameraY, npcX, npcY);
+        {
+            u8 objectEventId = TrySpawnObjectEventTemplateAt(template, mapNum, mapGroup, cameraX, cameraY, npcX, npcY);
+
+            if (objectEventId != OBJECT_EVENTS_COUNT)
+            {
+                // A displaced object is placed at its wandered position, but its movement-range anchor
+                // (initialCoords) must stay at its home base — the permanent/template position in the
+                // active frame (home-map offset dx/dy). Otherwise each cull/respawn re-centres the
+                // range on the wandered spot and the object drifts over time. (When not displaced the
+                // spawn position is already the home base, so initialCoords is correct as-is.)
+                if (displaced)
+                {
+                    gObjectEvents[objectEventId].initialCoords.x = homeX + MAP_OFFSET + dx;
+                    gObjectEvents[objectEventId].initialCoords.y = homeY + MAP_OFFSET + dy;
+                }
+                // Apply a permanent movement-type override set by script on this cross-map object.
+                if (wander != NULL && wander->movementType != OBJ_EVENT_WANDER_NO_MOVEMENT_TYPE)
+                    SetTrainerMovementType(&gObjectEvents[objectEventId], wander->movementType);
+            }
+        }
     }
 }
 
@@ -1721,6 +1807,255 @@ static bool8 GetConnectionObjectCoordOffset(const struct MapConnection *connecti
         return TRUE;
     }
     return FALSE;
+}
+
+// Return the offset (dx, dy) that maps tile coordinates of map (mapGroup, mapNum) into the active
+// (camera) object frame: (0, 0) if it is the active map, the connection delta if it is laterally
+// connected to the active map, or FALSE if it is neither (not currently in view).
+static bool8 GetMapToActiveFrameOffset(u8 mapGroup, u8 mapNum, s16 *dx, s16 *dy)
+{
+    s32 i, count;
+    const struct MapConnection *connection;
+
+    if (mapGroup == gSaveBlock1Ptr->location.mapGroup && mapNum == gSaveBlock1Ptr->location.mapNum)
+    {
+        *dx = 0;
+        *dy = 0;
+        return TRUE;
+    }
+    if (gMapHeader.connections == NULL)
+        return FALSE;
+
+    count = gMapHeader.connections->count;
+    connection = gMapHeader.connections->connections;
+    for (i = 0; i < count; i++, connection++)
+    {
+        if (connection->mapGroup == mapGroup && connection->mapNum == mapNum)
+        {
+            const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
+            if (connHeader != NULL)
+                return GetConnectionObjectCoordOffset(connection, connHeader, dx, dy);
+            return FALSE;
+        }
+    }
+    return FALSE;
+}
+
+// --- Object-event wander store ---
+// Persisted record of objects that have walked off their home map onto an adjacent one. Each entry
+// is keyed by the object's home identity (localId + home map) and records the map it now stands on
+// plus its tile there (see struct ObjectEventWander). The spawner consults it so a displaced object
+// respawns where it wandered rather than at its template, and isn't double-spawned by its home map.
+
+static struct ObjectEventWander *FindObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    u8 i;
+
+    if (localId == 0)
+        return NULL;
+    for (i = 0; i < OBJECT_EVENT_WANDER_COUNT; i++)
+    {
+        struct ObjectEventWander *w = &gSaveBlock1Ptr->objectEventWanderStore[i];
+        if (w->localId == localId && w->homeMapNum == mapNum && w->homeMapGroup == mapGroup)
+            return w;
+    }
+    return NULL;
+}
+
+static void SetObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup, u8 curMapNum, u8 curMapGroup, s16 x, s16 y)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w == NULL)
+    {
+        u8 i;
+        for (i = 0; i < OBJECT_EVENT_WANDER_COUNT; i++)
+        {
+            if (gSaveBlock1Ptr->objectEventWanderStore[i].localId == 0)
+            {
+                w = &gSaveBlock1Ptr->objectEventWanderStore[i];
+                break;
+            }
+        }
+        if (w == NULL)
+            return; // store full; the object will reset to its home position on respawn
+        w->localId = localId;
+        w->homeMapNum = mapNum;
+        w->homeMapGroup = mapGroup;
+        w->movementType = OBJ_EVENT_WANDER_NO_MOVEMENT_TYPE;
+        w->permX = OBJ_EVENT_WANDER_NO_PERM_POS;
+    }
+    w->curMapNum = curMapNum;
+    w->curMapGroup = curMapGroup;
+    w->x = x;
+    w->y = y;
+}
+
+// Record a permanent movement-type override for a cross-map object (set by setobjectmovementtype
+// targeting a map other than the active one). If the object has no entry yet (not displaced), anchor
+// one at its home template position so the spawner applies the override without treating it as
+// displaced; an existing (possibly displaced) entry keeps its position and just gains the override.
+static void SetObjectEventWanderMovementType(u8 localId, u8 mapNum, u8 mapGroup, u8 movementType)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w == NULL)
+    {
+        const struct ObjectEventTemplate *template = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
+        if (template == NULL)
+            return;
+        SetObjectEventWander(localId, mapNum, mapGroup, mapNum, mapGroup, template->x, template->y);
+        w = FindObjectEventWander(localId, mapNum, mapGroup);
+        if (w == NULL)
+            return; // store full
+    }
+    w->movementType = movementType;
+}
+
+// Record a permanent home-map spawn-position override for a cross-map object (set by setobjectxyperm
+// targeting a connected map, whose template is read-only ROM). Anchors a new entry at home if needed;
+// an existing (possibly displaced) entry keeps its displacement and just gains the override. The
+// spawner uses (permX, permY) for the object's home-map spawn whenever it isn't displaced.
+static void SetObjectEventWanderPermCoords(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w == NULL)
+    {
+        const struct ObjectEventTemplate *template = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
+        if (template == NULL)
+            return;
+        SetObjectEventWander(localId, mapNum, mapGroup, mapNum, mapGroup, template->x, template->y);
+        w = FindObjectEventWander(localId, mapNum, mapGroup);
+        if (w == NULL)
+            return; // store full
+    }
+    w->permX = x;
+    w->permY = y;
+}
+
+// Set an object's movement type, addressing it by its home map. On the active map this edits the
+// writable template copy (as vanilla setobjectmovementtype does). On any other (connected) map it
+// persists the override in the wander store and, if the object is currently loaded, changes it live.
+void SetObjEventMovementTypeByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, u8 movementType)
+{
+    u8 objectEventId;
+
+    if (mapNum == gSaveBlock1Ptr->location.mapNum && mapGroup == gSaveBlock1Ptr->location.mapGroup)
+    {
+        SetObjEventTemplateMovementType(localId, movementType);
+        return;
+    }
+    SetObjectEventWanderMovementType(localId, mapNum, mapGroup, movementType);
+    if (!TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
+        SetTrainerMovementType(&gObjectEvents[objectEventId], movementType);
+}
+
+// Permanently set an object's home-map spawn position, addressing it by its home map. On the active
+// map this edits the writable template copy (as vanilla setobjectxyperm does). On a connected map
+// there is no writable template, so it records the override in the wander store; either way the
+// object spawns at the new tile on its home map (taking effect on its next (re)spawn).
+void SetObjEventCoordsPermByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y)
+{
+    if (mapNum == gSaveBlock1Ptr->location.mapNum && mapGroup == gSaveBlock1Ptr->location.mapGroup)
+        SetObjEventTemplateCoords(localId, x, y);
+    else
+        SetObjectEventWanderPermCoords(localId, mapNum, mapGroup, x, y);
+}
+
+// Copy a live object's current position to its permanent spawn, addressing it by its home map. On
+// the active map this edits the template copy (vanilla copyobjectxytoperm). On a connected map it
+// stores the override in the wander store — only meaningful while the object is actually on its home
+// map (a displaced object's position already persists via the wander store, so it's left alone).
+void CopyObjEventCoordsToPermByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    u8 objectEventId;
+    u8 curMapNum, curMapGroup;
+    s16 localX, localY;
+
+    if (mapNum == gSaveBlock1Ptr->location.mapNum && mapGroup == gSaveBlock1Ptr->location.mapGroup)
+    {
+        TryOverrideObjectEventTemplateCoords(localId, mapNum, mapGroup);
+        return;
+    }
+    if (TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
+        return; // not loaded — nothing to copy
+    if (!GetObjectEventCurrentMapTile(&gObjectEvents[objectEventId], &curMapNum, &curMapGroup, &localX, &localY))
+        return;
+    if (curMapNum == mapNum && curMapGroup == mapGroup) // only when standing on its home map
+        SetObjectEventWanderPermCoords(localId, mapNum, mapGroup, localX, localY);
+}
+
+static void ClearObjectEventWander(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
+
+    if (w != NULL)
+        w->localId = 0;
+}
+
+// Determine which map an object currently stands on (the active map or a laterally connected one)
+// and its tile there in that map's local frame (no MAP_OFFSET). Returns FALSE if it sits on a
+// non-lateral connection (dive/emerge/diagonal), which isn't tracked.
+static bool8 GetObjectEventCurrentMapTile(struct ObjectEvent *objEvent, u8 *mapNum, u8 *mapGroup, s16 *localX, s16 *localY)
+{
+    const struct MapConnection *connection = GetMapConnectionAtPos(objEvent->currentCoords.x, objEvent->currentCoords.y);
+
+    if (connection == NULL)
+    {
+        *mapNum = gSaveBlock1Ptr->location.mapNum;
+        *mapGroup = gSaveBlock1Ptr->location.mapGroup;
+        *localX = objEvent->currentCoords.x - MAP_OFFSET;
+        *localY = objEvent->currentCoords.y - MAP_OFFSET;
+        return TRUE;
+    }
+    else
+    {
+        const struct MapHeader *connHeader = GetMapHeaderFromConnection(connection);
+        s16 dx, dy;
+
+        if (connHeader == NULL || !GetConnectionObjectCoordOffset(connection, connHeader, &dx, &dy))
+            return FALSE;
+        *mapNum = connection->mapNum;
+        *mapGroup = connection->mapGroup;
+        *localX = objEvent->currentCoords.x - MAP_OFFSET - dx;
+        *localY = objEvent->currentCoords.y - MAP_OFFSET - dy;
+        return TRUE;
+    }
+}
+
+// Track which map an active object currently stands on. If it has crossed a seam onto a map other
+// than its home, record the displacement so it persists; once it returns to its home map, drop the
+// record. Called per active non-player object from ObjectEventUpdateElevation.
+static void UpdateObjectEventWanderTracking(struct ObjectEvent *objEvent)
+{
+    u8 curMapNum, curMapGroup;
+    s16 localX, localY;
+
+    // Only template-owned NPCs wander; skip the player and special/anonymous objects. Also skip
+    // while the debug camera is detached, since objects then live in an abroad frame, not the
+    // player's, and GetMapConnectionAtPos would mislabel them.
+    if (objEvent->isPlayer || objEvent->localId == 0 || IsCameraDetachedFromPlayer())
+        return;
+    if (!GetObjectEventCurrentMapTile(objEvent, &curMapNum, &curMapGroup, &localX, &localY))
+        return;
+
+    if (curMapNum == objEvent->mapNum && curMapGroup == objEvent->mapGroup)
+    {
+        // Back on its home map. Drop the displacement record — unless it carries a permanent override
+        // (movement type or spawn position) that must survive, in which case keep the entry but mark
+        // it home (curMap == home) so the spawner uses the template/permanent position, not a stale
+        // displaced one.
+        struct ObjectEventWander *w = FindObjectEventWander(objEvent->localId, objEvent->mapNum, objEvent->mapGroup);
+        if (w != NULL && (w->movementType != OBJ_EVENT_WANDER_NO_MOVEMENT_TYPE || w->permX != OBJ_EVENT_WANDER_NO_PERM_POS))
+            SetObjectEventWander(objEvent->localId, objEvent->mapNum, objEvent->mapGroup, curMapNum, curMapGroup, localX, localY);
+        else
+            ClearObjectEventWander(objEvent->localId, objEvent->mapNum, objEvent->mapGroup);
+    }
+    else
+    {
+        SetObjectEventWander(objEvent->localId, objEvent->mapNum, objEvent->mapGroup, curMapNum, curMapGroup, localX, localY);
+    }
 }
 
 // Spawn object events that belong to maps laterally connected to the active map but whose tiles are
@@ -2257,9 +2592,13 @@ void TryMoveObjectEventToMapCoords(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s1
     u8 objectEventId;
     if (!TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
     {
-        x += MAP_OFFSET;
-        y += MAP_OFFSET;
-        MoveObjectEventToMapCoords(&gObjectEvents[objectEventId], x, y);
+        // (x, y) are tiles on map (mapNum, mapGroup); transform them into the active object frame so
+        // a target on a connected map lands at the right spot (dx/dy = 0 for the active map). If the
+        // map isn't currently in view there's nowhere to place the live object.
+        s16 dx, dy;
+        if (!GetMapToActiveFrameOffset(mapGroup, mapNum, &dx, &dy))
+            return;
+        MoveObjectEventToMapCoords(&gObjectEvents[objectEventId], x + MAP_OFFSET + dx, y + MAP_OFFSET + dy);
     }
 }
 
@@ -7887,6 +8226,12 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
         gPlayerBiome = MapGridGetMetatileBiomeAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
         gSaveBlock1Ptr->playerPos.x = objEvent->currentCoords.x - MAP_OFFSET;
         gSaveBlock1Ptr->playerPos.y = objEvent->currentCoords.y - MAP_OFFSET;
+    }
+    else
+    {
+        // Keep the wander store in sync with where this NPC currently stands, so a cross-seam
+        // displacement persists across culling, map reloads and saves (see the wander store above).
+        UpdateObjectEventWanderTracking(objEvent);
     }
 
     if (curElevation == ELEVATION_MULTI_LEVEL || prevElevation == ELEVATION_MULTI_LEVEL)

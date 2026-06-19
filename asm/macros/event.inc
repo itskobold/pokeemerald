@@ -676,12 +676,22 @@
 		.endif
 	.endm
 
-	@ Sets the specified (localId) object's position on the current map.
-	.macro setobjectxy localId:req, x:req, y:req
-	.byte SCR_OP_SETOBJECTXY
-	.2byte \localId
-	.2byte \x
-	.2byte \y
+	@ Sets the specified (localId) object's position. If no map is specified, then the current map is
+	@ used; otherwise the object is addressed by its home map (useful for an object that has wandered
+	@ onto an adjacent connected map).
+	.macro setobjectxy localId:req, x:req, y:req, map
+		.ifb \map
+			.byte SCR_OP_SETOBJECTXY
+			.2byte \localId
+			.2byte \x
+			.2byte \y
+		.else
+			.byte SCR_OP_SETOBJECTXYAT
+			.2byte \localId
+			.2byte \x
+			.2byte \y
+			map \map
+		.endif
 	.endm
 
 	@ Sets the specified object's invisibility to FALSE.
@@ -719,11 +729,19 @@
 	.byte SCR_OP_FACEPLAYER
 	.endm
 
-	@ Turns the specified object in the specified direction.
-	.macro turnobject localId:req, direction:req
-	.byte SCR_OP_TURNOBJECT
-	.2byte \localId
-	.byte \direction
+	@ Turns the specified object in the specified direction. If no map is specified, then the current
+	@ map is used; otherwise the object is addressed by its home map.
+	.macro turnobject localId:req, direction:req, map
+		.ifb \map
+			.byte SCR_OP_TURNOBJECT
+			.2byte \localId
+			.byte \direction
+		.else
+			.byte SCR_OP_TURNOBJECTAT
+			.2byte \localId
+			.byte \direction
+			map \map
+		.endif
 	.endm
 
 	@ Configures the arguments for a trainer battle, then jumps to the appropriate script in scripts/trainer_battle.inc
@@ -859,25 +877,48 @@
 
 	@ Sets the coordinates of an object's template, so that if the sprite goes off screen
 	@ it'll still be there when it comes back on screen.
-	.macro setobjectxyperm localId:req, x:req, y:req
-	.byte SCR_OP_SETOBJECTXYPERM
-	.2byte \localId
-	.2byte \x
-	.2byte \y
+	.macro setobjectxyperm localId:req, x:req, y:req, map
+		.ifb \map
+			.byte SCR_OP_SETOBJECTXYPERM
+			.2byte \localId
+			.2byte \x
+			.2byte \y
+		.else
+			.byte SCR_OP_SETOBJECTXYPERMAT
+			.2byte \localId
+			.2byte \x
+			.2byte \y
+			map \map
+		.endif
 	.endm
 
 	@ Copies a live object event's xy position to its template, so that if the sprite goes off screen
 	@ it'll still be there when it comes back on screen.
-	.macro copyobjectxytoperm localId:req
-	.byte SCR_OP_COPYOBJECTXYTOPERM
-	.2byte \localId
+	.macro copyobjectxytoperm localId:req, map
+		.ifb \map
+			.byte SCR_OP_COPYOBJECTXYTOPERM
+			.2byte \localId
+		.else
+			.byte SCR_OP_COPYOBJECTXYTOPERMAT
+			.2byte \localId
+			map \map
+		.endif
 	.endm
 
-	@ Sets the movement type (MOVEMENT_TYPE_*) for an object's template.
-	.macro setobjectmovementtype localId:req, movementType:req
-	.byte SCR_OP_SETOBJECTMOVEMENTTYPE
-	.2byte \localId
-	.byte \movementType
+	@ Sets the movement type (MOVEMENT_TYPE_*) for an object. If no map is specified, then the current
+	@ map is used; otherwise the object is addressed by its home map (a connected-map object's override
+	@ is persisted and applied on respawn).
+	.macro setobjectmovementtype localId:req, movementType:req, map
+		.ifb \map
+			.byte SCR_OP_SETOBJECTMOVEMENTTYPE
+			.2byte \localId
+			.byte \movementType
+		.else
+			.byte SCR_OP_SETOBJECTMOVEMENTTYPEAT
+			.2byte \localId
+			.byte \movementType
+			map \map
+		.endif
 	.endm
 
 	@ If a standard message box (or its text) is being drawn on-screen, this command blocks script execution until the

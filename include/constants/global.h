@@ -44,6 +44,10 @@
 #define DAYCARE_MON_COUNT 2
 #define POKEBLOCKS_COUNT 40
 #define OBJECT_EVENTS_COUNT 16
+// Max number of object events that can simultaneously carry cross-map state (displaced onto another
+// map, or a script-set permanent movement-type/position override). See SaveBlock1.objectEventWanderStore
+// / struct ObjectEventWander.
+#define OBJECT_EVENT_WANDER_COUNT 24
 #define MAIL_COUNT (10 + PARTY_SIZE)
 #define SECRET_BASES_COUNT 20
 #define POKE_NEWS_COUNT 16

@@ -1257,6 +1257,65 @@ bool8 ScrCmd_setobjectmovementtype(struct ScriptContext *ctx)
     return FALSE;
 }
 
+// Map-aware (*at) forms of the object commands that otherwise default to the current map. Passing the
+// object's home map lets these reach an object that has wandered onto an adjacent map (and resolves
+// it unambiguously). See the matching macros in asm/macros/event.inc.
+bool8 ScrCmd_setobjectxyat(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    u16 x = VarGet(ScriptReadHalfword(ctx));
+    u16 y = VarGet(ScriptReadHalfword(ctx));
+    u8 mapGroup = ScriptReadByte(ctx);
+    u8 mapNum = ScriptReadByte(ctx);
+
+    TryMoveObjectEventToMapCoords(localId, mapNum, mapGroup, x, y);
+    return FALSE;
+}
+
+bool8 ScrCmd_turnobjectat(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    u8 direction = ScriptReadByte(ctx);
+    u8 mapGroup = ScriptReadByte(ctx);
+    u8 mapNum = ScriptReadByte(ctx);
+
+    ObjectEventTurnByLocalIdAndMap(localId, mapNum, mapGroup, direction);
+    return FALSE;
+}
+
+bool8 ScrCmd_setobjectxypermat(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    u16 x = VarGet(ScriptReadHalfword(ctx));
+    u16 y = VarGet(ScriptReadHalfword(ctx));
+    u8 mapGroup = ScriptReadByte(ctx);
+    u8 mapNum = ScriptReadByte(ctx);
+
+    SetObjEventCoordsPermByLocalIdAndMap(localId, mapNum, mapGroup, x, y);
+    return FALSE;
+}
+
+bool8 ScrCmd_copyobjectxytopermat(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    u8 mapGroup = ScriptReadByte(ctx);
+    u8 mapNum = ScriptReadByte(ctx);
+
+    CopyObjEventCoordsToPermByLocalIdAndMap(localId, mapNum, mapGroup);
+    return FALSE;
+}
+
+bool8 ScrCmd_setobjectmovementtypeat(struct ScriptContext *ctx)
+{
+    u16 localId = VarGet(ScriptReadHalfword(ctx));
+    u8 movementType = ScriptReadByte(ctx);
+    u8 mapGroup = ScriptReadByte(ctx);
+    u8 mapNum = ScriptReadByte(ctx);
+
+    SetObjEventMovementTypeByLocalIdAndMap(localId, mapNum, mapGroup, movementType);
+    return FALSE;
+}
+
 bool8 ScrCmd_createvobject(struct ScriptContext *ctx)
 {
     u8 graphicsId = ScriptReadByte(ctx);

@@ -246,6 +246,11 @@ gScriptCmdTable::
 	script_cmd_table_entry SCR_OP_PANTOPLAYER                   ScrCmd_pantoplayer                    @ 0xe4
 	script_cmd_table_entry SCR_OP_TRACKENTITY                   ScrCmd_trackentity                    @ 0xe5
 	script_cmd_table_entry SCR_OP_TRACKPLAYER                   ScrCmd_trackplayer                    @ 0xe6
+	script_cmd_table_entry SCR_OP_SETOBJECTXYAT                 ScrCmd_setobjectxyat                  @ 0xe7
+	script_cmd_table_entry SCR_OP_TURNOBJECTAT                  ScrCmd_turnobjectat                   @ 0xe8
+	script_cmd_table_entry SCR_OP_SETOBJECTXYPERMAT             ScrCmd_setobjectxypermat              @ 0xe9
+	script_cmd_table_entry SCR_OP_COPYOBJECTXYTOPERMAT          ScrCmd_copyobjectxytopermat           @ 0xea
+	script_cmd_table_entry SCR_OP_SETOBJECTMOVEMENTTYPEAT       ScrCmd_setobjectmovementtypeat        @ 0xeb
 
 	.if ALLOCATE_SCRIPT_CMD_TABLE
 gScriptCmdTableEnd::
