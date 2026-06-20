@@ -2143,20 +2143,18 @@ static struct ObjectEventWander *FindObjectEventWander(u8 localId, u8 mapNum, u8
     return NULL;
 }
 
-// If the object with this home identity has wandered onto another map, report where it now stands in
-// home-frame object-event coords (incl. MAP_OFFSET), provided that map is reachable in the current
-// view traversal. Returns FALSE if it has no wander entry, isn't displaced (still on its home map), or
-// has roamed onto a map not currently stitched into the view. Lets the camera jump onto a tracked NPC
-// that has roamed off its home map while culled (so it isn't spawned to read a live position from).
+// Where a displaced object now stands, in home-frame object-event coords (incl. MAP_OFFSET), so the
+// camera can jump onto a tracked NPC that wandered off its home map while culled. FALSE if it has no
+// wander entry, isn't displaced, or is on a map not currently in view.
 bool8 GetDisplacedObjectFrameCoordsByLocalId(u8 localId, u8 mapNum, u8 mapGroup, s16 *x, s16 *y)
 {
     struct ObjectEventWander *w = FindObjectEventWander(localId, mapNum, mapGroup);
     s16 odx, ody;
 
     if (w == NULL || (w->curMapNum == mapNum && w->curMapGroup == mapGroup))
-        return FALSE; // no entry, or not displaced (still standing on its home map)
+        return FALSE;
     if (!GetMapToActiveFrameOffset(w->curMapGroup, w->curMapNum, &odx, &ody))
-        return FALSE; // displaced onto a map not currently in view, so unreachable from here
+        return FALSE;
     *x = w->x + MAP_OFFSET + odx;
     *y = w->y + MAP_OFFSET + ody;
     return TRUE;

@@ -508,10 +508,8 @@ static void CenterCameraOnTile(s16 x, s16 y)
     bool8 gfxReloaded;
     u8 i;
 
-    // Clamp to the home-map bounds only when the requested tile isn't backed by real map data. A
-    // tracked object that has wandered onto a connected map sits outside the home bounds but on a
-    // defined tile of the stitched plane, and must be reachable; clamping it back inside would stop
-    // the camera ever centring on it. Mirrors the freecam, which roams any defined tile.
+    // Clamp to home-map bounds only for undefined tiles; a tracked object on a connected map is
+    // outside home bounds but on a defined tile, and must stay reachable (as the freecam roams).
     if (!IsCameraTileDefined(x, y))
         ClampTileToMap(&x, &y);
 
@@ -621,8 +619,7 @@ void SetCameraTrackedLocalId(u8 localId)
     else if (GetDisplacedObjectFrameCoordsByLocalId(localId, gSaveBlock1Ptr->location.mapNum,
                                                     gSaveBlock1Ptr->location.mapGroup, &targetX, &targetY))
     {
-        // Culled but wandered onto a connected map: aim at its stored position there, not its home
-        // template (which is where it would never be while displaced).
+        // Culled but wandered onto a connected map: aim at its stored position there.
     }
     else if (!GetObjectEventTemplateCoordsByLocalId(localId, &targetX, &targetY))
     {
