@@ -161,4 +161,7 @@
 #define CONNECTION_DIVE       9
 #define CONNECTION_EMERGE     10
 
+#define SLOW_MOVEMENT_ON_STAIRS         TRUE
+#define FOLLOW_ME_IMPLEMENTED           FALSE    //for stairs movement. see ObjectMovingOnRockStairs in src/field_player_avatar.c
+
 #endif // GUARD_CONSTANTS_GLOBAL_H
