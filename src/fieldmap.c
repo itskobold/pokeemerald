@@ -1161,10 +1161,13 @@ bool8 CameraMove(int x, int y)
     const struct MapConnection *connection;
     int old_x, old_y;
     gCamera.active = FALSE;
-    // The freecam roams in the home frame without ever making a connected map "current": it just
-    // advances the camera tile and lets StitchCameraView slide the render buffer across the seam. The
-    // full connection transition (with its music/script/warp side effects) is reserved for the player.
-    if (IsFreecamActive())
+    // A detached camera (freecam, NPC track, or pan) roams the home frame without ever making a
+    // connected map "current": it just advances the camera tile and lets StitchCameraView slide the
+    // render buffer across the seam. The full connection transition (with its music/map-name/script/
+    // warp side effects) is reserved for the player actually walking across the border — while the
+    // camera is detached the player stays parked at home, so a tracked NPC or pan crossing a seam must
+    // glide silently the same way the freecam does.
+    if (IsCameraDetachedFromPlayer())
     {
         gCameraPos.x += x;
         gCameraPos.y += y;

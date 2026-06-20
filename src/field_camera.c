@@ -508,7 +508,12 @@ static void CenterCameraOnTile(s16 x, s16 y)
     bool8 gfxReloaded;
     u8 i;
 
-    ClampTileToMap(&x, &y);
+    // Clamp to the home-map bounds only when the requested tile isn't backed by real map data. A
+    // tracked object that has wandered onto a connected map sits outside the home bounds but on a
+    // defined tile of the stitched plane, and must be reachable; clamping it back inside would stop
+    // the camera ever centring on it. Mirrors the freecam, which roams any defined tile.
+    if (!IsCameraTileDefined(x, y))
+        ClampTileToMap(&x, &y);
 
     // Only rebuild the view when the focus actually moves (or the camera is mid-step). Re-centring
     // on the tile the camera already rests on must not zero the offset and redraw: that would
@@ -612,6 +617,12 @@ void SetCameraTrackedLocalId(u8 localId)
         // The player object can be culled like any other; recover its tile from the save.
         targetX = gSaveBlock1Ptr->playerPos.x + MAP_OFFSET;
         targetY = gSaveBlock1Ptr->playerPos.y + MAP_OFFSET;
+    }
+    else if (GetDisplacedObjectFrameCoordsByLocalId(localId, gSaveBlock1Ptr->location.mapNum,
+                                                    gSaveBlock1Ptr->location.mapGroup, &targetX, &targetY))
+    {
+        // Culled but wandered onto a connected map: aim at its stored position there, not its home
+        // template (which is where it would never be while displaced).
     }
     else if (!GetObjectEventTemplateCoordsByLocalId(localId, &targetX, &targetY))
     {
@@ -720,6 +731,13 @@ static u8 GetPanTargetTile(u8 localId, s16 *x, s16 *y)
     {
         *x = gSaveBlock1Ptr->playerPos.x;
         *y = gSaveBlock1Ptr->playerPos.y;
+    }
+    else if (GetDisplacedObjectFrameCoordsByLocalId(localId, gSaveBlock1Ptr->location.mapNum,
+                                                    gSaveBlock1Ptr->location.mapGroup, &templateX, &templateY))
+    {
+        // Culled but wandered onto a connected map: head for its stored position there.
+        *x = templateX - MAP_OFFSET;
+        *y = templateY - MAP_OFFSET;
     }
     else if (GetObjectEventTemplateCoordsByLocalId(localId, &templateX, &templateY))
     {
