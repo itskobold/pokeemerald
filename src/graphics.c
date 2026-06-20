@@ -1475,8 +1475,6 @@ const u8 gTradeGba_Gfx[] = INCGFX_U8("graphics/trade/gba.png", ".4bpp");
 
 static const u16 sEmptyPal[16] = {0};
 
-#include "data/graphics/berry_fix.h"
-
 // Trade
 const u16 gTradeMenu_Pal[] = INCGFX_U16("graphics/trade/menu.pal", ".gbapal");
 const u16 gTradeCursor_Pal[] = INCGFX_U16("graphics/trade/cursor.pal", ".gbapal");

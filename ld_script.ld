@@ -306,10 +306,8 @@ SECTIONS {
         src/battle_tent.o(.text);
         src/braille.o(.text);
         src/multiboot.o(.text);
-        src/berry_fix_graphics.o(.text);
         src/battle_controller_player_partner.o(.text);
         src/mirage_tower.o(.text);
-        src/berry_fix_program.o(.text);
         src/pokemon_summary_screen.o(.text);
         src/pokedex_area_region_map.o(.text);
         src/battle_pyramid_bag.o(.text);
@@ -664,10 +662,8 @@ SECTIONS {
         src/battle_tent.o(.rodata);
         src/braille.o(.rodata);
         src/multiboot.o(.rodata);
-        src/berry_fix_graphics.o(.rodata);
         src/battle_controller_player_partner.o(.rodata);
         src/mirage_tower.o(.rodata);
-        src/berry_fix_program.o(.rodata);
         src/pokemon_summary_screen.o(.rodata);
         src/pokedex_area_region_map.o(.rodata);
         src/battle_pyramid_bag.o(.rodata);
@@ -1295,7 +1291,6 @@ SECTIONS {
     ALIGN(4)
     {
         data/multiboot_ereader.o(.rodata);
-        data/multiboot_berry_glitch_fix.o(.rodata);
         data/multiboot_pokemon_colosseum.o(.rodata);
     } > ROM =0
 
