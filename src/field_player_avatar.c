@@ -2345,7 +2345,7 @@ bool8 ObjectMovingOnRockStairs(struct ObjectEvent *objectEvent, u8 direction)
 
         // Behind the cliff every tile is treated as MB_NORMAL: no slow-stairs movement (and no
         // stairs-driven state changes that would break the behind-cliff state machine).
-        if (objectEvent->behindCliff)
+        if (objectEvent->cliffLayer != CLIFF_LAYER_FRONT)
             return FALSE;
 
         #if FOLLOW_ME_IMPLEMENTED

@@ -260,6 +260,14 @@ struct MapHeader
                // the remaining 6 bits are unused
 };
 
+// Render plane of a sprite relative to a cliff face it has climbed behind. The states are ordered:
+// each higher one sinks the sprite further back, so >= FRONT comparisons gate "behind the cliff".
+enum CliffLayer
+{
+    CLIFF_LAYER_FRONT,    // in front of the cliff: normal elevation-based rendering
+    CLIFF_LAYER_BEHIND,   // behind the cliff face: drawn behind the top 2 tile layers
+    CLIFF_LAYER_OBSCURED, // fully buried: every tile the sprite spans is higher, so it is hidden
+};
 
 struct ObjectEvent
 {
@@ -291,9 +299,8 @@ struct ObjectEvent
              u32 disableJumpLandingGroundEffect:1;
              u32 fixedPriority:1;
              u32 hideReflection:1;
-             u32 behindCliff:1; // below-state on/behind a cliff face; persists onto transition tiles
-             u32 surfacingFromCliff:1; // surface condition met at step-commit; defer clearing behindCliff until arrival
-             u32 fullyBehindCliff:1; // whole sprite obscured by the cliff (every tile it spans is higher terrain); hide it behind all 3 layers
+             u32 surfacingFromCliff:1; // surface condition met at step-commit; defer leaving the cliff until arrival
+             u32 cliffLayer:2;         // CLIFF_LAYER_*: render plane relative to a cliff face
              //u32 padding:1;
     /*0x04*/ u8 spriteId;
     /*0x05*/ u8 graphicsId;

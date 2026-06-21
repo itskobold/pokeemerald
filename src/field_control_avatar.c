@@ -223,7 +223,7 @@ static void GetInFrontOfPlayerPosition(struct MapPosition *position)
 static bool32 IsInteractionBlockedBehindCliff(struct MapPosition *position)
 {
     struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
-    return player->behindCliff
+    return player->cliffLayer != CLIFF_LAYER_FRONT
         && MapGridGetElevationAt(position->x, position->y) > player->previousElevation;
 }
 
