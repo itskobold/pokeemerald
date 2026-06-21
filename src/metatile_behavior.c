@@ -11,7 +11,6 @@ static const u8 sTileBitAttributes[NUM_METATILE_BEHAVIORS] =
     [MB_NORMAL]                          = TILE_FLAG_UNUSED,
     [MB_TALL_GRASS]                      = TILE_FLAG_UNUSED | TILE_FLAG_HAS_ENCOUNTERS,
     [MB_LONG_GRASS]                      = TILE_FLAG_UNUSED | TILE_FLAG_HAS_ENCOUNTERS,
-    [MB_UNUSED_05]                       = TILE_FLAG_HAS_ENCOUNTERS,
     [MB_DEEP_SAND]                       = TILE_FLAG_UNUSED | TILE_FLAG_HAS_ENCOUNTERS,
     [MB_SHORT_GRASS]                     = TILE_FLAG_UNUSED,
     [MB_CAVE]                            = TILE_FLAG_UNUSED | TILE_FLAG_HAS_ENCOUNTERS,
@@ -248,14 +247,6 @@ bool8 MetatileBehavior_IsEscalator(u8 metatileBehavior)
         return FALSE;
 }
 
-bool8 Unref_MetatileBehavior_IsUnused04(u8 metatileBehavior)
-{
-    if (metatileBehavior == MB_UNUSED_04)
-        return TRUE;
-    else
-        return FALSE;
-}
-
 bool8 MetatileBehavior_IsLadder(u8 metatileBehavior)
 {
     if (metatileBehavior == MB_LADDER)
@@ -366,14 +357,6 @@ bool8 MetatileBehavior_IsIce_2(u8 metatileBehavior)
 bool8 MetatileBehavior_IsTrickHouseSlipperyFloor(u8 metatileBehavior)
 {
     if (metatileBehavior == MB_TRICK_HOUSE_PUZZLE_8_FLOOR)
-        return TRUE;
-    else
-        return FALSE;
-}
-
-bool8 Unref_MetatileBehavior_IsUnused05(u8 metatileBehavior)
-{
-    if (metatileBehavior == MB_UNUSED_05)
         return TRUE;
     else
         return FALSE;
@@ -941,6 +924,7 @@ bool8 MetatileBehavior_IsEastBlocked(u8 metatileBehavior)
      || metatileBehavior == MB_IMPASSABLE_NORTHEAST
      || metatileBehavior == MB_IMPASSABLE_SOUTHEAST
      || metatileBehavior == MB_IMPASSABLE_WEST_AND_EAST
+     || metatileBehavior == MB_IMPASSABLE_ALL
      || metatileBehavior == MB_SECRET_BASE_BREAKABLE_DOOR)
         return TRUE;
     else
@@ -953,6 +937,7 @@ bool8 MetatileBehavior_IsWestBlocked(u8 metatileBehavior)
      || metatileBehavior == MB_IMPASSABLE_NORTHWEST
      || metatileBehavior == MB_IMPASSABLE_SOUTHWEST
      || metatileBehavior == MB_IMPASSABLE_WEST_AND_EAST
+     || metatileBehavior == MB_IMPASSABLE_ALL
      || metatileBehavior == MB_SECRET_BASE_BREAKABLE_DOOR)
         return TRUE;
     else
@@ -964,7 +949,8 @@ bool8 MetatileBehavior_IsNorthBlocked(u8 metatileBehavior)
     if (metatileBehavior == MB_IMPASSABLE_NORTH
      || metatileBehavior == MB_IMPASSABLE_NORTHEAST
      || metatileBehavior == MB_IMPASSABLE_NORTHWEST
-     || metatileBehavior == MB_IMPASSABLE_SOUTH_AND_NORTH)
+     || metatileBehavior == MB_IMPASSABLE_SOUTH_AND_NORTH
+     || metatileBehavior == MB_IMPASSABLE_ALL)
         return TRUE;
     else
         return FALSE;
@@ -975,7 +961,8 @@ bool8 MetatileBehavior_IsSouthBlocked(u8 metatileBehavior)
     if (metatileBehavior == MB_IMPASSABLE_SOUTH
      || metatileBehavior == MB_IMPASSABLE_SOUTHEAST
      || metatileBehavior == MB_IMPASSABLE_SOUTHWEST
-     || metatileBehavior == MB_IMPASSABLE_SOUTH_AND_NORTH)
+     || metatileBehavior == MB_IMPASSABLE_SOUTH_AND_NORTH
+     || metatileBehavior == MB_IMPASSABLE_ALL)
         return TRUE;
     else
         return FALSE;
@@ -1480,6 +1467,14 @@ bool8 MetatileBehavior_IsRockStairs(u8 metatileBehavior)
         return TRUE;
     else
         return FALSE;
+}
+
+// Stairs tiles are the clean path between elevation levels (rock + sideways stairs).
+bool8 MetatileBehavior_IsElevationChange(u8 metatileBehavior)
+{
+    return MetatileBehavior_IsRockStairs(metatileBehavior)
+        || MetatileBehavior_IsSidewaysStairsRightSideAny(metatileBehavior)
+        || MetatileBehavior_IsSidewaysStairsLeftSideAny(metatileBehavior);
 }
 
 

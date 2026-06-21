@@ -88,14 +88,14 @@
     {
       "x": 4,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MOSSDEEP_CITY",
       "dest_warp_id": "7"
     },
     {
       "x": 3,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MOSSDEEP_CITY",
       "dest_warp_id": "7"
     }

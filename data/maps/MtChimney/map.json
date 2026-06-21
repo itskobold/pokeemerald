@@ -444,14 +444,14 @@
     {
       "x": 17,
       "y": 36,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MT_CHIMNEY_CABLE_CAR_STATION",
       "dest_warp_id": "0"
     },
     {
       "x": 18,
       "y": 36,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MT_CHIMNEY_CABLE_CAR_STATION",
       "dest_warp_id": "1"
     },
@@ -476,7 +476,7 @@
       "type": "sign",
       "x": 14,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "MtChimney_EventScript_MeteoriteMachine"
     },

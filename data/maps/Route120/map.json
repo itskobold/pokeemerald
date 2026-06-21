@@ -639,14 +639,14 @@
     {
       "x": 7,
       "y": 55,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ANCIENT_TOMB",
       "dest_warp_id": "0"
     },
     {
       "x": 19,
       "y": 23,
-      "elevation": 2,
+      "elevation": 5,
       "dest_map": "MAP_SCORCHED_SLAB",
       "dest_warp_id": "0"
     }
@@ -656,14 +656,14 @@
       "type": "weather",
       "x": 7,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "weather": "COORD_EVENT_WEATHER_RAIN"
     },
     {
       "type": "weather",
       "x": 7,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "weather": "COORD_EVENT_WEATHER_RAIN"
     },
     {
@@ -719,14 +719,14 @@
       "type": "weather",
       "x": 28,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "weather": "COORD_EVENT_WEATHER_SUNNY"
     },
     {
       "type": "weather",
       "x": 28,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "weather": "COORD_EVENT_WEATHER_SUNNY"
     },
     {
@@ -807,21 +807,21 @@
       "type": "secret_base",
       "x": 28,
       "y": 62,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE3_1"
     },
     {
       "type": "secret_base",
       "x": 30,
       "y": 62,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE4_1"
     },
     {
       "type": "secret_base",
       "x": 26,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB3_2"
     },
     {
@@ -835,21 +835,21 @@
       "type": "secret_base",
       "x": 18,
       "y": 12,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE2_3"
     },
     {
       "type": "secret_base",
       "x": 38,
       "y": 54,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB1_3"
     },
     {
       "type": "secret_base",
       "x": 31,
       "y": 23,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB2_3"
     },
     {
@@ -888,7 +888,7 @@
       "type": "secret_base",
       "x": 5,
       "y": 76,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB1_4"
     }
   ]

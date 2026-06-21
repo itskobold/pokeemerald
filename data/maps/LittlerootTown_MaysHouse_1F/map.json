@@ -144,21 +144,21 @@
     {
       "x": 1,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LITTLEROOT_TOWN",
       "dest_warp_id": "0"
     },
     {
       "x": 2,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LITTLEROOT_TOWN",
       "dest_warp_id": "0"
     },
     {
       "x": 2,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LITTLEROOT_TOWN_MAYS_HOUSE_2F",
       "dest_warp_id": "0"
     }
@@ -168,7 +168,7 @@
       "type": "trigger",
       "x": 2,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "var": "VAR_LITTLEROOT_INTRO_STATE",
       "var_value": "4",
       "script": "LittlerootTown_MaysHouse_1F_EventScript_GoSeeRoom"
@@ -177,7 +177,7 @@
       "type": "trigger",
       "x": 1,
       "y": 3,
-      "elevation": 0,
+      "elevation": 5,
       "var": "VAR_LITTLEROOT_RIVAL_STATE",
       "var_value": "2",
       "script": "LittlerootTown_MaysHouse_1F_EventScript_MeetRival0"
@@ -186,7 +186,7 @@
       "type": "trigger",
       "x": 2,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "var": "VAR_LITTLEROOT_RIVAL_STATE",
       "var_value": "2",
       "script": "LittlerootTown_MaysHouse_1F_EventScript_MeetRival1"
@@ -195,7 +195,7 @@
       "type": "trigger",
       "x": 3,
       "y": 3,
-      "elevation": 0,
+      "elevation": 5,
       "var": "VAR_LITTLEROOT_RIVAL_STATE",
       "var_value": "2",
       "script": "LittlerootTown_MaysHouse_1F_EventScript_MeetRival2"

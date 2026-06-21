@@ -89,21 +89,21 @@
     {
       "x": 5,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_RUSTBORO_CITY",
       "dest_warp_id": "5"
     },
     {
       "x": 6,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_RUSTBORO_CITY",
       "dest_warp_id": "6"
     },
     {
       "x": 14,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_RUSTBORO_CITY_DEVON_CORP_2F",
       "dest_warp_id": "0"
     }
@@ -114,7 +114,7 @@
       "type": "sign",
       "x": 3,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "RustboroCity_DevonCorp_1F_EventScript_ProductsDisplay"
     },
@@ -122,7 +122,7 @@
       "type": "sign",
       "x": 8,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "RustboroCity_DevonCorp_1F_EventScript_RocksMetalDisplay"
     }

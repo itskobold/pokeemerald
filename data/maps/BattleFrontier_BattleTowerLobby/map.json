@@ -186,7 +186,7 @@
     {
       "x": 6,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_BATTLE_FRONTIER_BATTLE_TOWER_BATTLE_ROOM",
       "dest_warp_id": "0"
     }
@@ -197,7 +197,7 @@
       "type": "sign",
       "x": 4,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_BattleTowerLobby_EventScript_ShowSinglesResults"
     },
@@ -205,7 +205,7 @@
       "type": "sign",
       "x": 8,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_BattleTowerLobby_EventScript_ShowDoublesResults"
     },
@@ -213,7 +213,7 @@
       "type": "sign",
       "x": 12,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_BattleTowerLobby_EventScript_ShowMultisResults"
     },
@@ -221,7 +221,7 @@
       "type": "sign",
       "x": 16,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_BattleTowerLobby_EventScript_ShowLinkMultisResults"
     },
@@ -229,7 +229,7 @@
       "type": "sign",
       "x": 2,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_BattleTowerLobby_EventScript_RulesBoard"
     }

@@ -1,8 +1,8 @@
 #ifndef GUARD_FIELD_PLAYER_AVATAR_H
 #define GUARD_FIELD_PLAYER_AVATAR_H
 
-// The player's actual elevation level (real levels only, stored as the tile's elevation
-// value minus ELEVATION_FIRST_LEVEL, i.e. 0-123). See gPlayerElevation in field_player_avatar.c.
+// The player's elevation level (the raw tile elevation, 0-127). See gPlayerElevation in
+// field_player_avatar.c.
 extern u8 gPlayerElevation;
 // The biome of the tile the player is on (the tile's raw biome value, no special cases).
 extern u8 gPlayerBiome;

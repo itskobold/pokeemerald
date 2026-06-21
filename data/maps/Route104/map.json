@@ -143,7 +143,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MR_BRINEYS_BOAT",
       "x": 12,
       "y": 54,
-      "elevation": 2,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_UP",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -496,7 +496,7 @@
       "graphics_id": "OBJ_EVENT_GFX_VAR_0",
       "x": 17,
       "y": 50,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -510,14 +510,14 @@
     {
       "x": 17,
       "y": 50,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE104_MR_BRINEYS_HOUSE",
       "dest_warp_id": "0"
     },
     {
       "x": 5,
       "y": 18,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE104_PRETTY_PETAL_FLOWER_SHOP",
       "dest_warp_id": "0"
     },
@@ -580,7 +580,7 @@
       "type": "sign",
       "x": 20,
       "y": 50,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route104_EventScript_BrineysCottageSign"
     },
@@ -588,7 +588,7 @@
       "type": "sign",
       "x": 27,
       "y": 66,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route104_EventScript_RouteSignPetalburg"
     },
@@ -596,7 +596,7 @@
       "type": "sign",
       "x": 23,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route104_EventScript_RouteSignRustboro"
     },
@@ -604,7 +604,7 @@
       "type": "sign",
       "x": 7,
       "y": 20,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route104_EventScript_FlowerShopSign"
     },

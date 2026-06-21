@@ -88,28 +88,28 @@
     {
       "x": 2,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SAFARI_ZONE_SOUTH",
       "dest_warp_id": "0"
     },
     {
       "x": 3,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SAFARI_ZONE_SOUTH",
       "dest_warp_id": "0"
     },
     {
       "x": 14,
       "y": 13,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE121",
       "dest_warp_id": "0"
     },
     {
       "x": 15,
       "y": 13,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE121",
       "dest_warp_id": "0"
     }
@@ -130,7 +130,7 @@
       "type": "sign",
       "x": 15,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route121_SafariZoneEntrance_EventScript_TrainerTipSign"
     }

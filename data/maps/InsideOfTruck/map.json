@@ -91,21 +91,21 @@
     {
       "x": 4,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 4,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     },
     {
       "x": 4,
       "y": 3,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_DYNAMIC"
     }
@@ -144,7 +144,7 @@
       "type": "sign",
       "x": 1,
       "y": 0,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "InsideOfTruck_EventScript_MovingBox"
     },
@@ -152,7 +152,7 @@
       "type": "sign",
       "x": 3,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "InsideOfTruck_EventScript_MovingBox"
     },
@@ -160,7 +160,7 @@
       "type": "sign",
       "x": 2,
       "y": 3,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "InsideOfTruck_EventScript_MovingBox"
     },
@@ -168,7 +168,7 @@
       "type": "sign",
       "x": 0,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "InsideOfTruck_EventScript_MovingBox"
     },
@@ -176,7 +176,7 @@
       "type": "sign",
       "x": 0,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "InsideOfTruck_EventScript_MovingBox"
     }

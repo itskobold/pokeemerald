@@ -62,7 +62,7 @@
       "type": "hidden_item",
       "x": 42,
       "y": 51,
-      "elevation": 0,
+      "elevation": 5,
       "item": "ITEM_CARBOS",
       "flag": "FLAG_HIDDEN_ITEM_UNDERWATER_124_CARBOS"
     },
@@ -70,7 +70,7 @@
       "type": "hidden_item",
       "x": 14,
       "y": 40,
-      "elevation": 0,
+      "elevation": 5,
       "item": "ITEM_GREEN_SHARD",
       "flag": "FLAG_HIDDEN_ITEM_UNDERWATER_124_GREEN_SHARD"
     },

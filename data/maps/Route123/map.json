@@ -619,7 +619,7 @@
     {
       "x": 22,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE123_BERRY_MASTERS_HOUSE",
       "dest_warp_id": "0"
     }
@@ -785,7 +785,7 @@
       "type": "sign",
       "x": 117,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route123_EventScript_RouteSignMtPyre"
     },
@@ -793,14 +793,14 @@
       "type": "secret_base",
       "x": 47,
       "y": 3,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE1_2"
     },
     {
       "type": "secret_base",
       "x": 49,
       "y": 3,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE2_2"
     },
     {
@@ -831,7 +831,7 @@
       "type": "secret_base",
       "x": 57,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE1_3"
     },
     {

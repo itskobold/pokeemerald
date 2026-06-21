@@ -43,6 +43,7 @@ COMMON_DATA u8 gSelectedObjectEvent = 0;
 
 static void GetPlayerPosition(struct MapPosition *);
 static void GetInFrontOfPlayerPosition(struct MapPosition *);
+static bool32 IsInteractionBlockedBehindCliff(struct MapPosition *);
 static u16 GetPlayerCurMetatileBehavior(int);
 static bool8 TryStartInteractionScript(struct MapPosition *, u16, u8);
 static const u8 *GetInteractionScript(struct MapPosition *, u8, u8);
@@ -175,7 +176,8 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
 
     GetInFrontOfPlayerPosition(&position);
     metatileBehavior = MapGridGetMetatileBehaviorAt(position.x, position.y);
-    if (input->pressedAButton && TryStartInteractionScript(&position, metatileBehavior, playerDirection) == TRUE)
+    if (input->pressedAButton && !IsInteractionBlockedBehindCliff(&position)
+     && TryStartInteractionScript(&position, metatileBehavior, playerDirection) == TRUE)
         return TRUE;
 
     if (input->heldDirection2 && input->dpadDirection == playerDirection)
@@ -211,14 +213,18 @@ static void GetPlayerPosition(struct MapPosition *position)
 
 static void GetInFrontOfPlayerPosition(struct MapPosition *position)
 {
-    s16 x, y;
-
     GetXYCoordsOneStepInFrontOfPlayer(&position->x, &position->y);
-    PlayerGetDestCoords(&x, &y);
-    if (MapGridGetElevationAt(x, y) != ELEVATION_TRANSITION)
-        position->elevation = PlayerGetElevation();
-    else
-        position->elevation = ELEVATION_TRANSITION;
+    position->elevation = PlayerGetElevation();
+}
+
+// Behind a cliff the player is rendered down at the frozen base level (previousElevation) while the
+// foreground tiles sit on the higher plateau. Restrict interaction to the base level so you can't
+// reach surf, PCs, etc. on the elevation you climbed past.
+static bool32 IsInteractionBlockedBehindCliff(struct MapPosition *position)
+{
+    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+    return player->behindCliff
+        && MapGridGetElevationAt(position->x, position->y) > player->previousElevation;
 }
 
 static u16 GetPlayerCurMetatileBehavior(int runningState)
@@ -910,7 +916,7 @@ static s8 GetWarpEventAtPosition(struct MapHeader *mapHeader, u16 x, u16 y, u8 e
     {
         if ((u16)warpEvent->x == x && (u16)warpEvent->y == y)
         {
-            if (warpEvent->elevation == elevation || warpEvent->elevation == ELEVATION_TRANSITION)
+            if (warpEvent->elevation == elevation)
                 return i;
         }
     }
@@ -947,7 +953,7 @@ static const u8 *GetCoordEventScriptAtPosition(struct MapHeader *mapHeader, u16 
     {
         if ((u16)coordEvents[i].x == x && (u16)coordEvents[i].y == y)
         {
-            if (coordEvents[i].elevation == elevation || coordEvents[i].elevation == ELEVATION_TRANSITION)
+            if (coordEvents[i].elevation == elevation)
             {
                 const u8 *script = TryRunCoordEventScript(&coordEvents[i]);
                 if (script != NULL)
@@ -973,7 +979,7 @@ static const struct BgEvent *GetBackgroundEventAtPosition(struct MapHeader *mapH
     {
         if ((u16)bgEvents[i].x == x && (u16)bgEvents[i].y == y)
         {
-            if (bgEvents[i].elevation == elevation || bgEvents[i].elevation == ELEVATION_TRANSITION)
+            if (bgEvents[i].elevation == elevation)
                 return &bgEvents[i];
         }
     }

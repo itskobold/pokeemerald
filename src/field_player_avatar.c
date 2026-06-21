@@ -36,9 +36,8 @@
 static EWRAM_DATA u8 sSpinStartFacingDir = 0;
 EWRAM_DATA struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT] = {};
 EWRAM_DATA struct PlayerAvatar gPlayerAvatar = {};
-// The player's actual elevation level (an ordinary level only, stored as tile value minus
-// ELEVATION_FIRST_LEVEL, i.e. 0-123). Updated on warp-in and on each tile-to-tile move; see
-// ObjectEventUpdateElevation. Transient/derived state, not part of the save.
+// The player's elevation level (the raw tile elevation, 0-127). Updated on warp-in and on each
+// tile-to-tile move; see ObjectEventUpdateElevation. Transient/derived state, not part of the save.
 EWRAM_DATA u8 gPlayerElevation = 0;
 // The biome of the tile the player is on (no special cases — just the tile's biome value).
 // Updated alongside gPlayerElevation in ObjectEventUpdateElevation. Transient, not saved.
@@ -729,7 +728,7 @@ u8 CheckForObjectEventCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u
     u8 collision = GetCollisionAtCoords(objectEvent, x, y, direction);
     u8 currentBehavior = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
     
-    if (collision == COLLISION_ELEVATION_MISMATCH && CanStopSurfing(x, y, direction))
+    if (collision == COLLISION_NONE && CanStopSurfing(x, y, direction))
         return COLLISION_STOP_SURFING;
 
     if (ShouldJumpLedge(x, y, direction))
@@ -780,9 +779,10 @@ static u8 CheckForObjectEventStaticCollision(struct ObjectEvent *objectEvent, s1
 
 static bool8 CanStopSurfing(s16 x, s16 y, u8 direction)
 {
+    // Dismount when surfing onto unoccupied land (any tile that isn't surfable water).
     if ((gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
-     && MapGridGetElevationAt(x, y) == ELEVATION_DEFAULT
-     && GetObjectEventIdByPosition(x, y, ELEVATION_DEFAULT) == OBJECT_EVENTS_COUNT)
+     && !MetatileBehavior_IsSurfableWaterOrUnderwater(MapGridGetMetatileBehaviorAt(x, y))
+     && GetObjectEventIdByPosition(x, y, ELEVATION_MATCH_ANY) == OBJECT_EVENTS_COUNT)
     {
         CreateStopSurfingTask(direction);
         return TRUE;
@@ -1389,8 +1389,7 @@ bool8 IsPlayerFacingSurfableFishableWater(void)
     s16 y = playerObjEvent->currentCoords.y;
 
     MoveCoords(playerObjEvent->facingDirection, &x, &y);
-    if (GetCollisionAtCoords(playerObjEvent, x, y, playerObjEvent->facingDirection) == COLLISION_ELEVATION_MISMATCH
-     && PlayerGetElevation() == ELEVATION_DEFAULT
+    if (!(gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
      && MetatileBehavior_IsSurfableFishableWater(MapGridGetMetatileBehaviorAt(x, y)))
         return TRUE;
     else
@@ -1451,7 +1450,7 @@ void InitPlayerAvatar(s16 x, s16 y, u8 direction, u8 gender)
     playerObjEventTemplate.graphicsId = GetPlayerAvatarGraphicsIdByStateIdAndGender(PLAYER_AVATAR_STATE_NORMAL, gender);
     playerObjEventTemplate.x = x - MAP_OFFSET;
     playerObjEventTemplate.y = y - MAP_OFFSET;
-    playerObjEventTemplate.elevation = ELEVATION_TRANSITION;
+    playerObjEventTemplate.elevation = ELEVATION_DEFAULT;
     playerObjEventTemplate.movementType = MOVEMENT_TYPE_PLAYER;
     playerObjEventTemplate.movementRangeX = 0;
     playerObjEventTemplate.movementRangeY = 0;
@@ -2343,7 +2342,12 @@ bool8 ObjectMovingOnRockStairs(struct ObjectEvent *objectEvent, u8 direction)
     #if SLOW_MOVEMENT_ON_STAIRS
         s16 x = objectEvent->currentCoords.x;
         s16 y = objectEvent->currentCoords.y;
-        
+
+        // Behind the cliff every tile is treated as MB_NORMAL: no slow-stairs movement (and no
+        // stairs-driven state changes that would break the behind-cliff state machine).
+        if (objectEvent->behindCliff)
+            return FALSE;
+
         #if FOLLOW_ME_IMPLEMENTED
             if (PlayerHasFollower() && (objectEvent->isPlayer || objectEvent->localId == GetFollowerLocalId()))
                 return FALSE;

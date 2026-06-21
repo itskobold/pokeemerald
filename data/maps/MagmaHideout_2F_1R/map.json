@@ -101,14 +101,14 @@
     {
       "x": 11,
       "y": 23,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MAGMA_HIDEOUT_2F_2R",
       "dest_warp_id": "0"
     },
     {
       "x": 8,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MAGMA_HIDEOUT_1F",
       "dest_warp_id": "1"
     },

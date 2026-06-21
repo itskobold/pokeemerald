@@ -75,14 +75,14 @@
     {
       "x": 3,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SOOTOPOLIS_CITY",
       "dest_warp_id": "6"
     },
     {
       "x": 4,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SOOTOPOLIS_CITY",
       "dest_warp_id": "6"
     }

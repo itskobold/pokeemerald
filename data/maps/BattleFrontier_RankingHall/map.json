@@ -106,7 +106,7 @@
       "type": "sign",
       "x": 26,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_TowerSinglesRecords"
     },
@@ -114,7 +114,7 @@
       "type": "sign",
       "x": 23,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_TowerDoublesRecords"
     },
@@ -122,7 +122,7 @@
       "type": "sign",
       "x": 26,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_TowerMultisRecords"
     },
@@ -130,7 +130,7 @@
       "type": "sign",
       "x": 29,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_TowerLinkRecords"
     },
@@ -138,7 +138,7 @@
       "type": "sign",
       "x": 42,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_ArenaRecords"
     },
@@ -146,7 +146,7 @@
       "type": "sign",
       "x": 46,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_PalaceRecords"
     },
@@ -154,7 +154,7 @@
       "type": "sign",
       "x": 10,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_FactoryRecords"
     },
@@ -162,7 +162,7 @@
       "type": "sign",
       "x": 8,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_DomeRecords"
     },
@@ -170,7 +170,7 @@
       "type": "sign",
       "x": 6,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_PikeRecords"
     },
@@ -178,7 +178,7 @@
       "type": "sign",
       "x": 44,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "BattleFrontier_RankingHall_EventScript_PyramidRecords"
     },
@@ -186,7 +186,7 @@
       "type": "sign",
       "x": 16,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_RankingHall_EventScript_DomePikeFactoryRecordsSign"
     },
@@ -194,7 +194,7 @@
       "type": "sign",
       "x": 36,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_RankingHall_EventScript_PalaceArenaPyramidRecordsSIgn"
     }

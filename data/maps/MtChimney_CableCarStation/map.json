@@ -76,14 +76,14 @@
     {
       "x": 6,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MT_CHIMNEY",
       "dest_warp_id": "0"
     },
     {
       "x": 7,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MT_CHIMNEY",
       "dest_warp_id": "1"
     }

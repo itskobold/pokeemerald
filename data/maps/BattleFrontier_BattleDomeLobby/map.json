@@ -49,7 +49,7 @@
       "graphics_id": "OBJ_EVENT_GFX_TEALA",
       "x": 5,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -62,7 +62,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MAN_3",
       "x": 1,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WANDER_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -75,7 +75,7 @@
       "graphics_id": "OBJ_EVENT_GFX_LASS",
       "x": 14,
       "y": 14,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WANDER_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -88,7 +88,7 @@
       "graphics_id": "OBJ_EVENT_GFX_FAT_MAN",
       "x": 18,
       "y": 14,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WANDER_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -101,7 +101,7 @@
       "graphics_id": "OBJ_EVENT_GFX_MANIAC",
       "x": 8,
       "y": 14,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WANDER_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -115,7 +115,7 @@
       "graphics_id": "OBJ_EVENT_GFX_TEALA",
       "x": 17,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -129,14 +129,14 @@
     {
       "x": 11,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_BATTLE_FRONTIER_OUTSIDE_WEST",
       "dest_warp_id": "1"
     },
     {
       "x": 12,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_BATTLE_FRONTIER_OUTSIDE_WEST",
       "dest_warp_id": "1"
     }
@@ -147,7 +147,7 @@
       "type": "sign",
       "x": 4,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_BattleDomeLobby_EventScript_ShowSinglesResults"
     },
@@ -155,7 +155,7 @@
       "type": "sign",
       "x": 7,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_BattleDomeLobby_EventScript_ShowPrevTourneyTree"
     },
@@ -163,7 +163,7 @@
       "type": "sign",
       "x": 18,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_BattleDomeLobby_EventScript_ShowDoublesResults"
     },
@@ -171,7 +171,7 @@
       "type": "sign",
       "x": 15,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "BattleFrontier_BattleDomeLobby_EventScript_RulesBoard"
     }

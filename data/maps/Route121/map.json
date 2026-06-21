@@ -445,7 +445,7 @@
     {
       "x": 37,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE121_SAFARI_ZONE_ENTRANCE",
       "dest_warp_id": "2"
     }
@@ -493,7 +493,7 @@
       "type": "sign",
       "x": 32,
       "y": 14,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route121_EventScript_MtPyrePierSign"
     },
@@ -501,35 +501,35 @@
       "type": "secret_base",
       "x": 40,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_RED_CAVE2_2"
     },
     {
       "type": "secret_base",
       "x": 18,
       "y": 13,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_RED_CAVE3_2"
     },
     {
       "type": "secret_base",
       "x": 43,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE1_2"
     },
     {
       "type": "secret_base",
       "x": 42,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE2_2"
     },
     {
       "type": "sign",
       "x": 39,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route121_EventScript_SafariZoneSign"
     },

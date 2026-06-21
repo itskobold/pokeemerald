@@ -202,7 +202,7 @@
       "type": "sign",
       "x": 0,
       "y": 14,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_TrickHousePuzzle3_EventScript_Scroll"
     }

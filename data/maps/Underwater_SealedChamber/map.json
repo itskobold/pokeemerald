@@ -48,7 +48,7 @@
     {
       "x": 7,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_UNDERWATER_ROUTE134",
       "dest_warp_id": "0"
     }
@@ -59,7 +59,7 @@
       "type": "sign",
       "x": 12,
       "y": 43,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Underwater_SealedChamber_EventScript_Braille"
     }

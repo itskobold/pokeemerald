@@ -245,7 +245,7 @@
     {
       "x": 5,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_DYNAMIC",
       "dest_warp_id": "WARP_ID_SECRET_BASE"
     }

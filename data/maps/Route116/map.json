@@ -373,7 +373,7 @@
       "graphics_id": "OBJ_EVENT_GFX_ITEM_BALL",
       "x": 34,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 1,
       "movement_range_y": 1,
@@ -426,35 +426,35 @@
     {
       "x": 47,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_RUSTURF_TUNNEL",
       "dest_warp_id": "0"
     },
     {
       "x": 38,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE116_TUNNELERS_REST_HOUSE",
       "dest_warp_id": "0"
     },
     {
       "x": 65,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_RUSTURF_TUNNEL",
       "dest_warp_id": "2"
     },
     {
       "x": 59,
       "y": 13,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_TERRA_CAVE_ENTRANCE",
       "dest_warp_id": "0"
     },
     {
       "x": 79,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_TERRA_CAVE_ENTRANCE",
       "dest_warp_id": "0"
     }
@@ -475,7 +475,7 @@
       "type": "sign",
       "x": 5,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route116_EventScript_RouteSignRustboro"
     },
@@ -483,7 +483,7 @@
       "type": "sign",
       "x": 48,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route116_EventScript_RusturfTunnelSign"
     },
@@ -491,7 +491,7 @@
       "type": "sign",
       "x": 40,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route116_EventScript_TunnelersRestHouseSign"
     },
@@ -499,21 +499,21 @@
       "type": "secret_base",
       "x": 71,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE1_1"
     },
     {
       "type": "secret_base",
       "x": 79,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE2_1"
     },
     {
       "type": "sign",
       "x": 16,
       "y": 12,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route116_EventScript_TrainerTipsBToStopEvolution"
     },
@@ -521,7 +521,7 @@
       "type": "sign",
       "x": 29,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route116_EventScript_TrainerTipsBagHasPockets"
     },
@@ -529,14 +529,14 @@
       "type": "secret_base",
       "x": 56,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE3_2"
     },
     {
       "type": "secret_base",
       "x": 55,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE4_2"
     },
     {

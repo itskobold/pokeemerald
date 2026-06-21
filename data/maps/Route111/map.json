@@ -79,7 +79,7 @@
       "graphics_id": "OBJ_EVENT_GFX_POKEFAN_F",
       "x": 13,
       "y": 113,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -93,7 +93,7 @@
       "graphics_id": "OBJ_EVENT_GFX_LASS",
       "x": 13,
       "y": 113,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 1,
       "movement_range_y": 0,
@@ -107,7 +107,7 @@
       "graphics_id": "OBJ_EVENT_GFX_EXPERT_F",
       "x": 13,
       "y": 113,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -675,35 +675,35 @@
     {
       "x": 13,
       "y": 113,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE111_WINSTRATE_FAMILYS_HOUSE",
       "dest_warp_id": "0"
     },
     {
       "x": 29,
       "y": 87,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_DESERT_RUINS",
       "dest_warp_id": "0"
     },
     {
       "x": 26,
       "y": 18,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE111_OLD_LADYS_REST_STOP",
       "dest_warp_id": "0"
     },
     {
       "x": 19,
       "y": 58,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MIRAGE_TOWER_1F",
       "dest_warp_id": "0"
     },
     {
       "x": 31,
       "y": 113,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_TRAINER_HILL_ENTRANCE",
       "dest_warp_id": "0"
     }
@@ -1021,7 +1021,7 @@
       "type": "sign",
       "x": 16,
       "y": 114,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route111_EventScript_WinstrateHouseSign"
     },
@@ -1029,7 +1029,7 @@
       "type": "sign",
       "x": 24,
       "y": 126,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route111_EventScript_RouteSignMauville"
     },
@@ -1037,7 +1037,7 @@
       "type": "sign",
       "x": 7,
       "y": 66,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route111_EventScript_RouteSign112"
     },
@@ -1045,7 +1045,7 @@
       "type": "sign",
       "x": 13,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route111_EventScript_RouteSign113"
     },
@@ -1053,28 +1053,28 @@
       "type": "secret_base",
       "x": 24,
       "y": 36,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_YELLOW_CAVE2_1"
     },
     {
       "type": "secret_base",
       "x": 34,
       "y": 50,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_YELLOW_CAVE3_1"
     },
     {
       "type": "secret_base",
       "x": 33,
       "y": 34,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_YELLOW_CAVE1_1"
     },
     {
       "type": "sign",
       "x": 25,
       "y": 19,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route111_EventScript_OldLadysRestStopSign"
     },
@@ -1082,21 +1082,21 @@
       "type": "secret_base",
       "x": 35,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_RED_CAVE2_3"
     },
     {
       "type": "secret_base",
       "x": 35,
       "y": 31,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_YELLOW_CAVE4_3"
     },
     {
       "type": "hidden_item",
       "x": 26,
       "y": 70,
-      "elevation": 0,
+      "elevation": 5,
       "item": "ITEM_STARDUST",
       "flag": "FLAG_HIDDEN_ITEM_ROUTE_111_STARDUST"
     },
@@ -1119,21 +1119,21 @@
       "type": "secret_base",
       "x": 14,
       "y": 19,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE1_4"
     },
     {
       "type": "secret_base",
       "x": 13,
       "y": 19,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE1_1"
     },
     {
       "type": "hidden_item",
       "x": 19,
       "y": 55,
-      "elevation": 0,
+      "elevation": 5,
       "item": "ITEM_PROTEIN",
       "flag": "FLAG_HIDDEN_ITEM_ROUTE_111_PROTEIN"
     },
@@ -1141,7 +1141,7 @@
       "type": "hidden_item",
       "x": 35,
       "y": 66,
-      "elevation": 0,
+      "elevation": 5,
       "item": "ITEM_RARE_CANDY",
       "flag": "FLAG_HIDDEN_ITEM_ROUTE_111_RARE_CANDY"
     },
@@ -1149,7 +1149,7 @@
       "type": "sign",
       "x": 24,
       "y": 116,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route111_EventScript_TrainerHillSign"
     }

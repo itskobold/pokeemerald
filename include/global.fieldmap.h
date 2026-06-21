@@ -15,19 +15,21 @@
 #define MAPGRID_BIOME_SHIFT       12
 
 // Per-tile attributes are stored separately, one u8 per tile, in each
-// data/layouts/*/attributes.bin file (loaded parallel to map.bin). The byte
-// holds the tile's elevation value; there is no separate collision bit. Special
-// elevation values give a tile its movement semantics (see the ELEVATION_ enum):
-//   0   elevation transition   1   collision (impassable)
-//   2   surfable water         3   multi-level (matches every elevation)
-//   4+  ordinary elevation levels
-// Committed map data only ever uses elevation values 0-127 (bits 0-6). Bit 7 is
-// reserved as a runtime-only collision override (MAPATTR_COLLISION), set/cleared
-// by scripts (e.g. MapGridSetMetatileImpassabilityAt) without disturbing the
-// tile's painted elevation. It is never present in attributes.bin on disk.
-#define MAPATTR_ELEVATION_MASK  0x7F // Bits 0-6
+// data/layouts/*/attributes.bin file (loaded parallel to map.bin). The byte means
+// three things: bits 0-5 are the tile's elevation level (a whole 6-bit value, 0-63,
+// every value an ordinary level with no special cases), bit 6 is the cliff-collision
+// flag (impassable only to objects climbing behind a cliff, used to wall off the
+// behind region without blocking normal movement), and bit 7 is the collision flag
+// (impassable). Movement semantics that used to ride on special elevation values now
+// live on metatile behaviors: stairs (MB_ROCK_STAIRS / MB_SIDEWAYS_STAIRS_*) gate
+// level changes, the surf behaviors gate water, and bridges/multi-level are handled
+// by the behind-cliff system.
+// Scripts may still toggle bit 7 at runtime (e.g. MapGridSetMetatileImpassabilityAt)
+// without disturbing the elevation level.
+#define MAPATTR_ELEVATION_MASK  0x3F // Bits 0-5
 #define MAPATTR_ELEVATION_SHIFT 0
-#define MAPATTR_COLLISION       0x80 // Bit 7, runtime-only collision override
+#define MAPATTR_CLIFF_COLLISION 0x40 // Bit 6, collision for objects behind a cliff
+#define MAPATTR_COLLISION       0x80 // Bit 7, collision (impassable)
 
 // The location attribute is 2 bits, so a map can define up to 4 distinct
 // per-location property sets (see struct MapHeaderLocationData / MapHeader).
@@ -35,14 +37,13 @@
 
 enum
 {
-    ELEVATION_TRANSITION = 0,  // Allows movement transitions between elevations
-    ELEVATION_COLLISION = 1,   // Impassable at any elevation
-    ELEVATION_SURF = 2,        // Surfable water
-    ELEVATION_MULTI_LEVEL = 3, // Shared by every elevation (e.g. bridges)
-    ELEVATION_FIRST_LEVEL = 4, // First ordinary elevation level (real levels are >= this)
-    ELEVATION_DEFAULT = 5,     // Default ground level
+    ELEVATION_DEFAULT = 5,     // Default ground level (levels 0-63 are all valid)
     ELEVATION_INVALID = 0xFFFF
 };
+
+// Wildcard for elevation-matching occupancy queries (GetObjectEventIdByPosition):
+// matches an object at any elevation. Never a real level (those are 0-63).
+#define ELEVATION_MATCH_ANY 0xFF
 
 // PACK_METATILE/PACK_LOCATION/PACK_BIOME operate on a map grid block (map.bin u16);
 // PACK_ELEVATION operates on an attribute byte (attributes.bin u8).
@@ -290,7 +291,9 @@ struct ObjectEvent
              u32 disableJumpLandingGroundEffect:1;
              u32 fixedPriority:1;
              u32 hideReflection:1;
-             //u32 padding:4;
+             u32 behindCliff:1; // below-state on/behind a cliff face; persists onto transition tiles
+             u32 surfacingFromCliff:1; // surface condition met at step-commit; defer clearing behindCliff until arrival
+             //u32 padding:2;
     /*0x04*/ u8 spriteId;
     /*0x05*/ u8 graphicsId;
     /*0x06*/ u8 movementType;

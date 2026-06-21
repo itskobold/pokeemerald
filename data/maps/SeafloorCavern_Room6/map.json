@@ -62,7 +62,7 @@
     {
       "x": 14,
       "y": 8,
-      "elevation": 2,
+      "elevation": 5,
       "dest_map": "MAP_SEAFLOOR_CAVERN_ENTRANCE",
       "dest_warp_id": "1"
     }

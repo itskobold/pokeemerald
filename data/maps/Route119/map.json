@@ -622,14 +622,14 @@
     {
       "x": 6,
       "y": 32,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE119_WEATHER_INSTITUTE_1F",
       "dest_warp_id": "0"
     },
     {
       "x": 33,
       "y": 109,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE119_HOUSE",
       "dest_warp_id": "0"
     }
@@ -639,7 +639,7 @@
       "type": "trigger",
       "x": 25,
       "y": 31,
-      "elevation": 0,
+      "elevation": 5,
       "var": "VAR_ROUTE119_STATE",
       "var_value": "0",
       "script": "Route119_EventScript_RivalTrigger1"
@@ -648,7 +648,7 @@
       "type": "trigger",
       "x": 26,
       "y": 31,
-      "elevation": 0,
+      "elevation": 5,
       "var": "VAR_ROUTE119_STATE",
       "var_value": "0",
       "script": "Route119_EventScript_RivalTrigger2"
@@ -806,7 +806,7 @@
       "type": "sign",
       "x": 9,
       "y": 33,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route119_EventScript_WeatherInstituteSign"
     },
@@ -814,7 +814,7 @@
       "type": "sign",
       "x": 27,
       "y": 19,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route119_EventScript_RouteSignFortree"
     },
@@ -822,21 +822,21 @@
       "type": "secret_base",
       "x": 5,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB1_1"
     },
     {
       "type": "secret_base",
       "x": 4,
       "y": 89,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB1_2"
     },
     {
       "type": "secret_base",
       "x": 5,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB2_1"
     },
     {
@@ -864,14 +864,14 @@
       "type": "secret_base",
       "x": 16,
       "y": 81,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE3_3"
     },
     {
       "type": "secret_base",
       "x": 16,
       "y": 28,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_BLUE_CAVE4_3"
     },
     {
@@ -894,35 +894,35 @@
       "type": "secret_base",
       "x": 26,
       "y": 81,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_RED_CAVE3_3"
     },
     {
       "type": "secret_base",
       "x": 19,
       "y": 76,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE2_3"
     },
     {
       "type": "secret_base",
       "x": 18,
       "y": 76,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE4_3"
     },
     {
       "type": "secret_base",
       "x": 4,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB3_3"
     },
     {
       "type": "secret_base",
       "x": 6,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_SHRUB4_3"
     },
     {
@@ -945,7 +945,7 @@
       "type": "sign",
       "x": 28,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route119_EventScript_TrainerTipsDecoration"
     }

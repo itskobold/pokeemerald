@@ -82,7 +82,7 @@
     {
       "x": 2,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MIRAGE_TOWER_4F",
       "dest_warp_id": "0"
     }

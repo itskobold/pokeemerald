@@ -102,7 +102,7 @@
     {
       "x": 13,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LILYCOVE_CITY_LILYCOVE_MUSEUM_1F",
       "dest_warp_id": "2"
     }
@@ -113,7 +113,7 @@
       "type": "sign",
       "x": 14,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_CutePainting"
     },
@@ -121,7 +121,7 @@
       "type": "sign",
       "x": 15,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_CutePainting"
     },
@@ -129,7 +129,7 @@
       "type": "sign",
       "x": 3,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_ToughPainting"
     },
@@ -137,7 +137,7 @@
       "type": "sign",
       "x": 2,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_ToughPainting"
     },
@@ -145,7 +145,7 @@
       "type": "sign",
       "x": 10,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_CoolPainting"
     },
@@ -153,7 +153,7 @@
       "type": "sign",
       "x": 11,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_CoolPainting"
     },
@@ -161,7 +161,7 @@
       "type": "sign",
       "x": 19,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_BeautyPainting"
     },
@@ -169,7 +169,7 @@
       "type": "sign",
       "x": 18,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_BeautyPainting"
     },
@@ -177,7 +177,7 @@
       "type": "sign",
       "x": 6,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_SmartPainting"
     },
@@ -185,7 +185,7 @@
       "type": "sign",
       "x": 7,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_2F_EventScript_SmartPainting"
     },
@@ -193,7 +193,7 @@
       "type": "sign",
       "x": 11,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_EventScript_BirdSculpture"
     },
@@ -201,7 +201,7 @@
       "type": "sign",
       "x": 15,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_LilycoveMuseum_EventScript_BirdSculpture"
     }

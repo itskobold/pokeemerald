@@ -153,7 +153,7 @@
       "type": "sign",
       "x": 8,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "TrainerHill_Entrance_EventScript_Records"
     }

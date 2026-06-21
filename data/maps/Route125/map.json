@@ -64,7 +64,7 @@
       "graphics_id": "OBJ_EVENT_GFX_SWIMMER_M",
       "x": 7,
       "y": 31,
-      "elevation": 2,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WALK_RIGHT_AND_LEFT",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -77,7 +77,7 @@
       "graphics_id": "OBJ_EVENT_GFX_SWIMMER_M",
       "x": 45,
       "y": 9,
-      "elevation": 2,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_RIGHT",
       "movement_range_x": 2,
       "movement_range_y": 5,
@@ -90,7 +90,7 @@
       "graphics_id": "OBJ_EVENT_GFX_SWIMMER_F",
       "x": 38,
       "y": 24,
-      "elevation": 2,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WALK_RIGHT_AND_LEFT",
       "movement_range_x": 6,
       "movement_range_y": 0,
@@ -103,7 +103,7 @@
       "graphics_id": "OBJ_EVENT_GFX_SWIMMER_F",
       "x": 30,
       "y": 28,
-      "elevation": 2,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_DOWN_LEFT_UP",
       "movement_range_x": 9,
       "movement_range_y": 9,
@@ -195,7 +195,7 @@
     {
       "x": 22,
       "y": 19,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SHOAL_CAVE_LOW_TIDE_ENTRANCE_ROOM",
       "dest_warp_id": "0"
     }
@@ -206,28 +206,28 @@
       "type": "secret_base",
       "x": 53,
       "y": 10,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_RED_CAVE1_2"
     },
     {
       "type": "secret_base",
       "x": 55,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_RED_CAVE4_2"
     },
     {
       "type": "secret_base",
       "x": 7,
       "y": 25,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_YELLOW_CAVE2_2"
     },
     {
       "type": "secret_base",
       "x": 24,
       "y": 32,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_YELLOW_CAVE4_2"
     }
   ]

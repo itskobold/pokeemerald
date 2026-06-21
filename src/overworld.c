@@ -2943,7 +2943,7 @@ static const u8 *TryInteractWithPlayer(struct CableClubPlayer *player)
     otherPlayerPos = player->pos;
     otherPlayerPos.x += gDirectionToVectors[player->facing].x;
     otherPlayerPos.y += gDirectionToVectors[player->facing].y;
-    otherPlayerPos.elevation = ELEVATION_TRANSITION;
+    otherPlayerPos.elevation = ELEVATION_DEFAULT;
     linkPlayerId = GetLinkPlayerIdAt(otherPlayerPos.x, otherPlayerPos.y);
 
     if (linkPlayerId != MAX_LINK_PLAYERS)

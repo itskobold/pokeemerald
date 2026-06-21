@@ -492,28 +492,28 @@
     {
       "x": 19,
       "y": 32,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LILYCOVE_CITY_CONTEST_LOBBY",
       "dest_warp_id": "2"
     },
     {
       "x": 30,
       "y": 32,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LILYCOVE_CITY_CONTEST_LOBBY",
       "dest_warp_id": "3"
     },
     {
       "x": 20,
       "y": 32,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LILYCOVE_CITY_CONTEST_LOBBY",
       "dest_warp_id": "2"
     },
     {
       "x": 31,
       "y": 32,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LILYCOVE_CITY_CONTEST_LOBBY",
       "dest_warp_id": "3"
     }
@@ -524,7 +524,7 @@
       "type": "sign",
       "x": 27,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_ContestHall_EventScript_BeautyStageSign"
     },
@@ -532,7 +532,7 @@
       "type": "sign",
       "x": 39,
       "y": 28,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_ContestHall_EventScript_CuteStageSign"
     },
@@ -540,7 +540,7 @@
       "type": "sign",
       "x": 11,
       "y": 28,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_ContestHall_EventScript_SmartStageSign"
     },
@@ -548,7 +548,7 @@
       "type": "sign",
       "x": 15,
       "y": 28,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_ContestHall_EventScript_SmartStageSign"
     },
@@ -556,7 +556,7 @@
       "type": "sign",
       "x": 23,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_ContestHall_EventScript_BeautyStageSign"
     },
@@ -564,7 +564,7 @@
       "type": "sign",
       "x": 35,
       "y": 28,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LilycoveCity_ContestHall_EventScript_CuteStageSign"
     }

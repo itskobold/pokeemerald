@@ -954,14 +954,10 @@ u32 InitCameraUpdateCallback(u8 trackedSpriteId)
     return 0;
 }
 
-// Tracks the camera's elevation level from its focus tile, mirroring gPlayerElevation. Only ordinary
-// levels (ELEVATION_FIRST_LEVEL and up) update it, stored as the level (tile value minus
-// ELEVATION_FIRST_LEVEL); special tiles leave the last tracked level untouched.
+// Tracks the camera's elevation level from its focus tile, mirroring gPlayerElevation.
 void UpdateCameraElevation(void)
 {
-    u8 elevation = MapGridGetElevationAt(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
-    if (elevation >= ELEVATION_FIRST_LEVEL)
-        gCameraElevation = elevation - ELEVATION_FIRST_LEVEL;
+    gCameraElevation = MapGridGetElevationAt(gCameraPos.x + MAP_OFFSET, gCameraPos.y + MAP_OFFSET);
 }
 
 // Tracks the biome of the camera's focus tile, mirroring gPlayerBiome.

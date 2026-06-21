@@ -223,7 +223,7 @@
       "type": "sign",
       "x": 2,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_EAST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine0"
     },
@@ -231,7 +231,7 @@
       "type": "sign",
       "x": 2,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_EAST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine1"
     },
@@ -239,7 +239,7 @@
       "type": "sign",
       "x": 2,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_EAST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine2"
     },
@@ -247,7 +247,7 @@
       "type": "sign",
       "x": 3,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_WEST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine3"
     },
@@ -255,7 +255,7 @@
       "type": "sign",
       "x": 3,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_WEST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine4"
     },
@@ -263,7 +263,7 @@
       "type": "sign",
       "x": 3,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_WEST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine5"
     },
@@ -271,7 +271,7 @@
       "type": "sign",
       "x": 7,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_EAST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine6"
     },
@@ -279,7 +279,7 @@
       "type": "sign",
       "x": 7,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_EAST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine7"
     },
@@ -287,7 +287,7 @@
       "type": "sign",
       "x": 7,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_EAST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine8"
     },
@@ -295,7 +295,7 @@
       "type": "sign",
       "x": 8,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_WEST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine9"
     },
@@ -303,7 +303,7 @@
       "type": "sign",
       "x": 8,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_WEST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine10"
     },
@@ -311,7 +311,7 @@
       "type": "sign",
       "x": 8,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_WEST",
       "script": "MauvilleCity_GameCorner_EventScript_SlotMachine11"
     },
@@ -319,7 +319,7 @@
       "type": "sign",
       "x": 14,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table1"
     },
@@ -327,7 +327,7 @@
       "type": "sign",
       "x": 15,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table1"
     },
@@ -335,7 +335,7 @@
       "type": "sign",
       "x": 14,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table1"
     },
@@ -343,7 +343,7 @@
       "type": "sign",
       "x": 15,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table1"
     },
@@ -351,7 +351,7 @@
       "type": "sign",
       "x": 14,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table1"
     },
@@ -359,7 +359,7 @@
       "type": "sign",
       "x": 15,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table1"
     },
@@ -367,7 +367,7 @@
       "type": "sign",
       "x": 18,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table2"
     },
@@ -375,7 +375,7 @@
       "type": "sign",
       "x": 19,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table2"
     },
@@ -383,7 +383,7 @@
       "type": "sign",
       "x": 18,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table2"
     },
@@ -391,7 +391,7 @@
       "type": "sign",
       "x": 19,
       "y": 7,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table2"
     },
@@ -399,7 +399,7 @@
       "type": "sign",
       "x": 18,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table2"
     },
@@ -407,7 +407,7 @@
       "type": "sign",
       "x": 19,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Roulette_EventScript_Table2"
     }

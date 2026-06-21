@@ -153,14 +153,14 @@
     {
       "x": 15,
       "y": 24,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_FORTREE_CITY",
       "dest_warp_id": "2"
     },
     {
       "x": 16,
       "y": 24,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_FORTREE_CITY",
       "dest_warp_id": "2"
     }
@@ -171,7 +171,7 @@
       "type": "sign",
       "x": 14,
       "y": 21,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "FortreeCity_Gym_EventScript_LeftGymStatue"
     },
@@ -179,7 +179,7 @@
       "type": "sign",
       "x": 17,
       "y": 21,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "FortreeCity_Gym_EventScript_RightGymStatue"
     }

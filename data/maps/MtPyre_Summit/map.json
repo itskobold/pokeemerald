@@ -240,7 +240,7 @@
       "type": "hidden_item",
       "x": 9,
       "y": 25,
-      "elevation": 0,
+      "elevation": 5,
       "item": "ITEM_ZINC",
       "flag": "FLAG_HIDDEN_ITEM_MT_PYRE_SUMMIT_ZINC"
     },

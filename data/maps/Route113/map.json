@@ -273,21 +273,21 @@
     {
       "x": 33,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE113_GLASS_WORKSHOP",
       "dest_warp_id": "0"
     },
     {
       "x": 41,
       "y": 12,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_TERRA_CAVE_ENTRANCE",
       "dest_warp_id": "0"
     },
     {
       "x": 88,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_TERRA_CAVE_ENTRANCE",
       "dest_warp_id": "0"
     }
@@ -395,7 +395,7 @@
       "type": "weather",
       "x": 94,
       "y": 11,
-      "elevation": 0,
+      "elevation": 5,
       "weather": "COORD_EVENT_WEATHER_SUNNY"
     },
     {
@@ -432,7 +432,7 @@
       "type": "sign",
       "x": 85,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route113_EventScript_RouteSign111"
     },
@@ -440,7 +440,7 @@
       "type": "sign",
       "x": 12,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route113_EventScript_RouteSignFallarbor"
     },
@@ -456,7 +456,7 @@
       "type": "sign",
       "x": 31,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route113_EventScript_GlassWorkshopSign"
     },

@@ -59,7 +59,7 @@
       "type": "sign",
       "x": 10,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleBackWall"
     },
@@ -67,7 +67,7 @@
       "type": "sign",
       "x": 6,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleStoryPart1"
     },
@@ -75,7 +75,7 @@
       "type": "sign",
       "x": 14,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleStoryPart2"
     },
@@ -83,7 +83,7 @@
       "type": "sign",
       "x": 4,
       "y": 13,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleStoryPart3"
     },
@@ -91,7 +91,7 @@
       "type": "sign",
       "x": 16,
       "y": 13,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleStoryPart4"
     },
@@ -99,7 +99,7 @@
       "type": "sign",
       "x": 6,
       "y": 18,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleStoryPart5"
     },
@@ -107,7 +107,7 @@
       "type": "sign",
       "x": 14,
       "y": 18,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleStoryPart6"
     },
@@ -115,7 +115,7 @@
       "type": "sign",
       "x": 9,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleBackWall"
     },
@@ -123,7 +123,7 @@
       "type": "sign",
       "x": 11,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SealedChamber_InnerRoom_EventScript_BrailleBackWall"
     }

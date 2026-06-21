@@ -125,7 +125,7 @@
       "type": "sign",
       "x": 5,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "Route110_TrickHouseEntrance_EventScript_Door"
     }

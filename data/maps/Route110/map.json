@@ -544,35 +544,35 @@
     {
       "x": 11,
       "y": 66,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_TRICK_HOUSE_ENTRANCE",
       "dest_warp_id": "0"
     },
     {
       "x": 15,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_NORTH_ENTRANCE",
       "dest_warp_id": "0"
     },
     {
       "x": 18,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_NORTH_ENTRANCE",
       "dest_warp_id": "2"
     },
     {
       "x": 16,
       "y": 88,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_SOUTH_ENTRANCE",
       "dest_warp_id": "0"
     },
     {
       "x": 19,
       "y": 88,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_SOUTH_ENTRANCE",
       "dest_warp_id": "2"
     }
@@ -665,7 +665,7 @@
       "type": "sign",
       "x": 15,
       "y": 25,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_VandalizedSign"
     },
@@ -673,7 +673,7 @@
       "type": "sign",
       "x": 9,
       "y": 51,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_SeasideParkingSign"
     },
@@ -681,7 +681,7 @@
       "type": "sign",
       "x": 14,
       "y": 88,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_CyclingRoadSign"
     },
@@ -689,7 +689,7 @@
       "type": "sign",
       "x": 20,
       "y": 94,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_SlateportCitySign"
     },
@@ -697,7 +697,7 @@
       "type": "sign",
       "x": 7,
       "y": 79,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_Route103Sign"
     },
@@ -705,7 +705,7 @@
       "type": "sign",
       "x": 3,
       "y": 17,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_MauvilleCitySign"
     },
@@ -713,14 +713,14 @@
       "type": "secret_base",
       "x": 16,
       "y": 25,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE3_1"
     },
     {
       "type": "secret_base",
       "x": 17,
       "y": 25,
-      "elevation": 0,
+      "elevation": 5,
       "secret_base_id": "SECRET_BASE_TREE4_1"
     },
     {
@@ -743,7 +743,7 @@
       "type": "sign",
       "x": 8,
       "y": 67,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_TrickHouseSign"
     },
@@ -751,7 +751,7 @@
       "type": "sign",
       "x": 32,
       "y": 93,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_CyclingRoadResultsSign"
     },
@@ -791,7 +791,7 @@
       "type": "sign",
       "x": 13,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route110_EventScript_CyclingRoadSign"
     }

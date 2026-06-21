@@ -99,6 +99,7 @@ static u8 GetCollisionInDirection(struct ObjectEvent *, u8);
 static u32 GetCopyDirection(u8, u32, u32);
 static void TryEnableObjectEventAnim(struct ObjectEvent *, struct Sprite *);
 static void ObjectEventExecHeldMovementAction(struct ObjectEvent *, struct Sprite *);
+static void UpdateObjectEventBehindCliff(struct ObjectEvent *);
 static void UpdateObjectEventSpriteAnimPause(struct ObjectEvent *, struct Sprite *);
 static bool8 IsCoordOutsideObjectEventMovementRange(struct ObjectEvent *, s16, s16);
 static bool8 IsMetatileDirectionallyImpassable(struct ObjectEvent *, s16, s16, u8);
@@ -178,7 +179,6 @@ static u8 DoJumpSpecialSpriteMovement(struct Sprite *);
 static void CreateLevitateMovementTask(struct ObjectEvent *);
 static void DestroyLevitateMovementTask(u8);
 static bool8 NpcTakeStep(struct Sprite *);
-static bool8 IsElevationMismatchAt(u8, s16, s16);
 static bool8 AreElevationsCompatible(u8, u8);
 
 static const struct SpriteFrameImage sPicTable_PechaBerryTree[];
@@ -2942,6 +2942,10 @@ void ShiftObjectEventCoords(struct ObjectEvent *objectEvent, s16 x, s16 y)
     objectEvent->previousCoords.y = objectEvent->currentCoords.y;
     objectEvent->currentCoords.x = x;
     objectEvent->currentCoords.y = y;
+    // Resolve behind-cliff state the instant the step commits, before it animates, so draw priority
+    // is settled from the climb's first frame. No-op on a still-shift (tile unchanged).
+    if (objectEvent->previousCoords.x != x || objectEvent->previousCoords.y != y)
+        UpdateObjectEventBehindCliff(objectEvent);
 }
 
 static void SetObjectEventCoords(struct ObjectEvent *objectEvent, s16 x, s16 y)
@@ -3034,10 +3038,9 @@ u8 GetObjectEventIdByPosition(u16 x, u16 y, u8 elevation)
 
 static bool8 ObjectEventDoesElevationMatch(struct ObjectEvent *objectEvent, u8 elevation)
 {
-    if (objectEvent->currentElevation != ELEVATION_TRANSITION && elevation != ELEVATION_TRANSITION && objectEvent->currentElevation != elevation)
-        return FALSE;
-
-    return TRUE;
+    // ELEVATION_MATCH_ANY is an occupancy-query wildcard (e.g. decoration placement);
+    // otherwise the object must be on exactly that level.
+    return elevation == ELEVATION_MATCH_ANY || objectEvent->currentElevation == elevation;
 }
 
 void UpdateObjectEventsForCameraUpdate(s16 x, s16 y)
@@ -5534,17 +5537,57 @@ u8 GetSidewaysStairsCollision(struct ObjectEvent *objectEvent, u8 dir, u8 curren
 
 static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 direction)
 {
+    u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
+    bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
+    bool32 onStairs = MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
+    // True when the front-terrain metatile collisions should be ignored: already behind the cliff,
+    // or this very step is the upward non-stairs climb that enters the behind state (see
+    // UpdateObjectEventBehindCliff). The latter lets the cliff's first tile be entered even though
+    // its metatile behaviour would otherwise wall it off.
+    bool32 cliffFree = objectEvent->behindCliff
+     || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
+    // Bit 6 only walls off the behind-cliff region for tiles still up on the cliff plane — those
+    // above the base level the object climbed from (previousElevation). Stepping back down to that
+    // base (or below) is the legitimate descent, so the cliff collision doesn't apply there.
+    bool32 cliffCollision = objectEvent->behindCliff && MapGridGetCliffCollisionAt(x, y)
+     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation;
+
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         return COLLISION_OUTSIDE_RANGE;
-    else if (MapGridGetCollisionAt(x, y) || GetMapBorderIdAt(x, y) == CONNECTION_INVALID || IsMetatileDirectionallyImpassable(objectEvent, x, y, direction))
+
+    // Hard collision. The main collision bit always blocks (the universal hard wall, on the cliff
+    // plane too), and bit 6 additionally walls off the behind-cliff region. Only the behaviour-based
+    // impassables (and surf below) are ignored on the cliff plane.
+    if (MapGridGetCollisionAt(x, y)
+     || cliffCollision
+     || GetMapBorderIdAt(x, y) == CONNECTION_INVALID
+     || (!cliffFree && IsMetatileDirectionallyImpassable(objectEvent, x, y, direction)))
         return COLLISION_IMPASSABLE;
     else if (objectEvent->trackedByCamera && !CanCameraMoveInDirection(direction))
         return COLLISION_IMPASSABLE;
-    else if (IsElevationMismatchAt(objectEvent->currentElevation, x, y))
-        return COLLISION_ELEVATION_MISMATCH;
-    else if (DoesObjectCollideWithObjectAt(objectEvent, x, y))
+
+    // Stairs are walked as same-elevation ground (the level isn't changed), so they skip the water
+    // and elevation gating below.
+    if (!isStairs)
+    {
+        // Surfable water blocks walking; only the surfing player may step onto it. Ignored on the
+        // cliff plane.
+        if (!cliffFree
+         && MetatileBehavior_IsSurfableWaterOrUnderwater(nextBehavior)
+         && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)))
+            return COLLISION_IMPASSABLE;
+
+        // Block a DOWNWARD step (an UPWARD step is the climb behind the cliff). Skipped while behind
+        // the cliff (roams freely) and when stepping OFF a stairs tile: stairs keep the level they
+        // were entered with, so previousElevation may sit above the level the stairs exit onto.
+        if (!objectEvent->behindCliff && !onStairs
+         && MapGridGetElevationAt(x, y) < objectEvent->previousElevation)
+            return COLLISION_ELEVATION_MISMATCH;
+    }
+
+    if (DoesObjectCollideWithObjectAt(objectEvent, x, y))
         return COLLISION_OBJECT_EVENT;
-    
+
     return COLLISION_NONE;
 }
 
@@ -5631,13 +5674,36 @@ u8 GetCollisionAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u32 dir)
 u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 direction)
 {
     u8 flags = 0;
+    u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
+    bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
+    bool32 onStairs = MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
+    // Behind the cliff, or the upward climb-entry step onto its first tile; see GetVanillaCollision.
+    bool32 cliffFree = objectEvent->behindCliff
+     || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
+    // Cliff collision only applies to destination tiles above the base; see GetVanillaCollision.
+    bool32 cliffCollision = objectEvent->behindCliff && MapGridGetCliffCollisionAt(x, y)
+     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation;
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         flags |= 1 << (COLLISION_OUTSIDE_RANGE - 1);
-    if (MapGridGetCollisionAt(x, y) || GetMapBorderIdAt(x, y) == CONNECTION_INVALID || IsMetatileDirectionallyImpassable(objectEvent, x, y, direction) || (objectEvent->trackedByCamera && !CanCameraMoveInDirection(direction)))
+    // The main collision bit always blocks; only the behaviour-based impassables (and surf) are
+    // ignored on the cliff plane. See GetVanillaCollision.
+    if (MapGridGetCollisionAt(x, y)
+     || cliffCollision
+     || GetMapBorderIdAt(x, y) == CONNECTION_INVALID
+     || (!cliffFree && IsMetatileDirectionallyImpassable(objectEvent, x, y, direction))
+     || (objectEvent->trackedByCamera && !CanCameraMoveInDirection(direction)))
         flags |= 1 << (COLLISION_IMPASSABLE - 1);
-    if (IsElevationMismatchAt(objectEvent->currentElevation, x, y))
-        flags |= 1 << (COLLISION_ELEVATION_MISMATCH - 1);
+    if (!isStairs)
+    {
+        if (!cliffFree
+         && MetatileBehavior_IsSurfableWaterOrUnderwater(nextBehavior)
+         && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)))
+            flags |= 1 << (COLLISION_IMPASSABLE - 1);
+        // Stepping off a stairs tile is not elevation-gated; see GetVanillaCollision.
+        if (!objectEvent->behindCliff && !onStairs && MapGridGetElevationAt(x, y) < objectEvent->previousElevation)
+            flags |= 1 << (COLLISION_ELEVATION_MISMATCH - 1);
+    }
     if (DoesObjectCollideWithObjectAt(objectEvent, x, y))
         flags |= 1 << (COLLISION_OBJECT_EVENT - 1);
     return flags;
@@ -5682,18 +5748,56 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
 {
     u8 i;
     struct ObjectEvent *curObject;
+    // On a stairs tile previousElevation holds the level an object carried on from — which differs by
+    // the end it entered from — so two objects meeting on one stairs tile keep mismatched levels and
+    // would pass through. A stairs tile has a single reliable elevation though, and both objects are
+    // physically on it, so read the tile's own elevation instead. Behind a cliff is the exception:
+    // there stairs are walked as plain terrain and the frozen base still governs.
+    bool32 onStairs = MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(x, y));
+    u8 tileElevation = MapGridGetElevationAt(x, y);
+    u8 moverElevation = (onStairs && !objectEvent->behindCliff) ? tileElevation : objectEvent->previousElevation;
 
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         curObject = &gObjectEvents[i];
         if (curObject->active && curObject != objectEvent)
-        {            
+        {
             // check for collision if curObject is active, not the object in question, and not exempt from collisions
-            if ((curObject->currentCoords.x == x && curObject->currentCoords.y == y) || (curObject->previousCoords.x == x && curObject->previousCoords.y == y))
+            bool32 occupied = (curObject->currentCoords.x == x && curObject->currentCoords.y == y)
+                           || (curObject->previousCoords.x == x && curObject->previousCoords.y == y);
+            // Resident's effective level at (x, y): the stairs tile elevation stands in for previousElevation
+            // (see moverElevation above) for objects not behind a cliff.
+            u8 curElevation = (onStairs && !curObject->behindCliff) ? tileElevation : curObject->previousElevation;
+
+            // Wandering NPCs check collision and reserve their destination atomically within one update,
+            // so by the time anyone else looks they already hold both tiles. The player is different: its
+            // collision is checked during field input, but the step only commits (reserving the tile)
+            // later in the object-update loop — after NPCs may have moved in. Without this an NPC can
+            // claim the tile the player is mid-decision of entering, and they overlap (worst head-on,
+            // and more often at speed since steps recur faster). So treat the player's imminent tile as
+            // occupied too: only while moving under field control (not a script) and before the step has
+            // committed (coords not yet shifted), so a standing/facing player doesn't wall off the tile
+            // ahead. facingDirection is the intended direction here — a new heading turns in place first.
+            if (!occupied && curObject->isPlayer && gPlayerAvatar.runningState == MOVING
+             && curObject->currentCoords.x == curObject->previousCoords.x
+             && curObject->currentCoords.y == curObject->previousCoords.y)
             {
-                if (AreElevationsCompatible(objectEvent->currentElevation, curObject->currentElevation))
-                    return TRUE;
+                s16 px = curObject->currentCoords.x;
+                s16 py = curObject->currentCoords.y;
+                MoveCoords(curObject->facingDirection, &px, &py);
+                occupied = (px == x && py == y);
             }
+
+            // Collide only with objects on the same render plane. previousElevation is each object's
+            // effective (drawn) level: it tracks the real tile on flat ground, but freezes at the base it
+            // climbed from while behind a cliff. So two objects sharing a tile but on opposite sides of a
+            // cliff face — one climbing behind it, one on the plateau top — have different
+            // previousElevations and pass freely, while objects genuinely on the same level collide.
+            // Using previousElevation (not currentElevation, the real tile) also dodges step-commit
+            // staleness: it holds steady across the climb transition, so the result can't flicker mid-step.
+            // On stairs the tile elevation stands in for it (see above) for objects not behind a cliff.
+            if (occupied && AreElevationsCompatible(moverElevation, curElevation))
+                return TRUE;
         }
     }
     return FALSE;
@@ -8503,6 +8607,16 @@ static void GetAllGroundEffectFlags_OnFinishStep(struct ObjectEvent *objEvent, u
 
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent *objEvent)
 {
+    // Behind the cliff the object behaves as if on plain ground: record MB_NORMAL so every
+    // consumer of these stored behaviors (ground effects, forced movement, directional blocks,
+    // etc.) sees normal terrain. behindCliff is already up to date for this step (elevation is
+    // updated just before ground-effect flags are gathered).
+    if (objEvent->behindCliff)
+    {
+        objEvent->previousMetatileBehavior = MB_NORMAL;
+        objEvent->currentMetatileBehavior = MB_NORMAL;
+        return;
+    }
     objEvent->previousMetatileBehavior = MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
     objEvent->currentMetatileBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
 }
@@ -8783,24 +8897,6 @@ static void SetObjectEventSpriteOamTableForLongGrass(struct ObjectEvent *objEven
         sprite->subspriteTableNum = 5;
 }
 
-static bool8 IsElevationMismatchAt(u8 elevation, s16 x, s16 y)
-{
-    u8 mapElevation;
-
-    if (elevation == ELEVATION_TRANSITION)
-        return FALSE;
-
-    mapElevation = MapGridGetElevationAt(x, y);
-
-    if (mapElevation == ELEVATION_TRANSITION || mapElevation == ELEVATION_MULTI_LEVEL)
-        return FALSE;
-
-    if (mapElevation != elevation)
-        return TRUE;
-
-    return FALSE;
-}
-
 // Indexed by elevation value. Values 0-3 are the special elevations (transition,
 // collision, surf, multi-level); 4+ are ordinary levels which alternate draw
 // priority to layer over one another (e.g. bridges), with odd levels drawn behind
@@ -8828,7 +8924,22 @@ static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, 
     ObjectEventUpdateElevation(objEvent);
 
     sprite->subspriteTableNum = sElevationToSubspriteTableNum[objEvent->previousElevation];
-    sprite->oam.priority = sElevationToPriority[objEvent->previousElevation];
+
+    // While behind a cliff, draw the whole sprite behind the top 2 metatile layers (priority 3 = in
+    // front of only the bottom BG layer). The subsprite tables otherwise split the sprite's pieces
+    // across priorities 1-3, so SUBSPRITES_ON would override oam.priority per piece; ignore those
+    // priorities so every piece honors the uniform behind-cliff priority. Restore SUBSPRITES_ON for
+    // normal elevation-based rendering.
+    if (objEvent->behindCliff)
+    {
+        sprite->subspriteMode = SUBSPRITES_IGNORE_PRIORITY;
+        sprite->oam.priority = 3;
+    }
+    else
+    {
+        sprite->subspriteMode = SUBSPRITES_ON;
+        sprite->oam.priority = sElevationToPriority[objEvent->previousElevation];
+    }
 }
 
 static void InitObjectPriorityByElevation(struct Sprite *sprite, u8 elevation)
@@ -8846,11 +8957,11 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
 {
     bool32 isPlayer = (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId]);
     u8 curElevation = MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
-    u8 prevElevation = MapGridGetElevationAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
+    u8 curBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
 
-    // Track the player's biome from its tile (no special cases, so before the multi-level early
-    // return below) and keep the saved player tile in sync with the player object. playerPos is
-    // strictly the player's position, distinct from the camera's focus tile; strip MAP_OFFSET.
+    // Track the player's biome from its tile and keep the saved player tile in sync with the player
+    // object. playerPos is strictly the player's position, distinct from the camera's focus tile;
+    // strip MAP_OFFSET.
     if (isPlayer)
     {
         gPlayerBiome = MapGridGetMetatileBiomeAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
@@ -8864,18 +8975,64 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
         UpdateObjectEventWanderTracking(objEvent);
     }
 
-    if (curElevation == ELEVATION_MULTI_LEVEL || prevElevation == ELEVATION_MULTI_LEVEL)
+    // Behind a cliff, stairs are walked as plain terrain and the frozen render base must persist, so
+    // hold the level we arrived with. In front of a cliff, read the stairs tile's real elevation like
+    // any other tile: holding the carried level leaves two objects sharing a stairs tile with different
+    // previousElevations, which decides draw order — so the one that stepped on from the higher side
+    // would always sort on top. The tile elevation is the same for both, fixing the order.
+    if (objEvent->behindCliff && MetatileBehavior_IsElevationChange(curBehavior))
         return;
 
+    // currentElevation always tracks the real tile, even while behind a cliff — the level needn't be
+    // frozen for collision (that's the collision bit, read separately). previousElevation stays
+    // frozen at the base while behind (set at movement-commit, see UpdateObjectEventBehindCliff),
+    // keeping the object drawn behind the higher cliff.
     objEvent->currentElevation = curElevation;
-
-    if (curElevation != ELEVATION_TRANSITION && curElevation != ELEVATION_MULTI_LEVEL)
+    if (!objEvent->behindCliff)
         objEvent->previousElevation = curElevation;
 
-    // Track the player's elevation level. Only ordinary levels (ELEVATION_FIRST_LEVEL and up) count,
-    // stored as the level (tile value minus ELEVATION_FIRST_LEVEL); special tiles leave it untouched.
-    if (isPlayer && curElevation >= ELEVATION_FIRST_LEVEL)
-        gPlayerElevation = curElevation - ELEVATION_FIRST_LEVEL;
+    if (isPlayer)
+        gPlayerElevation = curElevation;
+}
+
+// Resolve the behind-cliff state for a freshly committed step: previousCoords is the tile being
+// left, currentCoords the tile entered. Run from ShiftObjectEventCoords the instant a step commits
+// — before it animates — so draw priority is settled from the climb's first frame. The cliff face
+// is a distinct elevation band between the frozen base and the plateau top.
+static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
+{
+    u8 fromElevation = MapGridGetElevationAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
+    u8 toElevation = MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
+    u8 fromBehavior = MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
+    u8 toBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
+
+    // Stairs carry no elevation of their own: no climb/crest, hold the current state. Cliff-face-side
+    // is NOT included: an upward step onto it climbs behind like any other higher tile.
+    if (MetatileBehavior_IsElevationChange(toBehavior))
+        return;
+
+    if (objEvent->behindCliff)
+    {
+        // previousElevation holds the frozen render base. Crested up off the face band (above both
+        // that base and the tile we left), or dropped back down to the base or below: surface. Defer
+        // the actual clear until the step finishes (arrival at the new tile) so the sprite stays
+        // obscured behind the top 2 layers for the whole leaving step rather than popping in front the
+        // instant it commits — see DoGroundEffects_OnFinishStep.
+        if ((toElevation > objEvent->previousElevation && toElevation > fromElevation)
+         || toElevation <= objEvent->previousElevation)
+            objEvent->surfacingFromCliff = TRUE;
+        // otherwise lateral along the face band, or part-way down it: hold behind, obscured.
+    }
+    else if (toElevation > fromElevation && !MetatileBehavior_IsElevationChange(fromBehavior))
+    {
+        // Stepped UP onto non-stairs terrain: climb behind the cliff, freezing the render base
+        // (previousElevation) at the level we left. currentElevation keeps tracking the real tile.
+        // Stepping OFF a stairs tile is excluded — its higher exit level is the stairs' legitimate
+        // destination, not a cliff face (matches the onStairs collision exception).
+        objEvent->previousElevation = fromElevation;
+        objEvent->behindCliff = TRUE;
+        objEvent->surfacingFromCliff = FALSE;
+    }
 }
 
 void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 subpriority)
@@ -8896,13 +9053,7 @@ static void ObjectEventUpdateSubpriority(struct ObjectEvent *objEvent, struct Sp
 
 static bool8 AreElevationsCompatible(u8 a, u8 b)
 {
-    if (a == ELEVATION_TRANSITION || b == ELEVATION_TRANSITION)
-        return TRUE;
-
-    if (a != b)
-        return FALSE;
-
-    return TRUE;
+    return a == b;
 }
 
 void GroundEffect_SpawnOnTallGrass(struct ObjectEvent *objEvent, struct Sprite *sprite)
@@ -9236,6 +9387,14 @@ static void DoGroundEffects_OnFinishStep(struct ObjectEvent *objEvent, struct Sp
 #endif
     {
         flags = 0;
+        // Arrived at the new tile: a surface deferred at step-commit takes effect now, before the
+        // priority update below, so the sprite returns in front of the top 2 layers exactly on
+        // arrival rather than as it began to leave (see UpdateObjectEventBehindCliff).
+        if (objEvent->surfacingFromCliff)
+        {
+            objEvent->behindCliff = FALSE;
+            objEvent->surfacingFromCliff = FALSE;
+        }
         UpdateObjectEventElevationAndPriority(objEvent, sprite);
         GetAllGroundEffectFlags_OnFinishStep(objEvent, &flags);
         SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);

@@ -75,14 +75,14 @@
     {
       "x": 3,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE113",
       "dest_warp_id": "0"
     },
     {
       "x": 4,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE113",
       "dest_warp_id": "0"
     }

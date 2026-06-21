@@ -134,7 +134,7 @@
     {
       "x": 36,
       "y": 4,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_MAGMA_HIDEOUT_1F",
       "dest_warp_id": "2"
     }

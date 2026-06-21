@@ -775,13 +775,14 @@ u8 MapGridGetElevationAt(int x, int y)
 
 u8 MapGridGetCollisionAt(int x, int y)
 {
-    u8 attr = GetMapGridAttrAt(x, y);
+    // Collision is purely the dedicated bit (bit 7); elevation level never blocks.
+    return (GetMapGridAttrAt(x, y) & MAPATTR_COLLISION) != 0;
+}
 
-    // Impassable if a script has set the runtime collision override, or the tile's
-    // painted elevation is the dedicated collision value.
-    if (attr & MAPATTR_COLLISION)
-        return TRUE;
-    return UNPACK_ELEVATION(attr) == ELEVATION_COLLISION;
+u8 MapGridGetCliffCollisionAt(int x, int y)
+{
+    // Bit 6: blocks only objects roaming behind a cliff, to wall off the behind region.
+    return (GetMapGridAttrAt(x, y) & MAPATTR_CLIFF_COLLISION) != 0;
 }
 
 u8 MapGridGetMetatileLocationAt(int x, int y)

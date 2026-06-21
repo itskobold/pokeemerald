@@ -159,7 +159,7 @@
     {
       "x": 17,
       "y": 1,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_ROUTE119_WEATHER_INSTITUTE_1F",
       "dest_warp_id": "2"
     }

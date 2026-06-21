@@ -115,14 +115,14 @@
     {
       "x": 6,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SLATEPORT_CITY",
       "dest_warp_id": "3"
     },
     {
       "x": 7,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_SLATEPORT_CITY",
       "dest_warp_id": "3"
     }
@@ -133,7 +133,7 @@
       "type": "sign",
       "x": 4,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "SlateportCity_BattleTentLobby_EventScript_RulesBoard"
     }

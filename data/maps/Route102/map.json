@@ -180,7 +180,7 @@
       "type": "sign",
       "x": 17,
       "y": 2,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route102_EventScript_RouteSignPetalburg"
     },
@@ -188,7 +188,7 @@
       "type": "sign",
       "x": 40,
       "y": 9,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "Route102_EventScript_RouteSignOldale"
     }

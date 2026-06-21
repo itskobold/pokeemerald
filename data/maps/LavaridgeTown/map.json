@@ -147,7 +147,7 @@
       "graphics_id": "OBJ_EVENT_GFX_VAR_0",
       "x": 12,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "movement_type": "MOVEMENT_TYPE_FACE_DOWN",
       "movement_range_x": 0,
       "movement_range_y": 0,
@@ -174,35 +174,35 @@
     {
       "x": 12,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LAVARIDGE_TOWN_HERB_SHOP",
       "dest_warp_id": "0"
     },
     {
       "x": 5,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LAVARIDGE_TOWN_GYM_1F",
       "dest_warp_id": "0"
     },
     {
       "x": 15,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LAVARIDGE_TOWN_MART",
       "dest_warp_id": "0"
     },
     {
       "x": 9,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LAVARIDGE_TOWN_POKEMON_CENTER_1F",
       "dest_warp_id": "0"
     },
     {
       "x": 16,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "dest_map": "MAP_LAVARIDGE_TOWN_HOUSE",
       "dest_warp_id": "0"
     },
@@ -230,7 +230,7 @@
       "type": "sign",
       "x": 14,
       "y": 16,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LavaridgeTown_EventScript_HerbShopSign"
     },
@@ -238,7 +238,7 @@
       "type": "sign",
       "x": 7,
       "y": 15,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LavaridgeTown_EventScript_GymSign"
     },
@@ -246,7 +246,7 @@
       "type": "sign",
       "x": 17,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "Common_EventScript_ShowPokemartSign"
     },
@@ -254,7 +254,7 @@
       "type": "sign",
       "x": 13,
       "y": 8,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "LavaridgeTown_EventScript_TownSign"
     },
@@ -262,7 +262,7 @@
       "type": "sign",
       "x": 10,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "Common_EventScript_ShowPokemonCenterSign"
     },
@@ -270,7 +270,7 @@
       "type": "sign",
       "x": 16,
       "y": 5,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "Common_EventScript_ShowPokemartSign"
     },
@@ -278,7 +278,7 @@
       "type": "sign",
       "x": 11,
       "y": 6,
-      "elevation": 0,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_NORTH",
       "script": "Common_EventScript_ShowPokemonCenterSign"
     },
