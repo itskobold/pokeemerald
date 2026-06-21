@@ -293,7 +293,8 @@ struct ObjectEvent
              u32 hideReflection:1;
              u32 behindCliff:1; // below-state on/behind a cliff face; persists onto transition tiles
              u32 surfacingFromCliff:1; // surface condition met at step-commit; defer clearing behindCliff until arrival
-             //u32 padding:2;
+             u32 fullyBehindCliff:1; // whole sprite obscured by the cliff (every tile it spans is higher terrain); hide it behind all 3 layers
+             //u32 padding:1;
     /*0x04*/ u8 spriteId;
     /*0x05*/ u8 graphicsId;
     /*0x06*/ u8 movementType;

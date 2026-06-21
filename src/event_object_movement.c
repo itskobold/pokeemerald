@@ -8562,7 +8562,9 @@ static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct S
 static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     sprite->invisible = FALSE;
-    if (objectEvent->invisible || objectEvent->offScreen)
+    // Fully buried in a cliff: hide the sprite so it sits below every tile layer (priority can't sink
+    // it past the bottom BG layer; see UpdateObjectEventElevationAndPriority).
+    if (objectEvent->invisible || objectEvent->offScreen || objectEvent->fullyBehindCliff)
         sprite->invisible = TRUE;
 }
 
@@ -8916,6 +8918,27 @@ static const u8 sElevationToSubspriteTableNum[] = {
     2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
 };
 
+// True when every tile the sprite vertically spans is higher terrain than the frozen base, i.e. the
+// whole sprite sits within the cliff and is covered by the face. Bottom-anchored sprites grow upward
+// (north), so a sprite h px tall spans ceil(h/16) tile rows from the feet tile up; checking them all
+// makes this size-independent. The feet tile is always higher while behind, so for a 1-tile sprite
+// this is simply true; taller sprites stay partial until their head clears the cliff lip.
+static bool32 IsObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
+{
+    const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    s16 x = objEvent->currentCoords.x;
+    s16 y = objEvent->currentCoords.y;
+    u32 rows = (graphicsInfo->height + 15) / 16;
+    u32 r;
+
+    for (r = 0; r < rows; r++)
+    {
+        if (MapGridGetElevationAt(x, y - r) <= objEvent->previousElevation)
+            return FALSE;
+    }
+    return TRUE;
+}
+
 static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
     if (objEvent->fixedPriority)
@@ -8937,9 +8960,35 @@ static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, 
     }
     else
     {
+        // Surfaced: never fully obscured off the cliff. Cleared here (every boundary, immediate) rather
+        // than in the finish-step compute so leaving is reflected the instant behindCliff drops.
+        objEvent->fullyBehindCliff = FALSE;
         sprite->subspriteMode = SUBSPRITES_ON;
         sprite->oam.priority = sElevationToPriority[objEvent->previousElevation];
     }
+}
+
+// Once the whole sprite is buried in the cliff, sink it below all 3 tile layers. The bottom layer is
+// BG3 at priority 3 and OAM priority maxes at 3 (a tie draws the sprite in front), so "below the
+// bottom layer" isn't expressible as a priority — the sprite is hidden instead (see
+// UpdateObjectEventSpriteVisibility), which is what fully obscured looks like anyway. Resolved only on
+// arrival at a tile (spawn / finish-step), not at begin-step: begin-step already sees the destination
+// coords, which would hide the sprite the moment it started sliding in rather than once it arrives.
+static void UpdateObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
+{
+    if (objEvent->behindCliff)
+        objEvent->fullyBehindCliff = IsObjectEventFullyBehindCliff(objEvent);
+}
+
+// Run at begin-step, where the destination coords are already committed. Setting the flag here would
+// hide an object the instant it began sliding into an obscuring tile, so entering is deferred to
+// arrival (finish-step). Leaving wants the opposite: reveal the object as it starts to slide out of a
+// fully-obscuring tile rather than holding it hidden until arrival. So begin-step may only CLEAR the
+// flag, never set it.
+static void RevealObjectEventLeavingFullyBehindCliff(struct ObjectEvent *objEvent)
+{
+    if (objEvent->fullyBehindCliff && !IsObjectEventFullyBehindCliff(objEvent))
+        objEvent->fullyBehindCliff = FALSE;
 }
 
 static void InitObjectPriorityByElevation(struct Sprite *sprite, u8 elevation)
@@ -9347,6 +9396,7 @@ static void DoGroundEffects_OnSpawn(struct ObjectEvent *objEvent, struct Sprite 
     {
         flags = 0;
         UpdateObjectEventElevationAndPriority(objEvent, sprite);
+        UpdateObjectEventFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnSpawn(objEvent, &flags);
         SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);
         DoFlaggedGroundEffects(objEvent, sprite, flags);
@@ -9367,6 +9417,7 @@ static void DoGroundEffects_OnBeginStep(struct ObjectEvent *objEvent, struct Spr
     {
         flags = 0;
         UpdateObjectEventElevationAndPriority(objEvent, sprite);
+        RevealObjectEventLeavingFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnBeginStep(objEvent, &flags);
         SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);
         filters_out_some_ground_effects(objEvent, &flags);
@@ -9396,6 +9447,7 @@ static void DoGroundEffects_OnFinishStep(struct ObjectEvent *objEvent, struct Sp
             objEvent->surfacingFromCliff = FALSE;
         }
         UpdateObjectEventElevationAndPriority(objEvent, sprite);
+        UpdateObjectEventFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnFinishStep(objEvent, &flags);
         SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);
         FilterOutStepOnPuddleGroundEffectIfJumping(objEvent, &flags);
