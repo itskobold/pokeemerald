@@ -11,6 +11,7 @@
 // Clouds: a 3x3 set of seamlessly tiling 64x64 images, drawn as a grid of
 // overlay sprites (CLOUD_COLS x CLOUD_ROWS) that scrolls across the screen.
 #define CLOUD_TILE_IMAGES            9   // 3x3 distinct source tiles
+#define CLOUD_COVER_SETS             8   // selectable tile sets (clouds/0..7), chosen by cloudCover
 #define CLOUD_PATTERN_DIM            3   // tiles per side of the repeating pattern
 #define CLOUD_COLS                   5   // sprite columns (cover screen width + scroll)
 #define CLOUD_ROWS                   4   // sprite rows (cover screen height + scroll)

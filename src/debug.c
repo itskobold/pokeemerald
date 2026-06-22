@@ -3,6 +3,7 @@
 #include "event_data.h"
 #include "field_camera.h"
 #include "field_player_avatar.h"
+#include "field_weather.h"
 #include "item.h"
 #include "list_menu.h"
 #include "main.h"
@@ -16,6 +17,7 @@
 #include "string_util.h"
 #include "task.h"
 #include "window.h"
+#include "constants/field_weather.h"
 #include "constants/flags.h"
 #include "constants/moves.h"
 #include "constants/songs.h"
@@ -97,7 +99,15 @@ void SetDebugNewGameFlags()
 enum
 {
     DEBUG_MENU_ITEM_CAMERA,
+    DEBUG_MENU_ITEM_WEATHER,
     DEBUG_MENU_ITEM_CANCEL,
+};
+
+// Weather submenu items
+enum
+{
+    DEBUG_WEATHER_ITEM_SET_CLOUD_COVER,
+    DEBUG_WEATHER_ITEM_CANCEL,
 };
 
 // Camera submenu items
@@ -126,12 +136,19 @@ enum
 #define tWindowId    data[1]
 
 #define TAG_TRACK_NPC_SCROLL_ARROW 2110
+#define TAG_CLOUD_COVER_SCROLL_ARROW 2111
 
 static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void (*handleInput)(u8));
 static void Debug_DestroyMenu(u8 taskId);
 static void Debug_CloseMenu(u8 taskId);
 static void Debug_OpenMainMenu(void);
 static void Debug_ShowCameraMenu(void);
+static void Debug_ShowWeatherMenu(void);
+static void Debug_OpenCloudCoverBox(void);
+static void Debug_DrawCloudCoverBox(void);
+static void Debug_TearDownCloudCoverBox(u8 taskId);
+static void Debug_CommitCloudCoverBox(u8 taskId);
+static void Debug_CancelCloudCoverBox(u8 taskId);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_ReturnCameraToPlayer(u8 taskId);
 static void Debug_OpenNpcBox(u8 mode);
@@ -146,9 +163,14 @@ static u8 Debug_OrderForLocalId(u8 localId);
 
 static void DebugTask_HandleMenuInput_Main(u8 taskId);
 static void DebugTask_HandleMenuInput_Camera(u8 taskId);
+static void DebugTask_HandleMenuInput_Weather(u8 taskId);
 static void DebugTask_TrackNpcInput(u8 taskId);
+static void DebugTask_CloudCoverInput(u8 taskId);
 
 static void DebugAction_OpenCameraMenu(u8 taskId);
+static void DebugAction_OpenWeatherMenu(u8 taskId);
+static void DebugAction_Weather_SetCloudCover(u8 taskId);
+static void DebugAction_Weather_Cancel(u8 taskId);
 static void DebugAction_Cancel(u8 taskId);
 static void DebugAction_Camera_ToggleFreecam(u8 taskId);
 static void DebugAction_Camera_TrackNPC(u8 taskId);
@@ -184,11 +206,20 @@ static u8 sPanTileWindowId;
 static s16 sPanTileX;
 static s16 sPanTileY;
 
+// "Set Cloud Cover" numeric scroll box state. Up/down adjust the value in [0, CLOUD_COVER_SETS-1];
+// A commits it via SetCloudCover, B backs out to the weather menu.
+static u8 sCloudCoverWindowId;
+static u8 sCloudCoverArrowTaskId;
+static u16 sCloudCoverValue;
+
 // Writable copy of the camera submenu items, refilled from the const template each time the menu is
 // shown, so the freecam label can be swapped (debug.o's .data is discarded by the linker).
 static struct ListMenuItem sCameraMenuItems[DEBUG_CAMERA_ITEM_CANCEL + 1];
 
 static const u8 sDebugText_Camera[] = _("Camera");
+static const u8 sDebugText_Weather[] = _("Weather");
+static const u8 sDebugText_Weather_SetCloudCover[] = _("Set Cloud Cover");
+static const u8 sDebugText_CloudCover_Label[] = _("Cover ");
 static const u8 sDebugText_Cancel[] = _("Cancel");
 static const u8 sDebugText_Camera_EnableFreecam[] = _("Enable freecam");
 static const u8 sDebugText_Camera_DisableFreecam[] = _("Disable freecam");
@@ -203,8 +234,15 @@ static const u8 sDebugText_PanTile_Y[] = _(", Y: ");
 
 static const struct ListMenuItem sDebugMenuItems_Main[] =
 {
-    [DEBUG_MENU_ITEM_CAMERA] = {sDebugText_Camera, DEBUG_MENU_ITEM_CAMERA},
-    [DEBUG_MENU_ITEM_CANCEL] = {sDebugText_Cancel, DEBUG_MENU_ITEM_CANCEL},
+    [DEBUG_MENU_ITEM_CAMERA]  = {sDebugText_Camera, DEBUG_MENU_ITEM_CAMERA},
+    [DEBUG_MENU_ITEM_WEATHER] = {sDebugText_Weather, DEBUG_MENU_ITEM_WEATHER},
+    [DEBUG_MENU_ITEM_CANCEL]  = {sDebugText_Cancel, DEBUG_MENU_ITEM_CANCEL},
+};
+
+static const struct ListMenuItem sDebugMenuItems_Weather[] =
+{
+    [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER] = {sDebugText_Weather_SetCloudCover, DEBUG_WEATHER_ITEM_SET_CLOUD_COVER},
+    [DEBUG_WEATHER_ITEM_CANCEL]          = {sDebugText_Cancel, DEBUG_WEATHER_ITEM_CANCEL},
 };
 
 static const struct ListMenuItem sDebugMenuItems_Camera[] =
@@ -219,8 +257,15 @@ static const struct ListMenuItem sDebugMenuItems_Camera[] =
 
 static void (*const sDebugMenuActions_Main[])(u8) =
 {
-    [DEBUG_MENU_ITEM_CAMERA] = DebugAction_OpenCameraMenu,
-    [DEBUG_MENU_ITEM_CANCEL] = DebugAction_Cancel,
+    [DEBUG_MENU_ITEM_CAMERA]  = DebugAction_OpenCameraMenu,
+    [DEBUG_MENU_ITEM_WEATHER] = DebugAction_OpenWeatherMenu,
+    [DEBUG_MENU_ITEM_CANCEL]  = DebugAction_Cancel,
+};
+
+static void (*const sDebugMenuActions_Weather[])(u8) =
+{
+    [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER] = DebugAction_Weather_SetCloudCover,
+    [DEBUG_WEATHER_ITEM_CANCEL]          = DebugAction_Weather_Cancel,
 };
 
 static void (*const sDebugMenuActions_Camera[])(u8) =
@@ -765,6 +810,148 @@ static void DebugTask_TrackNpcInput(u8 taskId)
             Debug_CloseTrackNpcBox(taskId);
         else
             Debug_CancelPanNpcBox(taskId);
+    }
+}
+
+static void DebugTask_HandleMenuInput_Weather(u8 taskId)
+{
+    void (*func)(u8);
+    s32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+
+    if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        if ((func = sDebugMenuActions_Weather[input]) != NULL)
+            func(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        DebugAction_Weather_Cancel(taskId);
+    }
+}
+
+static void Debug_ShowWeatherMenu(void)
+{
+    Debug_ShowMenu(sDebugMenuItems_Weather, ARRAY_COUNT(sDebugMenuItems_Weather), DebugTask_HandleMenuInput_Weather);
+}
+
+static void DebugAction_OpenWeatherMenu(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_ShowWeatherMenu();
+}
+
+static void DebugAction_Weather_Cancel(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenMainMenu();
+}
+
+// Opens the numeric scroll box used to pick a target cloud cover.
+static void DebugAction_Weather_SetCloudCover(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenCloudCoverBox();
+}
+
+// Redraws the box as "Cover n" from the current sCloudCoverValue.
+static void Debug_DrawCloudCoverBox(void)
+{
+    u8 text[16];
+
+    StringCopy(text, sDebugText_CloudCover_Label);
+    ConvertIntToDecimalStringN(gStringVar1, sCloudCoverValue, STR_CONV_MODE_LEADING_ZEROS, 1);
+    StringAppend(text, gStringVar1);
+
+    FillWindowPixelBuffer(sCloudCoverWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sCloudCoverWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sCloudCoverWindowId, COPYWIN_GFX);
+}
+
+// Opens the cloud cover box, starting on the current target so reopening lands where you left off.
+static void Debug_OpenCloudCoverBox(void)
+{
+    sCloudCoverValue = gWeatherPtr->targetCloudCover;
+
+    LoadMessageBoxAndBorderGfx();
+    sCloudCoverWindowId = CreateWindowFromRect(0, 1, 9, 2);
+    DrawStdWindowFrame(sCloudCoverWindowId, FALSE);
+    Debug_DrawCloudCoverBox();
+    CopyWindowToVram(sCloudCoverWindowId, COPYWIN_FULL);
+
+    {
+        struct ScrollArrowsTemplate arrows;
+
+        arrows.firstArrowType = SCROLL_ARROW_UP;
+        arrows.firstX = 44;
+        arrows.firstY = 12;
+        arrows.secondArrowType = SCROLL_ARROW_DOWN;
+        arrows.secondX = 44;
+        arrows.secondY = 36;
+        arrows.fullyUpThreshold = CLOUD_COVER_SETS - 1;
+        arrows.fullyDownThreshold = 0;
+        arrows.tileTag = TAG_CLOUD_COVER_SCROLL_ARROW;
+        arrows.palTag = TAG_CLOUD_COVER_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sCloudCoverArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sCloudCoverValue);
+    }
+
+    CreateTask(DebugTask_CloudCoverInput, 3);
+    sDebugMenuOpen = TRUE;
+}
+
+// Tears down the box's window, scroll arrows and input task. The caller decides what to do next.
+static void Debug_TearDownCloudCoverBox(u8 taskId)
+{
+    RemoveScrollIndicatorArrowPair(sCloudCoverArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sCloudCoverWindowId, TRUE);
+    RemoveWindow(sCloudCoverWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
+}
+
+// Commits the box (A): sets the target cloud cover and hands input back to the field.
+static void Debug_CommitCloudCoverBox(u8 taskId)
+{
+    u8 value = sCloudCoverValue;
+
+    Debug_TearDownCloudCoverBox(taskId);
+    SetCloudCover(value);
+    UnlockPlayerFieldControls();
+}
+
+// Backs out of the box (B) without changing anything, returning to the weather menu.
+static void Debug_CancelCloudCoverBox(u8 taskId)
+{
+    Debug_TearDownCloudCoverBox(taskId);
+    Debug_ShowWeatherMenu();
+}
+
+// Up/down adjust the value (held to repeat), clamped to [0, CLOUD_COVER_SETS-1]. A commits, B cancels.
+static void DebugTask_CloudCoverInput(u8 taskId)
+{
+    if (JOY_REPEAT(DPAD_UP) && sCloudCoverValue < CLOUD_COVER_SETS - 1)
+    {
+        sCloudCoverValue++;
+        PlaySE(SE_SELECT);
+        Debug_DrawCloudCoverBox();
+    }
+    else if (JOY_REPEAT(DPAD_DOWN) && sCloudCoverValue > 0)
+    {
+        sCloudCoverValue--;
+        PlaySE(SE_SELECT);
+        Debug_DrawCloudCoverBox();
+    }
+    else if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CommitCloudCoverBox(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CancelCloudCoverBox(taskId);
     }
 }
 

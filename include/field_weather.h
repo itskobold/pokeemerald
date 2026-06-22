@@ -100,6 +100,9 @@ struct Weather
     u8 sandstormSpritesCreated;
     u8 sandstormSwirlSpritesCreated;
     // Clouds
+    u8 cloudCover:3;            // current tile set clouds/0..7
+    u8 targetCloudCover:3;      // set is stepped toward this (see SetCloudCover)
+    u8 cloudCoverTimer;         // frame counter; one step per 20 frames
     u16 cloudsScrollXCounter;
     u16 cloudsScrollYCounter;
     u16 cloudsXOffset;
@@ -194,6 +197,7 @@ void Sandstorm_InitAll(void);
 bool8 Sandstorm_Finish(void);
 void InitClouds(void);
 void UpdateClouds(void);
+void SetCloudCover(u8 target);
 void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);

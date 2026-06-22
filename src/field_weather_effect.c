@@ -22,16 +22,97 @@ const u16 gSandstormWeatherPalette[] = INCGFX_U16("graphics/weather/sandstorm.pn
 // array so the images are contiguous and can be loaded as one sprite sheet;
 // each 64x64 4bpp image is CLOUD_TILE_4BPP_SIZE bytes (64 hardware tiles).
 #define CLOUD_TILE_4BPP_SIZE (64 * 64 / 2)
-const u8 gWeatherCloudsTiles[CLOUD_TILE_IMAGES][CLOUD_TILE_4BPP_SIZE] = {
-    INCGFX_U8("graphics/weather/clouds/0/0.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/1.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/2.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/3.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/4.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/5.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/6.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/7.png", ".4bpp"),
-    INCGFX_U8("graphics/weather/clouds/0/8.png", ".4bpp"),
+// One 3x3 set per cloud-cover level (clouds/0..7); the active set is chosen at
+// load time by gWeatherPtr->cloudCover (see CreateCloudsSprites).
+const u8 gWeatherCloudsTiles[CLOUD_COVER_SETS][CLOUD_TILE_IMAGES][CLOUD_TILE_4BPP_SIZE] = {
+    {
+        INCGFX_U8("graphics/weather/clouds/0/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/0/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/1/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/1/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/2/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/2/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/3/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/3/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/4/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/4/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/5/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/5/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/6/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/6/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/7/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/7/8.png", ".4bpp"),
+    },
 };
 const u8 gWeatherFogHorizontalTiles[] = INCGFX_U8("graphics/weather/fog_horizontal.png", ".4bpp");
 const u8 gWeatherSnow1Tiles[] = INCGFX_U8("graphics/weather/snow0.png", ".4bpp");
@@ -47,7 +128,7 @@ const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", 
 
 // Controls for blending the fog weather effects
 // Set to negative values for darkening, positive for lightening (suggested range [-2, 5])
-#define CLOUDS_BRIGHTNESS -2          // Clouds overlay (darken)
+#define CLOUDS_BRIGHTNESS 3          // Clouds overlay (darken)
 #define UNDERWATER_BRIGHTNESS 2       // Horizontal fog under WEATHER_UNDERWATER_BUBBLES
 
 #define WEATHER_BLEND_EFFECT(brightness) ((brightness) < 0 ? BLDCNT_EFFECT_DARKEN : BLDCNT_EFFECT_LIGHTEN)
@@ -1558,6 +1639,8 @@ static void UpdateAshSprite(struct Sprite *sprite)
 #define CLOUD_PATTERN_PX    (CLOUD_PATTERN_DIM * CLOUD_TILE)        // pattern period (px)
 
 static void UpdateCloudsMovement(void);
+static void UpdateCloudCover(void);
+static void ReloadCloudsTiles(void);
 static void CreateCloudsSprites(void);
 static void DestroyCloudsSprites(void);
 static void UpdateCloudsSprite(struct Sprite *);
@@ -1641,6 +1724,9 @@ static void HideClouds(void)
 void InitClouds(void)
 {
     sCloudsShown = FALSE;
+    gWeatherPtr->cloudCover = gSaveBlock1Ptr->cloudCover; // persists across map transitions
+    gWeatherPtr->targetCloudCover = gSaveBlock1Ptr->cloudCover;
+    gWeatherPtr->cloudCoverTimer = 0;
     gWeatherPtr->cloudsScrollXCounter = 0;
     gWeatherPtr->cloudsScrollYCounter = 0;
     gWeatherPtr->cloudsXOffset = 0;
@@ -1654,6 +1740,8 @@ void UpdateClouds(void)
 {
     bool8 active = CloudsActiveForWeather(gWeatherPtr->currWeather)
                 && CloudsAllowedOnCurrentMap();
+
+    UpdateCloudCover();
 
     if (active)
         UpdateCloudsMovement();
@@ -1689,10 +1777,50 @@ static void UpdateCloudsMovement(void)
     }
 }
 
+// Request a target cloud cover; the overlay steps toward it (see UpdateCloudCover).
+void SetCloudCover(u8 target)
+{
+    if (target >= CLOUD_COVER_SETS)
+        target = CLOUD_COVER_SETS - 1;
+    gWeatherPtr->targetCloudCover = target;
+}
+
+// Step the current cloud cover one level toward the target every 20 frames,
+// swapping in the new tile set and persisting the value as it changes.
+static void UpdateCloudCover(void)
+{
+    if (gWeatherPtr->cloudCover == gWeatherPtr->targetCloudCover)
+        return;
+
+    if (++gWeatherPtr->cloudCoverTimer < 20)
+        return;
+    gWeatherPtr->cloudCoverTimer = 0;
+
+    if (gWeatherPtr->cloudCover < gWeatherPtr->targetCloudCover)
+        gWeatherPtr->cloudCover++;
+    else
+        gWeatherPtr->cloudCover--;
+
+    gSaveBlock1Ptr->cloudCover = gWeatherPtr->cloudCover; // persist current level
+    ReloadCloudsTiles();
+}
+
+// Overwrite the cloud tiles already in VRAM with the active set's images. The
+// tile range stays put, so the existing sprites keep pointing at the right tiles.
+static void ReloadCloudsTiles(void)
+{
+    u16 tileStart = GetSpriteTileStartByTag(GFXTAG_CLOUD);
+
+    if (tileStart != 0xFFFF)
+        RequestSpriteCopy((const u8 *)gWeatherCloudsTiles[gWeatherPtr->cloudCover],
+                          (u8 *)OBJ_VRAM0 + TILE_SIZE_4BPP * tileStart,
+                          sizeof(gWeatherCloudsTiles[0]));
+}
+
 static const struct SpriteSheet sCloudsSpriteSheet =
 {
-    .data = (const u8 *)gWeatherCloudsTiles,
-    .size = sizeof(gWeatherCloudsTiles),
+    .data = (const u8 *)gWeatherCloudsTiles[0], // data/size set per cloudCover at load time
+    .size = sizeof(gWeatherCloudsTiles[0]),
     .tag = GFXTAG_CLOUD,
 };
 
@@ -1755,6 +1883,7 @@ static void CreateCloudsSprites(void)
     if (!gWeatherPtr->cloudsSpritesCreated)
     {
         cloudsSpriteSheet = sCloudsSpriteSheet;
+        cloudsSpriteSheet.data = (const u8 *)gWeatherCloudsTiles[gWeatherPtr->cloudCover];
         LoadSpriteSheet(&cloudsSpriteSheet);
         for (i = 0; i < NUM_CLOUD_SPRITES; i++)
         {
