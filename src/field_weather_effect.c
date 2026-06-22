@@ -17,7 +17,22 @@
 #include "gpu_regs.h"
 
 const u16 gSandstormWeatherPalette[] = INCGFX_U16("graphics/weather/sandstorm.png", ".gbapal");
-const u8 gWeatherFogDiagonalTiles[] = INCGFX_U8("graphics/weather/fog_diagonal.png", ".4bpp");
+
+// The 9 cloud tiles tile together seamlessly as a 3x3 pattern. Stored as a 2D
+// array so the images are contiguous and can be loaded as one sprite sheet;
+// each 64x64 4bpp image is CLOUD_TILE_4BPP_SIZE bytes (64 hardware tiles).
+#define CLOUD_TILE_4BPP_SIZE (64 * 64 / 2)
+const u8 gWeatherCloudsTiles[CLOUD_TILE_IMAGES][CLOUD_TILE_4BPP_SIZE] = {
+    INCGFX_U8("graphics/weather/clouds/0/0.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/1.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/2.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/3.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/4.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/5.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/6.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/7.png", ".4bpp"),
+    INCGFX_U8("graphics/weather/clouds/0/8.png", ".4bpp"),
+};
 const u8 gWeatherFogHorizontalTiles[] = INCGFX_U8("graphics/weather/fog_horizontal.png", ".4bpp");
 const u8 gWeatherSnow1Tiles[] = INCGFX_U8("graphics/weather/snow0.png", ".4bpp");
 const u8 gWeatherSnow2Tiles[] = INCGFX_U8("graphics/weather/snow1.png", ".4bpp");
@@ -32,8 +47,8 @@ const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", 
 
 // Controls for blending the fog weather effects
 // Set to negative values for darkening, positive for lightening (suggested range [-2, 5])
-#define FOG_BRIGHTNESS -2          // Diagonal fog overlay (darken)
-#define UNDERWATER_BRIGHTNESS 5    // Horizontal fog under WEATHER_UNDERWATER_BUBBLES (lighten, like the old clouds)
+#define CLOUDS_BRIGHTNESS -2          // Clouds overlay (darken)
+#define UNDERWATER_BRIGHTNESS 2       // Horizontal fog under WEATHER_UNDERWATER_BUBBLES
 
 #define WEATHER_BLEND_EFFECT(brightness) ((brightness) < 0 ? BLDCNT_EFFECT_DARKEN : BLDCNT_EFFECT_LIGHTEN)
 #define WEATHER_BLEND_LEVEL(brightness)  ((brightness) < 0 ? -(brightness) : (brightness))
@@ -1533,19 +1548,25 @@ static void UpdateAshSprite(struct Sprite *sprite)
 #undef tSpriteRow
 
 //------------------------------------------------------------------------------
-// Diagonal fog (persistent overlay, always on except for a few weathers)
+// Clouds (persistent overlay, always on except for a few weathers)
 //------------------------------------------------------------------------------
 
-static void UpdateFogDiagonalMovement(void);
-static void CreateFogDiagonalSprites(void);
-static void DestroyFogDiagonalSprites(void);
-static void UpdateFogDiagonalSprite(struct Sprite *);
+#define CLOUD_TILE          64                              // size of one cloud tile (px)
+#define CLOUD_PARALLAX_NUM  1                                // clouds track camera at NUM/DEN (1/32) speed
+#define CLOUD_PARALLAX_DEN  32
+#define CLOUD_IMAGE_TILES   (CLOUD_TILE_4BPP_SIZE / TILE_SIZE_4BPP) // hardware tiles per image
+#define CLOUD_PATTERN_PX    (CLOUD_PATTERN_DIM * CLOUD_TILE)        // pattern period (px)
 
-static bool8 sFogDiagonalShown;
+static void UpdateCloudsMovement(void);
+static void CreateCloudsSprites(void);
+static void DestroyCloudsSprites(void);
+static void UpdateCloudsSprite(struct Sprite *);
 
-// Diagonal fog is a persistent overlay drawn on top of most weathers. It is
+static bool8 sCloudsShown;
+
+// Clouds are a persistent overlay drawn on top of most weathers. They are
 // suppressed for weathers that need the blend registers for themselves.
-static bool8 FogDiagonalActiveForWeather(u8 weather)
+static bool8 CloudsActiveForWeather(u8 weather)
 {
     switch (weather)
     {
@@ -1560,7 +1581,7 @@ static bool8 FogDiagonalActiveForWeather(u8 weather)
 
 // The overlay only makes sense on open-air overworld maps, so it is limited to
 // the overworld biome group and outdoor location types.
-static bool8 FogDiagonalAllowedOnCurrentMap(void)
+static bool8 CloudsAllowedOnCurrentMap(void)
 {
     if (gMapHeader.biomeGroup != BIOME_GROUP_OVERWORLD)
         return FALSE;
@@ -1580,32 +1601,32 @@ static bool8 FogDiagonalAllowedOnCurrentMap(void)
 // The sprites persist across weathers, but they must only carve the object
 // window while the overlay is active - otherwise they would leak into another
 // weather that uses the object window itself (e.g. underwater bubbles).
-static void SetFogDiagonalSpritesInvisible(bool8 invisible)
+static void SetCloudsSpritesInvisible(bool8 invisible)
 {
     u16 i;
 
-    for (i = 0; i < NUM_FOG_DIAGONAL_SPRITES; i++)
+    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
     {
-        if (gWeatherPtr->sprites.s2.fogDSprites[i] != NULL)
-            gWeatherPtr->sprites.s2.fogDSprites[i]->invisible = invisible;
+        if (gWeatherPtr->sprites.s2.cloudSprites[i] != NULL)
+            gWeatherPtr->sprites.s2.cloudSprites[i]->invisible = invisible;
     }
 }
 
-static void ShowFogDiagonal(void)
+static void ShowClouds(void)
 {
-    SetFogDiagonalSpritesInvisible(FALSE);
+    SetCloudsSpritesInvisible(FALSE);
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(FOG_BRIGHTNESS));
-    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(FOG_BRIGHTNESS));
+                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(CLOUDS_BRIGHTNESS));
+    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(CLOUDS_BRIGHTNESS));
     SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
                                | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
     ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
     SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
 }
 
-static void HideFogDiagonal(void)
+static void HideClouds(void)
 {
-    SetFogDiagonalSpritesInvisible(TRUE);
+    SetCloudsSpritesInvisible(TRUE);
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
                                | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
     SetGpuReg(REG_OFFSET_BLDY, 0);
@@ -1617,66 +1638,65 @@ static void HideFogDiagonal(void)
 
 // Called once from StartWeather. The sprites persist for the life of the
 // weather task (one map session) and stay invisible until shown.
-void InitFogDiagonal(void)
+void InitClouds(void)
 {
-    sFogDiagonalShown = FALSE;
-    gWeatherPtr->fogDScrollXCounter = 0;
-    gWeatherPtr->fogDScrollYCounter = 0;
-    gWeatherPtr->fogDXOffset = 0;
-    gWeatherPtr->fogDYOffset = 0;
-    gWeatherPtr->fogDBaseSpritesX = 0;
-    gWeatherPtr->fogDPosY = 0;
-    CreateFogDiagonalSprites();
-    SetFogDiagonalSpritesInvisible(TRUE); // Stay hidden until an active weather shows the overlay
+    sCloudsShown = FALSE;
+    gWeatherPtr->cloudsScrollXCounter = 0;
+    gWeatherPtr->cloudsScrollYCounter = 0;
+    gWeatherPtr->cloudsXOffset = 0;
+    gWeatherPtr->cloudsYOffset = 0;
+    CreateCloudsSprites();
+    SetCloudsSpritesInvisible(TRUE); // Stay hidden until an active weather shows the overlay
 }
 
 // Called every frame from the weather task to toggle the overlay by weather.
-void UpdateFogDiagonal(void)
+void UpdateClouds(void)
 {
-    bool8 active = FogDiagonalActiveForWeather(gWeatherPtr->currWeather)
-                && FogDiagonalAllowedOnCurrentMap();
+    bool8 active = CloudsActiveForWeather(gWeatherPtr->currWeather)
+                && CloudsAllowedOnCurrentMap();
 
     if (active)
-        UpdateFogDiagonalMovement();
+        UpdateCloudsMovement();
 
-    if (active && !sFogDiagonalShown)
+    if (active && !sCloudsShown)
     {
-        ShowFogDiagonal();
-        sFogDiagonalShown = TRUE;
+        ShowClouds();
+        sCloudsShown = TRUE;
     }
-    else if (!active && sFogDiagonalShown)
+    else if (!active && sCloudsShown)
     {
-        HideFogDiagonal();
-        sFogDiagonalShown = FALSE;
+        HideClouds();
+        sCloudsShown = FALSE;
     }
 }
 
-static void UpdateFogDiagonalMovement(void)
+// Drift the clouds diagonally (down-left). The offsets wrap at one full pattern
+// period so the wrap lands on an identical phase and stays seamless.
+static void UpdateCloudsMovement(void)
 {
-    if (++gWeatherPtr->fogDScrollXCounter > 2)
+    if (++gWeatherPtr->cloudsScrollXCounter > 2)
     {
-        gWeatherPtr->fogDXOffset++;
-        gWeatherPtr->fogDScrollXCounter = 0;
+        gWeatherPtr->cloudsScrollXCounter = 0;
+        if (++gWeatherPtr->cloudsXOffset >= CLOUD_PATTERN_PX)
+            gWeatherPtr->cloudsXOffset -= CLOUD_PATTERN_PX;
     }
 
-    if (++gWeatherPtr->fogDScrollYCounter > 4)
+    if (++gWeatherPtr->cloudsScrollYCounter > 4)
     {
-        gWeatherPtr->fogDYOffset++;
-        gWeatherPtr->fogDScrollYCounter = 0;
+        gWeatherPtr->cloudsScrollYCounter = 0;
+        if (++gWeatherPtr->cloudsYOffset >= CLOUD_PATTERN_PX)
+            gWeatherPtr->cloudsYOffset -= CLOUD_PATTERN_PX;
     }
-
-    gWeatherPtr->fogDBaseSpritesX = (gSpriteCoordOffsetX - gWeatherPtr->fogDXOffset) & 0xFF;
-    gWeatherPtr->fogDPosY = gSpriteCoordOffsetY + gWeatherPtr->fogDYOffset;
 }
 
-static const struct SpriteSheet sFogDiagonalSpriteSheet =
+static const struct SpriteSheet sCloudsSpriteSheet =
 {
-    .data = gWeatherFogDiagonalTiles,
-    .size = sizeof(gWeatherFogDiagonalTiles),
-    .tag = GFXTAG_FOG_D,
+    .data = (const u8 *)gWeatherCloudsTiles,
+    .size = sizeof(gWeatherCloudsTiles),
+    .tag = GFXTAG_CLOUD,
 };
 
-static const struct OamData sFogDiagonalSpriteOamData =
+static const struct OamData sCloudsSpriteOamData =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_OFF,
@@ -1690,92 +1710,130 @@ static const struct OamData sFogDiagonalSpriteOamData =
     .paletteNum = 0,
 };
 
-static const union AnimCmd sFogDiagonalSpriteAnimCmd0[] =
+// One anim per source image; anim N selects the Nth 64x64 image (its tile
+// offset within the sheet is N * CLOUD_IMAGE_TILES).
+#define CLOUDS_ANIM(n)                              \
+    static const union AnimCmd sCloudsAnim##n[] =   \
+    {                                               \
+        ANIMCMD_FRAME((n) * CLOUD_IMAGE_TILES, 16), \
+        ANIMCMD_END,                                \
+    }
+
+CLOUDS_ANIM(0); CLOUDS_ANIM(1); CLOUDS_ANIM(2);
+CLOUDS_ANIM(3); CLOUDS_ANIM(4); CLOUDS_ANIM(5);
+CLOUDS_ANIM(6); CLOUDS_ANIM(7); CLOUDS_ANIM(8);
+
+static const union AnimCmd *const sCloudsSpriteAnimCmds[] =
 {
-    ANIMCMD_FRAME(0, 16),
-    ANIMCMD_END,
+    sCloudsAnim0, sCloudsAnim1, sCloudsAnim2,
+    sCloudsAnim3, sCloudsAnim4, sCloudsAnim5,
+    sCloudsAnim6, sCloudsAnim7, sCloudsAnim8,
 };
 
-static const union AnimCmd *const sFogDiagonalSpriteAnimCmds[] =
+static const struct SpriteTemplate sCloudsSpriteTemplate =
 {
-    sFogDiagonalSpriteAnimCmd0,
-};
-
-static const struct SpriteTemplate sFogDiagonalSpriteTemplate =
-{
-    .tileTag = GFXTAG_FOG_D,
+    .tileTag = GFXTAG_CLOUD,
     .paletteTag = PALTAG_WEATHER,
-    .oam = &sFogDiagonalSpriteOamData,
-    .anims = sFogDiagonalSpriteAnimCmds,
+    .oam = &sCloudsSpriteOamData,
+    .anims = sCloudsSpriteAnimCmds,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = UpdateFogDiagonalSprite,
+    .callback = UpdateCloudsSprite,
 };
 
 #define tSpriteColumn data[0]
 #define tSpriteRow    data[1]
+#define tImageIndex   data[2]
 
-static void CreateFogDiagonalSprites(void)
+static void CreateCloudsSprites(void)
 {
     u16 i;
-    struct SpriteSheet fogDiagonalSpriteSheet;
+    struct SpriteSheet cloudsSpriteSheet;
     u8 spriteId;
     struct Sprite *sprite;
 
-    if (!gWeatherPtr->fogDSpritesCreated)
+    if (!gWeatherPtr->cloudsSpritesCreated)
     {
-        fogDiagonalSpriteSheet = sFogDiagonalSpriteSheet;
-        LoadSpriteSheet(&fogDiagonalSpriteSheet);
-        for (i = 0; i < NUM_FOG_DIAGONAL_SPRITES; i++)
+        cloudsSpriteSheet = sCloudsSpriteSheet;
+        LoadSpriteSheet(&cloudsSpriteSheet);
+        for (i = 0; i < NUM_CLOUD_SPRITES; i++)
         {
-            spriteId = CreateSpriteAtEnd(&sFogDiagonalSpriteTemplate, 0, (i / 5) * 64, 0xFF);
+            spriteId = CreateSpriteAtEnd(&sCloudsSpriteTemplate, 0, 0, 0xFF);
             if (spriteId != MAX_SPRITES)
             {
                 sprite = &gSprites[spriteId];
-                sprite->tSpriteColumn = i % 5;
-                sprite->tSpriteRow = i / 5;
-                gWeatherPtr->sprites.s2.fogDSprites[i] = sprite;
+                sprite->tSpriteColumn = i % CLOUD_COLS;
+                sprite->tSpriteRow = i / CLOUD_COLS;
+                sprite->tImageIndex = -1; // force the first frame to pick an image
+                gWeatherPtr->sprites.s2.cloudSprites[i] = sprite;
             }
             else
             {
-                gWeatherPtr->sprites.s2.fogDSprites[i] = NULL;
+                gWeatherPtr->sprites.s2.cloudSprites[i] = NULL;
             }
         }
 
-        gWeatherPtr->fogDSpritesCreated = TRUE;
+        gWeatherPtr->cloudsSpritesCreated = TRUE;
     }
 }
 
-static void DestroyFogDiagonalSprites(void)
+static void DestroyCloudsSprites(void)
 {
     u16 i;
 
-    if (gWeatherPtr->fogDSpritesCreated)
+    if (gWeatherPtr->cloudsSpritesCreated)
     {
-        for (i = 0; i < NUM_FOG_DIAGONAL_SPRITES; i++)
+        for (i = 0; i < NUM_CLOUD_SPRITES; i++)
         {
-            if (gWeatherPtr->sprites.s2.fogDSprites[i])
-                DestroySprite(gWeatherPtr->sprites.s2.fogDSprites[i]);
+            if (gWeatherPtr->sprites.s2.cloudSprites[i])
+                DestroySprite(gWeatherPtr->sprites.s2.cloudSprites[i]);
         }
 
-        FreeSpriteTilesByTag(GFXTAG_FOG_D);
-        gWeatherPtr->fogDSpritesCreated = FALSE;
+        FreeSpriteTilesByTag(GFXTAG_CLOUD);
+        gWeatherPtr->cloudsSpritesCreated = FALSE;
     }
 }
 
-static void UpdateFogDiagonalSprite(struct Sprite *sprite)
+// Each sprite is a 64px-aligned cell of an infinitely tiling 3x3 pattern. From
+// its grid slot and the (camera + drift) scroll offset, derive both the on-screen
+// position and which of the 9 source images it should show. Because on-screen
+// sprites always map to a contiguous run of pattern cells, the result is a
+// seamless, scrolling cloud field.
+static void UpdateCloudsSprite(struct Sprite *sprite)
 {
-    sprite->y2 = gWeatherPtr->fogDPosY;
-    sprite->x = gWeatherPtr->fogDBaseSpritesX + 32 + sprite->tSpriteColumn * 64;
-    if (sprite->x >= DISPLAY_WIDTH + 32)
+    // Track the camera at 1.5x speed so the clouds parallax against the world.
+    s32 baseX = (-gSpriteCoordOffsetX * CLOUD_PARALLAX_NUM / CLOUD_PARALLAX_DEN) - gWeatherPtr->cloudsXOffset;
+    s32 baseY = (-gSpriteCoordOffsetY * CLOUD_PARALLAX_NUM / CLOUD_PARALLAX_DEN) + gWeatherPtr->cloudsYOffset;
+    s32 col = sprite->tSpriteColumn;
+    s32 row = sprite->tSpriteRow;
+    // Tile top-left, aligned to the scroll phase so each sprite shows exactly
+    // one source tile; covers [-CLOUD_TILE .. screen) as the phase drifts.
+    s32 x = (baseX & (CLOUD_TILE - 1)) - CLOUD_TILE + col * CLOUD_TILE;
+    s32 y = (baseY & (CLOUD_TILE - 1)) - CLOUD_TILE + row * CLOUD_TILE;
+    // Pattern cell this sprite currently occupies (anchored in world space).
+    s32 patternCol = (col - (baseX >> 6) - 1) % CLOUD_PATTERN_DIM;
+    s32 patternRow = (row - (baseY >> 6) - 1) % CLOUD_PATTERN_DIM;
+    s32 imageIndex;
+
+    if (patternCol < 0)
+        patternCol += CLOUD_PATTERN_DIM;
+    if (patternRow < 0)
+        patternRow += CLOUD_PATTERN_DIM;
+    imageIndex = patternRow * CLOUD_PATTERN_DIM + patternCol;
+
+    // sprite->x/y are centers; the -32 center-to-corner vec puts the top-left at x/y.
+    sprite->x = x + CLOUD_TILE / 2;
+    sprite->y = y + CLOUD_TILE / 2;
+    if (sprite->tImageIndex != imageIndex)
     {
-        sprite->x = gWeatherPtr->fogDBaseSpritesX + (DISPLAY_WIDTH * 2) - (4 - sprite->tSpriteColumn) * 64;
-        sprite->x &= 0x1FF;
+        sprite->tImageIndex = imageIndex;
+        StartSpriteAnim(sprite, imageIndex);
     }
 }
 
 #undef tSpriteColumn
 #undef tSpriteRow
+#undef tImageIndex
 
 //------------------------------------------------------------------------------
 // WEATHER_SANDSTORM

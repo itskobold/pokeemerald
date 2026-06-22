@@ -152,16 +152,15 @@ void StartWeather(void)
         gWeatherPtr->weatherPicSpritePalIndex = AllocSpritePalette(PALTAG_WEATHER_2);
         gWeatherPtr->rainSpriteCount = 0;
         gWeatherPtr->curRainSpriteIndex = 0;
-        gWeatherPtr->cloudSpritesCreated = 0;
         gWeatherPtr->snowflakeSpriteCount = 0;
         gWeatherPtr->ashSpritesCreated = 0;
         gWeatherPtr->fogHSpritesCreated = 0;
-        gWeatherPtr->fogDSpritesCreated = 0;
+        gWeatherPtr->cloudsSpritesCreated = 0;
         gWeatherPtr->sandstormSpritesCreated = 0;
         gWeatherPtr->sandstormSwirlSpritesCreated = 0;
         gWeatherPtr->bubblesSpritesCreated = 0;
         gWeatherPtr->lightenedFogSpritePalsCount = 0;
-        InitFogDiagonal(); // Persistent overlay, shown for most weathers
+        InitClouds(); // Persistent overlay, shown for most weathers
         Weather_SetBlendCoeffs(16, 0);
         gWeatherPtr->currWeather = 0;
         gWeatherPtr->palProcessingState = WEATHER_PAL_STATE_IDLE;
@@ -235,7 +234,7 @@ static void Task_WeatherMain(u8 taskId)
         sWeatherFuncs[gWeatherPtr->currWeather].main();
     }
 
-    UpdateFogDiagonal();
+    UpdateClouds();
     gWeatherPalStateFuncs[gWeatherPtr->palProcessingState]();
 }
 

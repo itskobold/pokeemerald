@@ -9,7 +9,6 @@ enum {
     GFXTAG_CLOUD = TAG_WEATHER_START,
     GFXTAG_FOG_H,
     GFXTAG_ASH,
-    GFXTAG_FOG_D,
     GFXTAG_SANDSTORM,
     GFXTAG_BUBBLE,
     GFXTAG_RAIN,
@@ -29,14 +28,13 @@ struct Weather
         {
             struct Sprite *rainSprites[MAX_RAIN_SPRITES];
             struct Sprite *snowflakeSprites[101];
-            struct Sprite *cloudSprites[NUM_CLOUD_SPRITES];
         } s1;
         struct
         {
             u8 filler0[0xA0];
             struct Sprite *fogHSprites[NUM_FOG_HORIZONTAL_SPRITES];
             struct Sprite *ashSprites[NUM_ASH_SPRITES];
-            struct Sprite *fogDSprites[NUM_FOG_DIAGONAL_SPRITES];
+            struct Sprite *cloudSprites[NUM_CLOUD_SPRITES];
             struct Sprite *sandstormSprites1[NUM_SANDSTORM_SPRITES];
             struct Sprite *sandstormSprites2[NUM_SWIRL_SANDSTORM_SPRITES];
         } s2;
@@ -68,7 +66,6 @@ struct Weather
     u8 rainSpriteVisibleDelay;
     u8 isDownpour;
     u8 rainStrength;
-    u8 cloudSpritesCreated;
     // Snow
     u16 snowflakeVisibleCounter;
     u16 snowflakeTimer;
@@ -102,14 +99,12 @@ struct Weather
     u16 sandstormWaveCounter;
     u8 sandstormSpritesCreated;
     u8 sandstormSwirlSpritesCreated;
-    // Diagonal fog
-    u16 fogDBaseSpritesX;
-    u16 fogDPosY;
-    u16 fogDScrollXCounter;
-    u16 fogDScrollYCounter;
-    u16 fogDXOffset;
-    u16 fogDYOffset;
-    u8 fogDSpritesCreated;
+    // Clouds
+    u16 cloudsScrollXCounter;
+    u16 cloudsScrollYCounter;
+    u16 cloudsXOffset;
+    u16 cloudsYOffset;
+    u8 cloudsSpritesCreated;
     // Bubbles
     u16 bubblesDelayCounter;
     u16 bubblesDelayIndex;
@@ -197,8 +192,8 @@ void Sandstorm_InitVars(void);
 void Sandstorm_Main(void);
 void Sandstorm_InitAll(void);
 bool8 Sandstorm_Finish(void);
-void InitFogDiagonal(void);
-void UpdateFogDiagonal(void);
+void InitClouds(void);
+void UpdateClouds(void);
 void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);

@@ -2,13 +2,19 @@
 #define GUARD_CONSTANTS_FIELD_WEATHER_H
 
 #define MAX_RAIN_SPRITES             24
-#define NUM_CLOUD_SPRITES            3
 #define NUM_FOG_HORIZONTAL_SPRITES   20
 #define NUM_ASH_SPRITES              20
-#define NUM_FOG_DIAGONAL_SPRITES     20
 #define NUM_SANDSTORM_SPRITES        20
 #define NUM_SWIRL_SANDSTORM_SPRITES  5
 #define NUM_SNOWFLAKE_SPRITES        16
+
+// Clouds: a 3x3 set of seamlessly tiling 64x64 images, drawn as a grid of
+// overlay sprites (CLOUD_COLS x CLOUD_ROWS) that scrolls across the screen.
+#define CLOUD_TILE_IMAGES            9   // 3x3 distinct source tiles
+#define CLOUD_PATTERN_DIM            3   // tiles per side of the repeating pattern
+#define CLOUD_COLS                   5   // sprite columns (cover screen width + scroll)
+#define CLOUD_ROWS                   4   // sprite rows (cover screen height + scroll)
+#define NUM_CLOUD_SPRITES            (CLOUD_COLS * CLOUD_ROWS)
 
 // Controls how the weather should be changing the screen palettes.
 #define WEATHER_PAL_STATE_CHANGING_WEATHER   0
