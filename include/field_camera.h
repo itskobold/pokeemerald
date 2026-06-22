@@ -44,6 +44,7 @@ void RestoreCameraTracking(void);
 void ResetCameraTracking(void);
 void RequestCameraResetToPlayerOnFieldReturn(void);
 u8 GetCameraTrackedLocalId(void);
+struct ObjectEvent *GetCameraTrackedObjectEvent(void);
 void SetCameraPanningCallback(void (*callback)(void));
 void SetCameraPanning(s16 horizontal, s16 vertical);
 void InstallCameraPanAheadCallback(void);

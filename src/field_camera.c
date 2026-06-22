@@ -647,6 +647,20 @@ u8 GetCameraTrackedLocalId(void)
     return sCameraTrackedLocalId;
 }
 
+// Returns the object event the camera is currently following (the player by default, or a debug-
+// tracked NPC), or NULL when nothing is anchored (freecam, or the target is culled/flag-removed).
+struct ObjectEvent *GetCameraTrackedObjectEvent(void)
+{
+    u8 i;
+
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+    {
+        if (gObjectEvents[i].active && gObjectEvents[i].trackedByCamera)
+            return &gObjectEvents[i];
+    }
+    return NULL;
+}
+
 // Reattaches the camera to the player, used when leaving freecam.
 void RecenterCameraOnPlayer(void)
 {

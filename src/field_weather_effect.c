@@ -1,6 +1,7 @@
 #include "global.h"
 #include "battle_anim.h"
 #include "event_object_movement.h"
+#include "field_camera.h"
 #include "fieldmap.h"
 #include "field_weather.h"
 #include "overworld.h"
@@ -1873,15 +1874,16 @@ static void UpdateCliffSilhouetteBrightness(bool32 show)
 // darkening never lands on that lingering final cloud frame (which read as a 1-frame overlap).
 #define CLOUD_CLEARED_SETTLE_FRAMES 2
 
-// Whether the silhouette ramp should be driving toward full this frame: the player itself is fully buried
-// in a cliff and the clouds have been fully faded out (see cloudClearedTimer) for long enough to settle,
-// so the overlay's blend/object-window machinery is idle and free for the silhouettes to borrow.
+// Whether the silhouette ramp should be driving toward full this frame: the camera-tracked object
+// (the player by default, or a debug-tracked NPC) is fully buried in a cliff and the clouds have been
+// fully faded out (see cloudClearedTimer) for long enough to settle, so the overlay's blend/object-
+// window machinery is idle and free for the silhouettes to borrow.
 static bool32 ShouldRampUpCliffSilhouettes(void)
 {
-    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+    struct ObjectEvent *tracked = GetCameraTrackedObjectEvent();
 
-    return player->active
-        && player->cliffLayer == CLIFF_LAYER_OBSCURED
+    return tracked != NULL
+        && tracked->cliffLayer == CLIFF_LAYER_OBSCURED
         && gWeatherPtr->cloudClearedTimer >= CLOUD_CLEARED_SETTLE_FRAMES;
 }
 
@@ -2218,16 +2220,16 @@ static void ReleaseCloudBlend(void)
     SetGpuReg(REG_OFFSET_BLDY, 0);
 }
 
-// Keep the clouds paused while the player is buried in a cliff OR the silhouettes are still ramping out;
-// once both are clear, kick off the inverse fade back to the held targets. Holding the pause through the
-// silhouette ramp-out (not just the player's cliffLayer) lets that darkening finish fading before the
-// clouds return.
+// Keep the clouds paused while the camera-tracked object is buried in a cliff OR the silhouettes are
+// still ramping out; once both are clear, kick off the inverse fade back to the held targets. Holding
+// the pause through the silhouette ramp-out (not just the tracked object's cliffLayer) lets that
+// darkening finish fading before the clouds return.
 static void UpdateCloudPauseTrigger(bool32 silhouettesActive)
 {
-    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
-    bool32 keepPaused = gWeatherPtr->externalPauseClouds; // field move / battle entry, regardless of the player
+    struct ObjectEvent *tracked = GetCameraTrackedObjectEvent();
+    bool32 keepPaused = gWeatherPtr->externalPauseClouds; // field move / battle entry, regardless of the tracked object
 
-    if (player->active && (player->cliffLayer == CLIFF_LAYER_OBSCURED || silhouettesActive))
+    if ((tracked != NULL && tracked->cliffLayer == CLIFF_LAYER_OBSCURED) || silhouettesActive)
         keepPaused = TRUE;
 
     if (keepPaused)
