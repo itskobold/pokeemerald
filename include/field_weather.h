@@ -106,6 +106,8 @@ struct Weather
     s8 cloudBrightness;         // current overlay brightness (actual -2..3, stage 0 skipped)
     s8 targetCloudBrightness;   // stepped toward this (see SetCloudBrightness)
     u8 cloudBrightnessTimer;    // frame counter; one step per 20 frames
+    bool8 pauseClouds;          // while set, cover & brightness fade to 0 (player hidden in a cliff)
+    bool8 unpauseClouds;        // while set, cover & brightness fade back to their targets (inverse fade)
     u16 cloudsScrollXCounter;
     u16 cloudsScrollYCounter;
     u16 cloudsXOffset;
@@ -202,6 +204,7 @@ void InitClouds(void);
 void UpdateClouds(void);
 void SetCloudCover(u8 target);
 void SetCloudBrightness(s8 target);
+void PauseClouds(void);
 void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);

@@ -1640,6 +1640,11 @@ static void UpdateAshSprite(struct Sprite *sprite)
 static void UpdateCloudsMovement(void);
 static void UpdateCloudCover(void);
 static void UpdateCloudBrightness(void);
+static bool32 StepCloudCover(u8 target);
+static bool32 StepCloudBrightness(s8 target);
+static void UnpauseClouds(void);
+static void ReleaseCloudBlend(void);
+static void UpdateCloudPauseTrigger(void);
 static void ApplyCloudBrightness(void);
 static void ReloadCloudsTiles(void);
 static void CreateCloudsSprites(void);
@@ -1739,6 +1744,8 @@ void InitClouds(void)
     gWeatherPtr->cloudBrightness = FromCloudBrightnessRaw(gSaveBlock1Ptr->weatherState.cloudBrightness);
     gWeatherPtr->targetCloudBrightness = gWeatherPtr->cloudBrightness;
     gWeatherPtr->cloudBrightnessTimer = 0;
+    gWeatherPtr->pauseClouds = FALSE;
+    gWeatherPtr->unpauseClouds = FALSE;
     gWeatherPtr->cloudsScrollXCounter = 0;
     gWeatherPtr->cloudsScrollYCounter = 0;
     gWeatherPtr->cloudsXOffset = 0;
@@ -1753,8 +1760,20 @@ void UpdateClouds(void)
     bool8 active = CloudsActiveForWeather(gWeatherPtr->currWeather)
                 && CloudsAllowedOnCurrentMap();
 
-    UpdateCloudCover();
-    UpdateCloudBrightness();
+    UpdateCloudPauseTrigger();
+
+    // While paused (player buried in a cliff), cover & brightness fade to 0. When the pause lifts they
+    // fade back to their targets with the inverse motion (one step per frame, see UnpauseClouds). Only
+    // once fully restored do the normal 20-frame steppers take back over.
+    if (gWeatherPtr->pauseClouds)
+        PauseClouds();
+    else if (gWeatherPtr->unpauseClouds)
+        UnpauseClouds();
+    else
+    {
+        UpdateCloudCover();
+        UpdateCloudBrightness();
+    }
 
     if (active)
         UpdateCloudsMovement();
@@ -1798,8 +1817,24 @@ void SetCloudCover(u8 target)
     gWeatherPtr->targetCloudCover = target;
 }
 
-// Step the current cloud cover one level toward the target every 20 frames,
-// swapping in the new tile set and persisting the value as it changes.
+// Move the current cover one level toward target, swapping in the new tile set and persisting the value.
+// Returns TRUE if a step was taken (i.e. it was not already at the target).
+static bool32 StepCloudCover(u8 target)
+{
+    if (gWeatherPtr->cloudCover == target)
+        return FALSE;
+
+    if (gWeatherPtr->cloudCover < target)
+        gWeatherPtr->cloudCover++;
+    else
+        gWeatherPtr->cloudCover--;
+
+    gSaveBlock1Ptr->weatherState.cloudCover = gWeatherPtr->cloudCover; // persist current level
+    ReloadCloudsTiles();
+    return TRUE;
+}
+
+// Step the current cloud cover one level toward the target every 20 frames.
 static void UpdateCloudCover(void)
 {
     if (gWeatherPtr->cloudCover == gWeatherPtr->targetCloudCover)
@@ -1809,13 +1844,7 @@ static void UpdateCloudCover(void)
         return;
     gWeatherPtr->cloudCoverTimer = 0;
 
-    if (gWeatherPtr->cloudCover < gWeatherPtr->targetCloudCover)
-        gWeatherPtr->cloudCover++;
-    else
-        gWeatherPtr->cloudCover--;
-
-    gSaveBlock1Ptr->weatherState.cloudCover = gWeatherPtr->cloudCover; // persist current level
-    ReloadCloudsTiles();
+    StepCloudCover(gWeatherPtr->targetCloudCover);
 }
 
 // Request a target overlay brightness; it is stepped toward (see UpdateCloudBrightness).
@@ -1831,18 +1860,15 @@ void SetCloudBrightness(s8 target)
     gWeatherPtr->targetCloudBrightness = target;
 }
 
-// Step the brightness one level toward the target every 20 frames, persisting and
-// reapplying it as it changes. Stage 0 is skipped: +1 jumps straight to -1 and back.
-static void UpdateCloudBrightness(void)
+// Move the brightness one level toward target, persisting and reapplying it. Stage 0 is skipped: +1
+// jumps straight to -1 and back. Returns TRUE if a step was taken (targets are never 0, so this can't
+// be asked to land on 0; PauseClouds drives to 0 by its own path).
+static bool32 StepCloudBrightness(s8 target)
 {
-    if (gWeatherPtr->cloudBrightness == gWeatherPtr->targetCloudBrightness)
-        return;
+    if (gWeatherPtr->cloudBrightness == target)
+        return FALSE;
 
-    if (++gWeatherPtr->cloudBrightnessTimer < 20)
-        return;
-    gWeatherPtr->cloudBrightnessTimer = 0;
-
-    if (gWeatherPtr->cloudBrightness < gWeatherPtr->targetCloudBrightness)
+    if (gWeatherPtr->cloudBrightness < target)
     {
         if (++gWeatherPtr->cloudBrightness == 0)
             gWeatherPtr->cloudBrightness = 1;
@@ -1856,6 +1882,103 @@ static void UpdateCloudBrightness(void)
     gSaveBlock1Ptr->weatherState.cloudBrightness = ToCloudBrightnessRaw(gWeatherPtr->cloudBrightness); // persist
     if (sCloudsShown)
         ApplyCloudBrightness();
+    return TRUE;
+}
+
+// Step the brightness one level toward the target every 20 frames.
+static void UpdateCloudBrightness(void)
+{
+    if (gWeatherPtr->cloudBrightness == gWeatherPtr->targetCloudBrightness)
+        return;
+
+    if (++gWeatherPtr->cloudBrightnessTimer < 20)
+        return;
+    gWeatherPtr->cloudBrightnessTimer = 0;
+
+    StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
+}
+
+// Per frame while paused: step cover and brightness toward 0 so both reach 0 on the same frame. The one
+// with the larger magnitude steps alone until they match, then both step in lockstep. Unlike the normal
+// steppers this is allowed to land brightness on 0 and does not persist to the save block, so the real
+// cover/brightness (and their targets) are kept for when the pause is lifted.
+void PauseClouds(void)
+{
+    s32 cover = gWeatherPtr->cloudCover;            // 0..7, never negative
+    s32 brightness = gWeatherPtr->cloudBrightness;  // -2..3
+    s32 absCover = cover;
+    s32 absBrightness = (brightness < 0) ? -brightness : brightness;
+    bool32 stepCover, stepBrightness;
+
+    if (absCover == 0 && absBrightness == 0)
+        return;
+
+    if (absCover > absBrightness)
+        stepCover = TRUE, stepBrightness = FALSE;
+    else if (absBrightness > absCover)
+        stepCover = FALSE, stepBrightness = TRUE;
+    else // equal magnitude (both non-zero): step both
+        stepCover = stepBrightness = TRUE;
+
+    if (stepCover)
+    {
+        gWeatherPtr->cloudCover = cover - 1;
+        ReloadCloudsTiles();
+    }
+    if (stepBrightness)
+    {
+        gWeatherPtr->cloudBrightness = brightness + (brightness > 0 ? -1 : 1);
+        if (sCloudsShown)
+            ApplyCloudBrightness();
+    }
+
+    // Fully faded now: hand the blend registers back so another effect can drive them while we're hidden.
+    if (gWeatherPtr->cloudCover == 0 && gWeatherPtr->cloudBrightness == 0)
+        ReleaseCloudBlend();
+}
+
+// Per frame while unpausing: the inverse of PauseClouds. Step cover and brightness back toward their
+// targets (the values held through the pause), one level per frame, until both arrive. Stepping each
+// toward its own target mirrors the pause exactly: both leave 0 together, the nearer target lands first.
+static void UnpauseClouds(void)
+{
+    bool32 coverBusy = StepCloudCover(gWeatherPtr->targetCloudCover);
+    bool32 brightnessBusy = StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
+
+    if (!coverBusy && !brightnessBusy)
+        gWeatherPtr->unpauseClouds = FALSE; // restored; normal steppers take over
+}
+
+// Drop the cloud overlay's claim on the blend registers so other processes can take control.
+// Reclaimed the next time the brightness is applied (ShowClouds / StepCloudBrightness).
+static void ReleaseCloudBlend(void)
+{
+    SetGpuReg(REG_OFFSET_BLDCNT, 0);
+    SetGpuReg(REG_OFFSET_BLDY, 0);
+}
+
+// Pause the clouds once the player's own sprite has gone invisible from being fully buried in a cliff
+// (other object events don't count); on the way out kick off the inverse fade the moment it's visible.
+static void UpdateCloudPauseTrigger(void)
+{
+    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+    struct Sprite *sprite;
+
+    if (!player->active)
+        return;
+    sprite = &gSprites[player->spriteId];
+
+    if (player->cliffLayer == CLIFF_LAYER_OBSCURED && sprite->invisible)
+    {
+        gWeatherPtr->pauseClouds = TRUE;
+        gWeatherPtr->unpauseClouds = FALSE;
+    }
+    else if (!sprite->invisible)
+    {
+        if (gWeatherPtr->pauseClouds)
+            gWeatherPtr->unpauseClouds = TRUE; // begin the inverse fade back to the held targets
+        gWeatherPtr->pauseClouds = FALSE;
+    }
 }
 
 // Overwrite the cloud tiles already in VRAM with the active set's images. The
