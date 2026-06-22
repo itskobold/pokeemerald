@@ -100,14 +100,15 @@ struct Weather
     u8 sandstormSpritesCreated;
     u8 sandstormSwirlSpritesCreated;
     // Clouds
-    u8 cloudCover:3;            // current tile set clouds/0..7
-    u8 targetCloudCover:3;      // set is stepped toward this (see SetCloudCover)
+    u8 cloudCover:4;            // current cover level 0..15 (0 = no clouds, else clouds/1..15)
+    u8 targetCloudCover:4;      // set is stepped toward this (see SetCloudCover)
     u8 cloudCoverTimer;         // frame counter; one step per 20 frames
     s8 cloudBrightness;         // current overlay brightness (actual -2..3, stage 0 skipped)
     s8 targetCloudBrightness;   // stepped toward this (see SetCloudBrightness)
     u8 cloudBrightnessTimer;    // frame counter; one step per 20 frames
     bool8 pauseClouds;          // while set, cover & brightness fade to 0 (player hidden in a cliff)
     bool8 unpauseClouds;        // while set, cover & brightness fade back to their targets (inverse fade)
+    u8 cloudClearedTimer;       // frames the clouds have been fully faded out; gates the cliff silhouettes
     u16 cloudsScrollXCounter;
     u16 cloudsScrollYCounter;
     u16 cloudsXOffset;
@@ -205,6 +206,7 @@ void UpdateClouds(void);
 void SetCloudCover(u8 target);
 void SetCloudBrightness(s8 target);
 void PauseClouds(void);
+bool32 ShouldDrawCliffSilhouettes(void);
 void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);

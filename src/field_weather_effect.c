@@ -22,20 +22,10 @@ const u16 gSandstormWeatherPalette[] = INCGFX_U16("graphics/weather/sandstorm.pn
 // array so the images are contiguous and can be loaded as one sprite sheet;
 // each 64x64 4bpp image is CLOUD_TILE_4BPP_SIZE bytes (64 hardware tiles).
 #define CLOUD_TILE_4BPP_SIZE (64 * 64 / 2)
-// One 3x3 set per cloud-cover level (clouds/0..7); the active set is chosen at
-// load time by gWeatherPtr->cloudCover (see CreateCloudsSprites).
-const u8 gWeatherCloudsTiles[CLOUD_COVER_SETS][CLOUD_TILE_IMAGES][CLOUD_TILE_4BPP_SIZE] = {
-    {
-        INCGFX_U8("graphics/weather/clouds/0/0.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/1.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/2.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/3.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/4.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/5.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/6.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/7.png", ".4bpp"),
-        INCGFX_U8("graphics/weather/clouds/0/8.png", ".4bpp"),
-    },
+// One 3x3 set per non-empty cover level. Cover level N (1..15) uses set N-1 here (clouds/N); level 0 is
+// "no clouds" and loads nothing (see ApplyCloudCover). The active set is chosen at load time by
+// gWeatherPtr->cloudCover (see CreateCloudsSprites / ReloadCloudsTiles).
+const u8 gWeatherCloudsTiles[CLOUD_TILE_SETS][CLOUD_TILE_IMAGES][CLOUD_TILE_4BPP_SIZE] = {
     {
         INCGFX_U8("graphics/weather/clouds/1/0.png", ".4bpp"),
         INCGFX_U8("graphics/weather/clouds/1/1.png", ".4bpp"),
@@ -112,6 +102,94 @@ const u8 gWeatherCloudsTiles[CLOUD_COVER_SETS][CLOUD_TILE_IMAGES][CLOUD_TILE_4BP
         INCGFX_U8("graphics/weather/clouds/7/6.png", ".4bpp"),
         INCGFX_U8("graphics/weather/clouds/7/7.png", ".4bpp"),
         INCGFX_U8("graphics/weather/clouds/7/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/8/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/8/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/9/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/9/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/10/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/10/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/11/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/11/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/12/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/12/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/13/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/13/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/14/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/14/8.png", ".4bpp"),
+    },
+    {
+        INCGFX_U8("graphics/weather/clouds/15/0.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/1.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/2.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/3.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/4.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/5.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/6.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/7.png", ".4bpp"),
+        INCGFX_U8("graphics/weather/clouds/15/8.png", ".4bpp"),
     },
 };
 const u8 gWeatherFogHorizontalTiles[] = INCGFX_U8("graphics/weather/fog_horizontal.png", ".4bpp");
@@ -1646,6 +1724,8 @@ static void UnpauseClouds(void);
 static void ReleaseCloudBlend(void);
 static void UpdateCloudPauseTrigger(void);
 static void ApplyCloudBrightness(void);
+static void ApplyCliffSilhouetteBlend(void);
+static void ApplyCloudCover(void);
 static void ReloadCloudsTiles(void);
 static void CreateCloudsSprites(void);
 static void DestroyCloudsSprites(void);
@@ -1701,6 +1781,19 @@ static void SetCloudsSpritesInvisible(bool8 invisible)
     }
 }
 
+// Bring the cloud sprites in line with the current cover level. Level 0 means "no clouds": the sprites
+// are freed entirely so nothing is drawn or carves the object window (this is what lets the cliff
+// silhouettes own the window unobstructed). The sprite sheet itself stays allocated for the whole map
+// session: freeing and reallocating it mid-session fragments OBJ VRAM and corrupts the reload once other
+// sprites (e.g. silhouetted NPCs that come on-screen behind the cliff) grab the freed tile range.
+static void ApplyCloudCover(void)
+{
+    if (gWeatherPtr->cloudCover != 0)
+        ReloadCloudsTiles(); // swap this level's set into the persistent sheet
+    // Hidden whenever the overlay is off OR cover is 0, so at level 0 they carve nothing.
+    SetCloudsSpritesInvisible(!(sCloudsShown && gWeatherPtr->cloudCover != 0));
+}
+
 // Push the current overlay brightness into the blend registers.
 static void ApplyCloudBrightness(void)
 {
@@ -1711,9 +1804,39 @@ static void ApplyCloudBrightness(void)
     SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(brightness));
 }
 
+// Fixed darkening applied to the silhouettes of cliff-buried objects (see ShouldDrawCliffSilhouettes).
+#define CLIFF_SILHOUETTE_BRIGHTNESS -6
+
+// The buried player has hidden the clouds, so the overlay's object window is free: reuse it to darken
+// the BG wherever a buried object's sprite carves it (those sprites are switched to object-window mode
+// in UpdateObjectEventSpriteVisibility), painting each as a flat dark silhouette of itself.
+static void ApplyCliffSilhouetteBlend(void)
+{
+    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(CLIFF_SILHOUETTE_BRIGHTNESS));
+    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(CLIFF_SILHOUETTE_BRIGHTNESS));
+}
+
+// Clouds tear down the same frame their cover reaches 0, but their sprites' OAM isn't cleared until the
+// next sprite-system pass. Wait this many fully-cleared frames before lighting the silhouettes so the -6
+// darkening never lands on that lingering final cloud frame (which read as a 1-frame overlap).
+#define CLOUD_CLEARED_SETTLE_FRAMES 2
+
+// Whether buried-object silhouettes should be drawn this frame: the player itself is fully buried in a
+// cliff and the clouds have been fully faded out (see cloudClearedTimer) for long enough to settle, so
+// the overlay's blend/object-window machinery is idle and free for the silhouettes to borrow.
+bool32 ShouldDrawCliffSilhouettes(void)
+{
+    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+
+    return player->active
+        && player->cliffLayer == CLIFF_LAYER_OBSCURED
+        && gWeatherPtr->cloudClearedTimer >= CLOUD_CLEARED_SETTLE_FRAMES;
+}
+
 static void ShowClouds(void)
 {
-    SetCloudsSpritesInvisible(FALSE);
+    SetCloudsSpritesInvisible(gWeatherPtr->cloudCover == 0); // at level 0 they stay hidden (carve nothing)
     ApplyCloudBrightness();
     SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
                                | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
@@ -1746,19 +1869,22 @@ void InitClouds(void)
     gWeatherPtr->cloudBrightnessTimer = 0;
     gWeatherPtr->pauseClouds = FALSE;
     gWeatherPtr->unpauseClouds = FALSE;
+    gWeatherPtr->cloudClearedTimer = 0;
     gWeatherPtr->cloudsScrollXCounter = 0;
     gWeatherPtr->cloudsScrollYCounter = 0;
     gWeatherPtr->cloudsXOffset = 0;
     gWeatherPtr->cloudsYOffset = 0;
-    CreateCloudsSprites();
-    SetCloudsSpritesInvisible(TRUE); // Stay hidden until an active weather shows the overlay
+    CreateCloudsSprites(); // allocate the persistent sheet + sprites once for the whole session
+    ApplyCloudCover();     // swap in the saved level's tiles; stays hidden until an active weather shows it
 }
 
 // Called every frame from the weather task to toggle the overlay by weather.
 void UpdateClouds(void)
 {
-    bool8 active = CloudsActiveForWeather(gWeatherPtr->currWeather)
-                && CloudsAllowedOnCurrentMap();
+    bool8 cloudsActive = CloudsActiveForWeather(gWeatherPtr->currWeather)
+                      && CloudsAllowedOnCurrentMap();
+    bool8 silhouettes;
+    bool8 active;
 
     UpdateCloudPauseTrigger();
 
@@ -1775,7 +1901,24 @@ void UpdateClouds(void)
         UpdateCloudBrightness();
     }
 
-    if (active)
+    // Count frames since the clouds finished fading out so the silhouettes can wait for the last cloud
+    // frame's OAM to clear (see CLOUD_CLEARED_SETTLE_FRAMES). Reset the moment they're not fully cleared.
+    if (gWeatherPtr->pauseClouds && gWeatherPtr->cloudCover == 0 && gWeatherPtr->cloudBrightness == 0)
+    {
+        if (gWeatherPtr->cloudClearedTimer < 255)
+            gWeatherPtr->cloudClearedTimer++;
+    }
+    else
+    {
+        gWeatherPtr->cloudClearedTimer = 0;
+    }
+
+    // Once the clouds have fully faded behind the buried player, keep the object-window overlay up (even
+    // on maps with no cloud weather) so the buried-object silhouettes have a window to carve.
+    silhouettes = ShouldDrawCliffSilhouettes();
+    active = cloudsActive || silhouettes;
+
+    if (cloudsActive)
         UpdateCloudsMovement();
 
     if (active && !sCloudsShown)
@@ -1788,6 +1931,10 @@ void UpdateClouds(void)
         HideClouds();
         sCloudsShown = FALSE;
     }
+
+    // Override the (released) cloud blend with the fixed silhouette darkening while buried.
+    if (silhouettes)
+        ApplyCliffSilhouetteBlend();
 }
 
 // Drift the clouds diagonally (down-left). The offsets wrap at one full pattern
@@ -1830,7 +1977,7 @@ static bool32 StepCloudCover(u8 target)
         gWeatherPtr->cloudCover--;
 
     gSaveBlock1Ptr->weatherState.cloudCover = gWeatherPtr->cloudCover; // persist current level
-    ReloadCloudsTiles();
+    ApplyCloudCover(); // (un)load sprites as the level crosses 0, else just swap the tiles
     return TRUE;
 }
 
@@ -1898,13 +2045,24 @@ static void UpdateCloudBrightness(void)
     StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
 }
 
+// Per-frame cover step while (un)pausing: faster at higher levels so the fade in/out is quick.
+static s32 CloudPauseCoverStep(s32 cover)
+{
+    if (cover > 10)
+        return 3;
+    if (cover > 5)
+        return 2;
+    return 1;
+}
+
 // Per frame while paused: step cover and brightness toward 0 so both reach 0 on the same frame. The one
-// with the larger magnitude steps alone until they match, then both step in lockstep. Unlike the normal
-// steppers this is allowed to land brightness on 0 and does not persist to the save block, so the real
-// cover/brightness (and their targets) are kept for when the pause is lifted.
+// with the larger magnitude steps alone until they match, then both step in lockstep (cover takes its
+// faster, level-keyed step). Unlike the normal steppers this is allowed to land brightness on 0 and does
+// not persist to the save block, so the real cover/brightness (and their targets) are kept for when the
+// pause is lifted.
 void PauseClouds(void)
 {
-    s32 cover = gWeatherPtr->cloudCover;            // 0..7, never negative
+    s32 cover = gWeatherPtr->cloudCover;            // 0..15, never negative
     s32 brightness = gWeatherPtr->cloudBrightness;  // -2..3
     s32 absCover = cover;
     s32 absBrightness = (brightness < 0) ? -brightness : brightness;
@@ -1922,8 +2080,9 @@ void PauseClouds(void)
 
     if (stepCover)
     {
-        gWeatherPtr->cloudCover = cover - 1;
-        ReloadCloudsTiles();
+        s32 step = CloudPauseCoverStep(cover);
+        gWeatherPtr->cloudCover = cover - step; // step is sized so this never drops below 0
+        ApplyCloudCover(); // frees the sprites once it reaches 0 so the silhouettes have the window to themselves
     }
     if (stepBrightness)
     {
@@ -1942,8 +2101,13 @@ void PauseClouds(void)
 // toward its own target mirrors the pause exactly: both leave 0 together, the nearer target lands first.
 static void UnpauseClouds(void)
 {
-    bool32 coverBusy = StepCloudCover(gWeatherPtr->targetCloudCover);
-    bool32 brightnessBusy = StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
+    s32 steps = CloudPauseCoverStep(gWeatherPtr->cloudCover); // same level-keyed rate, climbing back up
+    bool32 coverBusy = FALSE;
+    bool32 brightnessBusy;
+
+    while (steps-- > 0 && StepCloudCover(gWeatherPtr->targetCloudCover))
+        coverBusy = TRUE;
+    brightnessBusy = StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
 
     if (!coverBusy && !brightnessBusy)
         gWeatherPtr->unpauseClouds = FALSE; // restored; normal steppers take over
@@ -1957,23 +2121,23 @@ static void ReleaseCloudBlend(void)
     SetGpuReg(REG_OFFSET_BLDY, 0);
 }
 
-// Pause the clouds once the player's own sprite has gone invisible from being fully buried in a cliff
-// (other object events don't count); on the way out kick off the inverse fade the moment it's visible.
+// Pause the clouds once the player is fully buried in a cliff (other object events don't count); on the
+// way out kick off the inverse fade the moment it surfaces. Keyed off the player's cliffLayer rather
+// than its sprite visibility, since once silhouettes show the player's own sprite is drawn (in object-
+// window mode) instead of hidden - so sprite->invisible can no longer stand in for "buried".
 static void UpdateCloudPauseTrigger(void)
 {
     struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
-    struct Sprite *sprite;
 
     if (!player->active)
         return;
-    sprite = &gSprites[player->spriteId];
 
-    if (player->cliffLayer == CLIFF_LAYER_OBSCURED && sprite->invisible)
+    if (player->cliffLayer == CLIFF_LAYER_OBSCURED)
     {
         gWeatherPtr->pauseClouds = TRUE;
         gWeatherPtr->unpauseClouds = FALSE;
     }
-    else if (!sprite->invisible)
+    else
     {
         if (gWeatherPtr->pauseClouds)
             gWeatherPtr->unpauseClouds = TRUE; // begin the inverse fade back to the held targets
@@ -1988,7 +2152,7 @@ static void ReloadCloudsTiles(void)
     u16 tileStart = GetSpriteTileStartByTag(GFXTAG_CLOUD);
 
     if (tileStart != 0xFFFF)
-        RequestSpriteCopy((const u8 *)gWeatherCloudsTiles[gWeatherPtr->cloudCover],
+        RequestSpriteCopy((const u8 *)gWeatherCloudsTiles[gWeatherPtr->cloudCover - 1], // level N -> set N-1
                           (u8 *)OBJ_VRAM0 + TILE_SIZE_4BPP * tileStart,
                           sizeof(gWeatherCloudsTiles[0]));
 }
@@ -2059,7 +2223,7 @@ static void CreateCloudsSprites(void)
     if (!gWeatherPtr->cloudsSpritesCreated)
     {
         cloudsSpriteSheet = sCloudsSpriteSheet;
-        cloudsSpriteSheet.data = (const u8 *)gWeatherCloudsTiles[gWeatherPtr->cloudCover];
+        cloudsSpriteSheet.data = (const u8 *)gWeatherCloudsTiles[0]; // placeholder set; ApplyCloudCover swaps in the real one
         LoadSpriteSheet(&cloudsSpriteSheet);
         for (i = 0; i < NUM_CLOUD_SPRITES; i++)
         {
@@ -2092,6 +2256,10 @@ static void DestroyCloudsSprites(void)
         {
             if (gWeatherPtr->sprites.s2.cloudSprites[i])
                 DestroySprite(gWeatherPtr->sprites.s2.cloudSprites[i]);
+            // Clear the pointer: with mid-session unloading at cover 0 (see ApplyCloudCover) the array is
+            // walked again later (SetCloudsSpritesInvisible), and a stale pointer would scribble into the
+            // freed/reused sprite slot.
+            gWeatherPtr->sprites.s2.cloudSprites[i] = NULL;
         }
 
         FreeSpriteTilesByTag(GFXTAG_CLOUD);

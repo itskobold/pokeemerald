@@ -983,7 +983,7 @@ struct ExternalEventFlags
 
 struct WeatherState
 {
-    u8 cloudCover:3;      // persistent cloud tile set (clouds/0..7)
+    u8 cloudCover:4;      // persistent cloud cover level 0..15 (0 = no clouds, else clouds/1..15)
     u8 cloudBrightness:3; // overlay brightness, raw 0..5 (actual -2..3, see field_weather.h)
 };
 

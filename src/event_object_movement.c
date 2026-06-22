@@ -11,6 +11,7 @@
 #include "field_effect.h"
 #include "field_effect_helpers.h"
 #include "field_player_avatar.h"
+#include "field_weather.h"
 #include "fieldmap.h"
 #include "mauville_old_man.h"
 #include "metatile_behavior.h"
@@ -8543,10 +8544,24 @@ static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct S
 static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     sprite->invisible = FALSE;
-    // Fully buried in a cliff: hide the sprite, since priority can't sink it below the bottom BG layer
-    // (see UpdateObjectEventElevationAndPriority).
-    if (objectEvent->invisible || objectEvent->offScreen || objectEvent->cliffLayer == CLIFF_LAYER_OBSCURED)
+    sprite->oam.objMode = ST_OAM_OBJ_NORMAL;
+
+    if (objectEvent->invisible || objectEvent->offScreen)
+    {
         sprite->invisible = TRUE;
+    }
+    else if (objectEvent->cliffLayer == CLIFF_LAYER_OBSCURED)
+    {
+        // Fully buried in a cliff: priority can't sink the sprite below the bottom BG layer
+        // (see UpdateObjectEventElevationAndPriority), so it can't be drawn normally. While the player
+        // is buried too and the clouds have fully faded, draw the buried object (the player included) as
+        // a flat dark silhouette by switching its sprite to object-window mode so it carves the cloud
+        // overlay's window (the darkening is applied in ApplyCliffSilhouetteBlend); otherwise just hide it.
+        if (ShouldDrawCliffSilhouettes())
+            sprite->oam.objMode = ST_OAM_OBJ_WINDOW;
+        else
+            sprite->invisible = TRUE;
+    }
 }
 
 static void GetAllGroundEffectFlags_OnSpawn(struct ObjectEvent *objEvent, u32 *flags)

@@ -11,7 +11,8 @@
 // Clouds: a 3x3 set of seamlessly tiling 64x64 images, drawn as a grid of
 // overlay sprites (CLOUD_COLS x CLOUD_ROWS) that scrolls across the screen.
 #define CLOUD_TILE_IMAGES            9   // 3x3 distinct source tiles
-#define CLOUD_COVER_SETS             8   // selectable tile sets (clouds/0..7), chosen by cloudCover
+#define CLOUD_COVER_SETS             16  // cover levels 0..15; level 0 is "no clouds" (sprites unloaded)
+#define CLOUD_TILE_SETS              (CLOUD_COVER_SETS - 1) // loadable tile sets clouds/1..15 (level N -> set N-1)
 
 // Cloud overlay brightness, stored as a 3-bit value offset by +2 so raw 0..5
 // maps to actual -2..3 (negative darkens, positive lightens the overlay).
