@@ -257,7 +257,7 @@ static bool32 CanFish(void)
         if (IsPlayerFacingSurfableFishableWater())
             return TRUE;
     }
-    else
+    else if (MapGridGetElevationAt(x, y) == PlayerGetElevation())
     {
         if (MetatileBehavior_IsSurfableWaterOrUnderwater(tileBehavior) && MapGridGetCollisionAt(x, y) == 0)
             return TRUE;

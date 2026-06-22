@@ -90,6 +90,7 @@ void SetDebugNewGameFlags()
     AddBagItem(ITEM_MAX_REPEL, 99);
     AddBagItem(ITEM_ACRO_BIKE, 1);
     AddBagItem(ITEM_MACH_BIKE, 1);
+    AddBagItem(ITEM_SUPER_ROD, 1);
 }
 
 // Shell debug menu, opened in the field by pressing L + R + Select together.

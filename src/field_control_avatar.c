@@ -494,12 +494,14 @@ static const u8 *GetInteractedMetatileScript(struct MapPosition *position, u8 me
     return NULL;
 }
 
-static const u8 *GetInteractedWaterScript(struct MapPosition *unused1, u8 metatileBehavior, u8 direction)
+static const u8 *GetInteractedWaterScript(struct MapPosition *position, u8 metatileBehavior, u8 direction)
 {
     if (FlagGet(FLAG_BADGE05_GET) == TRUE && PartyHasMonWithSurf() == TRUE && IsPlayerFacingSurfableFishableWater() == TRUE)
         return EventScript_UseSurf;
 
-    if (MetatileBehavior_IsWaterfall(metatileBehavior) == TRUE)
+    // Only the waterfall on the player's own elevation can be climbed.
+    if (MetatileBehavior_IsWaterfall(metatileBehavior) == TRUE
+     && MapGridGetElevationAt(position->x, position->y) == position->elevation)
     {
         if (FlagGet(FLAG_BADGE08_GET) == TRUE && IsPlayerSurfingNorth() == TRUE)
             return EventScript_UseWaterfall;

@@ -1390,7 +1390,8 @@ bool8 IsPlayerFacingSurfableFishableWater(void)
 
     MoveCoords(playerObjEvent->facingDirection, &x, &y);
     if (!(gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
-     && MetatileBehavior_IsSurfableFishableWater(MapGridGetMetatileBehaviorAt(x, y)))
+     && MetatileBehavior_IsSurfableFishableWater(MapGridGetMetatileBehaviorAt(x, y))
+     && MapGridGetElevationAt(x, y) == playerObjEvent->previousElevation)
         return TRUE;
     else
         return FALSE;
