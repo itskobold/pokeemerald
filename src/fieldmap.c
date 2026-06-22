@@ -1441,14 +1441,26 @@ void CopyPrimaryTilesetToVram(struct MapLayout const *mapLayout)
     CopyTilesetToVram(mapLayout->primaryTileset, NUM_TILES_IN_PRIMARY, 0);
 }
 
+// The secondary tileset graphics currently resident in VRAM. A location crossing only needs to
+// reload (and redraw) when it would actually change this — most location boundaries within a map
+// share one tileset, so tracking it lets those crossings skip the decompress + full redraw.
+static const struct Tileset *sLoadedSecondaryTileset;
+
+const struct Tileset *GetLoadedSecondaryTileset(void)
+{
+    return sLoadedSecondaryTileset;
+}
+
 void CopySecondaryTilesetToVram(struct MapLayout const *mapLayout)
 {
     CopyTilesetToVram(GetActiveLocationData()->secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
+    sLoadedSecondaryTileset = GetActiveLocationData()->secondaryTileset;
 }
 
 void CopySecondaryTilesetToVramUsingHeap(struct MapLayout const *mapLayout)
 {
     CopyTilesetToVramUsingHeap(GetActiveLocationData()->secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
+    sLoadedSecondaryTileset = GetActiveLocationData()->secondaryTileset;
 }
 
 static void LoadPrimaryTilesetPalette(struct MapLayout const *mapLayout)
@@ -1467,6 +1479,7 @@ void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
     {
         CopyTilesetToVramUsingHeap(mapLayout->primaryTileset, NUM_TILES_IN_PRIMARY, 0);
         CopyTilesetToVramUsingHeap(GetActiveLocationData()->secondaryTileset, NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY, NUM_TILES_IN_PRIMARY);
+        sLoadedSecondaryTileset = GetActiveLocationData()->secondaryTileset;
     }
 }
 

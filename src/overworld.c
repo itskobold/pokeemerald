@@ -942,8 +942,14 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
         return;
 
     SetActiveMapLocationForMap(gTasks[taskId].data[2], gTasks[taskId].data[3], gTasks[taskId].data[0]);
-    ApplyActiveLocationSecondaryTileset();
-    DrawWholeMapView();
+
+    // Most location boundaries within a map (and many across connections) share a secondary tileset;
+    // only pay the decompress + full redraw when the new location's tileset isn't already in VRAM.
+    if (GetActiveLocationData()->secondaryTileset != GetLoadedSecondaryTileset())
+    {
+        ApplyActiveLocationSecondaryTileset();
+        DrawWholeMapView();
+    }
 
     if (gTasks[taskId].data[1])
     {
@@ -968,15 +974,12 @@ bool8 UpdateMapLocationGfxImmediate(s16 x, s16 y)
     u8 newLocation = MapGridGetMetatileLocationAt(x, y);
     u8 taskId = FindTaskIdByFunc(Task_UpdateMapLocationGfx);
     u8 curGroup, curNum;
-    // A deferred swap in flight means the active-location pointer was already advanced but its
-    // tileset hasn't been loaded into VRAM yet. The jump cancels that task, so its pending load must
-    // happen here — even if the location index ends up unchanged below — or the redraw shows the
-    // stale tileset for a frame (the flicker after warping/connecting in, which can leave a swap
-    // mid-flight; Fly's long fly-in animation lets the swap settle first, so it doesn't).
-    bool8 mustReload = (taskId != TASK_NONE);
+    bool8 mustReload;
 
     // A jump supersedes any deferred swap left over from prior scrolling: its latched target is
     // stale now the camera has teleported, and letting it fire would switch to the wrong location.
+    // (A deferred swap in flight may also have advanced the active-location pointer without loading
+    // its tileset into VRAM yet; the tileset comparison below catches that.)
     if (taskId != TASK_NONE)
         DestroyTask(taskId);
 
@@ -984,14 +987,15 @@ bool8 UpdateMapLocationGfxImmediate(s16 x, s16 y)
     GetActiveLocationMap(&curGroup, &curNum);
 
     // Adopt the destination tile's (map, location) when the focus map defines it (ignoring undefined-
-    // location tiles, like TryUpdateMapLocation); a change in either map or location index reloads.
+    // location tiles, like TryUpdateMapLocation).
     if (newLocation < MAX_MAP_LOCATIONS && focusHeader->locations[newLocation] != NULL
      && (newLocation != GetActiveMapLocation() || anchor.mapGroup != curGroup || anchor.mapNum != curNum))
-    {
         SetActiveMapLocationForMap(anchor.mapGroup, anchor.mapNum, newLocation);
-        mustReload = TRUE;
-    }
 
+    // Reload only when the resulting secondary tileset isn't the one already resident in VRAM —
+    // covers both an actual location change and a deferred swap that advanced the pointer but never
+    // loaded its tileset. Equal tileset means VRAM is already correct, so the caller need not redraw.
+    mustReload = (GetActiveLocationData()->secondaryTileset != GetLoadedSecondaryTileset());
     if (mustReload)
         ApplyActiveLocationSecondaryTileset();
     return mustReload;
