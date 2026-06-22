@@ -2183,12 +2183,27 @@ void PauseClouds(void)
 // toward its own target mirrors the pause exactly: both leave 0 together, the nearer target lands first.
 static void UnpauseClouds(void)
 {
-    s32 steps = CloudPauseCoverStep(gWeatherPtr->cloudCover); // same level-keyed rate, climbing back up
-    bool32 coverBusy = FALSE;
+    s32 step = CloudPauseCoverStep(gWeatherPtr->cloudCover); // same level-keyed rate, climbing back up
+    s32 target = gWeatherPtr->targetCloudCover;
+    bool32 coverBusy = (gWeatherPtr->cloudCover != target);
     bool32 brightnessBusy;
 
-    while (steps-- > 0 && StepCloudCover(gWeatherPtr->targetCloudCover))
-        coverBusy = TRUE;
+    // Advance cover up to `step` levels toward target but reload the tile sheet only ONCE: each
+    // ReloadCloudsTiles is an ~18KB VBlank CpuCopy, and queuing several in one frame overruns VBlank
+    // and stutters. Stepping StepCloudCover per level reloaded redundantly (all copies hit the same
+    // VRAM in one VBlank, only the last shows), so this matches PauseClouds and is visually identical.
+    if (coverBusy)
+    {
+        s32 cover = gWeatherPtr->cloudCover;
+
+        while (step-- > 0 && cover != target)
+            cover += (cover < target) ? 1 : -1;
+
+        gWeatherPtr->cloudCover = cover;
+        gSaveBlock1Ptr->weatherState.cloudCover = cover; // persist current level
+        ApplyCloudCover(); // single tile reload for the whole multi-level step
+    }
+
     brightnessBusy = StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
 
     if (!coverBusy && !brightnessBusy)

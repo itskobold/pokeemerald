@@ -790,7 +790,19 @@ void ProcessSpriteCopyRequests(void)
 
         while (sSpriteCopyRequestCount > 0)
         {
-            CpuCopy16(sSpriteCopyRequests[i].src, sSpriteCopyRequests[i].dest, sSpriteCopyRequests[i].size);
+            const u8 *src = sSpriteCopyRequests[i].src;
+            u8 *dest = sSpriteCopyRequests[i].dest;
+            u16 size = sSpriteCopyRequests[i].size;
+
+            // CpuFastCopy moves 32-byte blocks via LDMIA/STMIA, far faster than CpuSet's per-halfword
+            // loop - it matters in VBlank for large copies (the 18KB cloud tile reload above all, plus
+            // streamed object frames). It needs a multiple-of-32-byte size; tile data always is, but fall
+            // back to CpuCopy16 for anything that isn't so the BIOS never rounds up and over-copies.
+            if ((size & 31) == 0)
+                CpuFastCopy(src, dest, size);
+            else
+                CpuCopy16(src, dest, size);
+
             sSpriteCopyRequestCount--;
             i++;
         }
