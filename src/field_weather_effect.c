@@ -1716,6 +1716,16 @@ static void UpdateAshSprite(struct Sprite *sprite)
 #define CLOUD_IMAGE_TILES   (CLOUD_TILE_4BPP_SIZE / TILE_SIZE_4BPP) // hardware tiles per image
 #define CLOUD_PATTERN_PX    (CLOUD_PATTERN_DIM * CLOUD_TILE)        // pattern period (px)
 
+// Subtle wobble layered on top of the drift to keep the field from looking frozen. Two pieces, both
+// driven by cloudsWavePhase (one unit/frame) and applied via sprite->x2/y2 so they nudge position only,
+// never the tile-image selection. SWAY is a slow circle the whole field rides together (perfectly
+// seamless). RIPPLE is a horizontal shimmer whose phase tracks screen-Y, so horizontal neighbours share
+// an offset (seam stays shut) while vertical neighbours differ only ~0.1px at this wavelength - reads as
+// a watery ripple over the fuzzy clouds. Amplitudes are small to keep seams invisible.
+#define CLOUD_SWAY_AMP      4   // px, whole-field circular sway (halved phase rate => ~8.5s/cycle)
+#define CLOUD_RIPPLE_AMP    3   // px, horizontal ripple displacement
+#define CLOUD_RIPPLE_SHIFT  4   // screen-Y -> phase shift; larger = longer vertical wavelength
+
 static void UpdateCloudsMovement(void);
 static void UpdateCloudCover(void);
 static void UpdateCloudBrightness(void);
@@ -1919,6 +1929,7 @@ void InitClouds(void)
     gWeatherPtr->cloudsScrollYCounter = 0;
     gWeatherPtr->cloudsXOffset = 0;
     gWeatherPtr->cloudsYOffset = 0;
+    gWeatherPtr->cloudsWavePhase = 0;
     CreateCloudsSprites(); // allocate the persistent sheet + sprites once for the whole session
     ApplyCloudCover();     // swap in the saved level's tiles; stays hidden until an active weather shows it
 }
@@ -2012,6 +2023,8 @@ static void UpdateCloudsMovement(void)
         if (++gWeatherPtr->cloudsYOffset >= CLOUD_PATTERN_PX)
             gWeatherPtr->cloudsYOffset -= CLOUD_PATTERN_PX;
     }
+
+    gWeatherPtr->cloudsWavePhase++; // drives the sway/ripple wobble (see UpdateCloudsSprite)
 }
 
 // Request a target cloud cover; the overlay steps toward it (see UpdateCloudCover).
@@ -2358,6 +2371,22 @@ static void UpdateCloudsSprite(struct Sprite *sprite)
     // sprite->x/y are centers; the -32 center-to-corner vec puts the top-left at x/y.
     sprite->x = x + CLOUD_TILE / 2;
     sprite->y = y + CLOUD_TILE / 2;
+
+    // Layer a gentle wobble on top (x2/y2 only, so the tile-image pick above is untouched). Uniform sway
+    // the whole field shares + a directional ripple flowing toward the lower-left. Seam rule for a per-tile
+    // shift: x2 may vary only with y, y2 only with x (a shear) - else neighbours separate normal to their
+    // shared edge and a gap opens. So it's two crossed shear waves: the horizontal-offset bands travel down
+    // (y - phase), the vertical-offset bands travel left (x + phase); together the warp drifts lower-left.
+    // Amplitudes stay small (see CLOUD_*_AMP). gSineTable is Q8 (+/-256), so *AMP >> 8 yields +/-AMP px.
+    {
+        u16 phase = gWeatherPtr->cloudsWavePhase;
+        s16 swayX = (gSineTable[(phase >> 1) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
+        s16 swayY = (gSineTable[((phase >> 1) + 64) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
+        s16 rippleX = (gSineTable[((sprite->y >> CLOUD_RIPPLE_SHIFT) - phase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
+        s16 rippleY = (gSineTable[((sprite->x >> CLOUD_RIPPLE_SHIFT) + phase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
+        sprite->x2 = swayX + rippleX;
+        sprite->y2 = swayY + rippleY;
+    }
     if (sprite->tImageIndex != imageIndex)
     {
         sprite->tImageIndex = imageIndex;

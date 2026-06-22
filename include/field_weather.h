@@ -114,6 +114,7 @@ struct Weather
     u16 cloudsScrollYCounter;
     u16 cloudsXOffset;
     u16 cloudsYOffset;
+    u16 cloudsWavePhase;        // free-running counter driving the sway/ripple wobble (see UpdateCloudsSprite)
     u8 cloudsSpritesCreated;
     // Bubbles
     u16 bubblesDelayCounter;
