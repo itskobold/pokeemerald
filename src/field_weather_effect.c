@@ -4,6 +4,7 @@
 #include "fieldmap.h"
 #include "field_weather.h"
 #include "overworld.h"
+#include "palette.h"
 #include "random.h"
 #include "script.h"
 #include "constants/weather.h"
@@ -1732,6 +1733,7 @@ static void DestroyCloudsSprites(void);
 static void UpdateCloudsSprite(struct Sprite *);
 
 static bool8 sCloudsShown;
+static u8 sCloudBlendFadeY; // last screen-fade level the cloud blend was applied at (see UpdateClouds)
 
 // Clouds are a persistent overlay drawn on top of most weathers. They are
 // suppressed for weathers that need the blend registers for themselves.
@@ -1794,6 +1796,20 @@ static void ApplyCloudCover(void)
     SetCloudsSpritesInvisible(!(sCloudsShown && gWeatherPtr->cloudCover != 0));
 }
 
+// Screen fades (map transitions, battle entry, etc.) blend the palettes toward black/white in software,
+// but the cloud overlay's brightening/darkening is a hardware BLDY blend applied after the palette lookup,
+// so it ignores the fade - its cloud-shaped patches would stay lit while the rest of the screen goes dark.
+// Scale the BLDY level down by the screen-fade progress so the overlay fades out (and back in) with the
+// screen. gPaletteFade.y is the current blend coefficient: 0 = no fade, 16 = fully faded.
+static u8 FadeScaledBlendLevel(u8 level)
+{
+    u32 fade = gPaletteFade.y;
+
+    if (fade >= 16)
+        return 0;
+    return level * (16 - fade) / 16;
+}
+
 // Push the current overlay brightness into the blend registers.
 static void ApplyCloudBrightness(void)
 {
@@ -1801,7 +1817,7 @@ static void ApplyCloudBrightness(void)
 
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
                                | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(brightness));
-    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(brightness));
+    SetGpuReg(REG_OFFSET_BLDY, FadeScaledBlendLevel(WEATHER_BLEND_LEVEL(brightness)));
 }
 
 // Max darkening magnitude applied to the silhouettes of cliff-buried objects, and the per-frame ramp
@@ -1819,7 +1835,7 @@ static void ApplyCliffSilhouetteBlend(void)
 
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
                                | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(brightness));
-    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(brightness));
+    SetGpuReg(REG_OFFSET_BLDY, FadeScaledBlendLevel(WEATHER_BLEND_LEVEL(brightness)));
 }
 
 // Step the silhouette darkening one notch (CLIFF_SILHOUETTE_STEP) toward its max while shown, or back to
@@ -1888,6 +1904,7 @@ static void HideClouds(void)
 void InitClouds(void)
 {
     sCloudsShown = FALSE;
+    sCloudBlendFadeY = gPaletteFade.y;
     gWeatherPtr->cloudCover = gSaveBlock1Ptr->weatherState.cloudCover; // persists across map transitions
     gWeatherPtr->targetCloudCover = gSaveBlock1Ptr->weatherState.cloudCover;
     gWeatherPtr->cloudCoverTimer = 0;
@@ -1965,9 +1982,17 @@ void UpdateClouds(void)
         sCloudsShown = FALSE;
     }
 
-    // Override the (released) cloud blend with the ramped silhouette darkening while buried.
+    // Override the (released) cloud blend with the ramped silhouette darkening while buried. Both blend
+    // appliers scale by the screen-fade progress (see FadeScaledBlendLevel); the silhouette path already
+    // reapplies every frame, so a fade in/out is tracked there for free. The cloud path is only reapplied
+    // on a brightness step, so refresh it whenever the fade level moves so the overlay fades with the
+    // screen rather than hanging as lit patches over a black/white screen.
     if (silhouettes)
         ApplyCliffSilhouetteBlend();
+    else if (sCloudsShown && gPaletteFade.y != sCloudBlendFadeY)
+        ApplyCloudBrightness();
+
+    sCloudBlendFadeY = gPaletteFade.y;
 }
 
 // Drift the clouds diagonally (down-left). The offsets wrap at one full pattern
