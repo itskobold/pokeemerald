@@ -2593,6 +2593,7 @@ bool8 FldEff_FieldMoveShowMonInit(void)
     gFieldEffectArguments[1] = GetMonData(pokemon, MON_DATA_OT_ID);
     gFieldEffectArguments[2] = GetMonData(pokemon, MON_DATA_PERSONALITY);
     gFieldEffectArguments[0] |= noDucking;
+    SetCloudsExternalPause(TRUE); // fade the cloud overlay out; the banner waits for it before taking the window/blend registers
     FieldEffectStart(FLDEFF_FIELD_MOVE_SHOW_MON);
     FieldEffectActiveListRemove(FLDEFF_FIELD_MOVE_SHOW_MON_INIT);
     return FALSE;
@@ -2615,6 +2616,8 @@ static void Task_FieldMoveShowMonOutdoors(u8 taskId)
 
 static void FieldMoveShowMonOutdoorsEffect_Init(struct Task *task)
 {
+    if (!AreCloudsClearedForEffect()) // wait for the cloud overlay to fade out & release WINOUT first
+        return;
     task->data[11] = REG_WININ;
     task->data[12] = REG_WINOUT;
     StoreWordInTwoHalfwords((u16*) &task->data[13], (u32)gMain.vblankCallback);
@@ -2721,6 +2724,7 @@ static void FieldMoveShowMonOutdoorsEffect_End(struct Task *task)
     InitTextBoxGfxAndPrinters();
     FreeResourcesAndDestroySprite(&gSprites[task->tMonSpriteId], task->tMonSpriteId);
     FieldEffectActiveListRemove(FLDEFF_FIELD_MOVE_SHOW_MON);
+    SetCloudsExternalPause(FALSE); // banner done, registers freed: let the overlay fade back in
     DestroyTask(FindTaskIdByFunc(Task_FieldMoveShowMonOutdoors));
 }
 
@@ -2850,6 +2854,7 @@ static void FieldMoveShowMonIndoorsEffect_End(struct Task *task)
     InitTextBoxGfxAndPrinters();
     FreeResourcesAndDestroySprite(&gSprites[task->tMonSpriteId], task->tMonSpriteId);
     FieldEffectActiveListRemove(FLDEFF_FIELD_MOVE_SHOW_MON);
+    SetCloudsExternalPause(FALSE); // banner done, registers freed: let the overlay fade back in
     DestroyTask(FindTaskIdByFunc(Task_FieldMoveShowMonIndoors));
 }
 
@@ -3095,9 +3100,10 @@ u8 FldEff_RayquazaSpotlight(void)
     sprite->data[3] = -1;
     sprite->data[4] = sprite->y;
     sprite->data[5] = 0;
-    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG0 | BLDCNT_EFFECT_BLEND | BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3 | BLDCNT_TGT2_OBJ | BLDCNT_TGT2_BD);
-    SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(14, 14));
-    SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG_ALL | WININ_WIN0_OBJ | WININ_WIN0_CLR | WININ_WIN1_BG_ALL | WININ_WIN1_OBJ | WININ_WIN1_CLR);
+    // The spotlight overrides the cloud overlay's blend/window registers. Fade the overlay out first; the
+    // spotlight's blend setup waits for it to clear (see UpdateRayquazaSpotlightEffect), as the field-move
+    // banner does, so the receding clouds aren't left rendering wrong over the scene.
+    SetCloudsExternalPause(TRUE);
     LoadPalette(sSpotlight_Pal, BG_PLTT_ID(12), sizeof(sSpotlight_Pal));
     SetGpuReg(REG_OFFSET_BG0VOFS, 120);
     for (i = 3; i < 15; i++)

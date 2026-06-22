@@ -1923,6 +1923,7 @@ void InitClouds(void)
     gWeatherPtr->cloudBrightnessTimer = 0;
     gWeatherPtr->pauseClouds = FALSE;
     gWeatherPtr->unpauseClouds = FALSE;
+    gWeatherPtr->externalPauseClouds = FALSE; // also clears any battle-entry pause when returning to the field
     gWeatherPtr->cloudClearedTimer = 0;
     gWeatherPtr->cliffSilhouetteBrightness = 0;
     gWeatherPtr->cloudsScrollXCounter = 0;
@@ -1978,6 +1979,11 @@ void UpdateClouds(void)
     // Once the clouds have fully faded behind the buried player, keep the object-window overlay up (even
     // on maps with no cloud weather) so the buried-object silhouettes have a window to carve.
     active = cloudsActive || silhouettes;
+
+    // An external pause (field move / battle entry) instead drops the overlay entirely once it has faded
+    // out, handing its window & blend registers back to the effect that asked for them (HideClouds below).
+    if (gWeatherPtr->externalPauseClouds && gWeatherPtr->cloudCover == 0 && gWeatherPtr->cloudBrightness == 0)
+        active = FALSE;
 
     if (cloudsActive)
         UpdateCloudsMovement();
@@ -2199,12 +2205,10 @@ static void ReleaseCloudBlend(void)
 static void UpdateCloudPauseTrigger(bool32 silhouettesActive)
 {
     struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
-    bool32 keepPaused;
+    bool32 keepPaused = gWeatherPtr->externalPauseClouds; // field move / battle entry, regardless of the player
 
-    if (!player->active)
-        return;
-
-    keepPaused = player->cliffLayer == CLIFF_LAYER_OBSCURED || silhouettesActive;
+    if (player->active && (player->cliffLayer == CLIFF_LAYER_OBSCURED || silhouettesActive))
+        keepPaused = TRUE;
 
     if (keepPaused)
     {
@@ -2216,6 +2220,41 @@ static void UpdateCloudPauseTrigger(bool32 silhouettesActive)
         if (gWeatherPtr->pauseClouds)
             gWeatherPtr->unpauseClouds = TRUE; // begin the inverse fade back to the held targets
         gWeatherPtr->pauseClouds = FALSE;
+    }
+}
+
+// Request/release an external cloud pause for an effect that needs the overlay's window & blend registers
+// (a field move's show-mon banner). Set: the overlay fades out and is dropped entirely (see UpdateClouds).
+// Cleared: it fades back in to the held cover/brightness. The targets are kept through the pause, so the
+// fade-in lands where it left off.
+void SetCloudsExternalPause(bool8 paused)
+{
+    gWeatherPtr->externalPauseClouds = paused;
+}
+
+// Whether an externally-paused overlay has finished fading out and handed its window/blend registers back
+// (HideClouds restored the baseline WINOUT). An effect that overrides those registers waits on this so it
+// doesn't blank the cloud sprites' still-receding object-window regions (which would show as black patches).
+// Also TRUE when no pause is in effect or the overlay was never shown (e.g. indoors), so nothing waits then.
+bool32 AreCloudsClearedForEffect(void)
+{
+    return !gWeatherPtr->externalPauseClouds || !sCloudsShown;
+}
+
+// Tear the overlay down at once (no fade) for the battle transition, which grabs the blend registers the
+// next frame (no time to wait out a fade like the field-move banner does, see AreCloudsClearedForEffect).
+// The held cover/brightness targets aren't touched, so the overlay is rebuilt when the field reloads
+// (InitClouds clears the pause). Leaves the pause set so the overlay stays down until then.
+void HideCloudsForBattle(void)
+{
+    gWeatherPtr->externalPauseClouds = TRUE; // keeps the overlay suppressed for any remaining field frames
+    if (sCloudsShown) // only tear down the registers if the overlay is actually driving them
+    {
+        gWeatherPtr->cloudCover = 0;
+        gWeatherPtr->cloudBrightness = 0;
+        ApplyCloudCover(); // hide the sprites now
+        HideClouds();      // hand the window & blend registers back to the transition
+        sCloudsShown = FALSE;
     }
 }
 

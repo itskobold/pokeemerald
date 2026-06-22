@@ -108,6 +108,8 @@ struct Weather
     u8 cloudBrightnessTimer;    // frame counter; one step per 20 frames
     bool8 pauseClouds;          // while set, cover & brightness fade to 0 (player hidden in a cliff)
     bool8 unpauseClouds;        // while set, cover & brightness fade back to their targets (inverse fade)
+    bool8 externalPauseClouds;  // external pause request (field moves, battle entry); folds into the pause above and drops the overlay entirely once cleared
+
     u8 cloudClearedTimer;       // frames the clouds have been fully faded out; gates the cliff silhouettes
     u8 cliffSilhouetteBrightness; // current silhouette darkening magnitude 0..6; ramps in/out at 1 per frame
     u16 cloudsScrollXCounter;
@@ -208,6 +210,9 @@ void UpdateClouds(void);
 void SetCloudCover(u8 target);
 void SetCloudBrightness(s8 target);
 void PauseClouds(void);
+void SetCloudsExternalPause(bool8 paused);
+bool32 AreCloudsClearedForEffect(void);
+void HideCloudsForBattle(void);
 bool32 ShouldDrawCliffSilhouettes(void);
 void Drought_InitVars(void);
 void Drought_Main(void);
