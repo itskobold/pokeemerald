@@ -3,7 +3,7 @@
   "name": "AbandonedShip_CaptainsOffice",
   "layout": "LAYOUT_ABANDONED_SHIP_CAPTAINS_OFFICE",
   "requires_flash": false,
-  "weather": "WEATHER_SHADE",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": true,
   "allow_escaping": true,
   "allow_running": true,

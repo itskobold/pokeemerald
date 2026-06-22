@@ -3,7 +3,7 @@
   "name": "CaveOfOrigin_UnusedRubySapphireMap3",
   "layout": "LAYOUT_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP3",
   "requires_flash": true,
-  "weather": "WEATHER_FOG_HORIZONTAL",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": true,
   "allow_escaping": true,
   "allow_running": true,

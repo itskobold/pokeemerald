@@ -3,7 +3,7 @@
   "name": "NavelRock_Top",
   "layout": "LAYOUT_NAVEL_ROCK_TOP",
   "requires_flash": false,
-  "weather": "WEATHER_SHADE",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": true,

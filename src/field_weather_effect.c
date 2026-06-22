@@ -7,6 +7,8 @@
 #include "random.h"
 #include "script.h"
 #include "constants/weather.h"
+#include "constants/biome.h"
+#include "constants/map_types.h"
 #include "constants/songs.h"
 #include "sound.h"
 #include "sprite.h"
@@ -14,14 +16,9 @@
 #include "trig.h"
 #include "gpu_regs.h"
 
-EWRAM_DATA static u8 sCurrentAbnormalWeather = 0;
-EWRAM_DATA static u16 sUnusedWeatherRelated = 0;
-
-const u16 gCloudsWeatherPalette[] = INCGFX_U16("graphics/weather/cloud.png", ".gbapal");
 const u16 gSandstormWeatherPalette[] = INCGFX_U16("graphics/weather/sandstorm.png", ".gbapal");
 const u8 gWeatherFogDiagonalTiles[] = INCGFX_U8("graphics/weather/fog_diagonal.png", ".4bpp");
 const u8 gWeatherFogHorizontalTiles[] = INCGFX_U8("graphics/weather/fog_horizontal.png", ".4bpp");
-const ALIGNED(2) u8 gWeatherCloudTiles[] = INCGFX_U8("graphics/weather/cloud.png", ".4bpp");
 const u8 gWeatherSnow1Tiles[] = INCGFX_U8("graphics/weather/snow0.png", ".4bpp");
 const u8 gWeatherSnow2Tiles[] = INCGFX_U8("graphics/weather/snow1.png", ".4bpp");
 const u8 gWeatherBubbleTiles[] = INCGFX_U8("graphics/weather/bubble.png", ".4bpp");
@@ -30,151 +27,16 @@ const u8 gWeatherRainTiles[] = INCGFX_U8("graphics/weather/rain.png", ".4bpp");
 const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", ".4bpp");
 
 //------------------------------------------------------------------------------
-// WEATHER_SUNNY_CLOUDS
+// Weather blend controls
 //------------------------------------------------------------------------------
 
-static void CreateCloudSprites(void);
-static void DestroyCloudSprites(void);
-static void UpdateCloudSprite(struct Sprite *);
-
-// Controls for blending the cloud/fog weather effects
+// Controls for blending the fog weather effects
 // Set to negative values for darkening, positive for lightening (suggested range [-2, 5])
-#define CLOUD_BRIGHTNESS 5
-#define FOG_BRIGHTNESS -2
+#define FOG_BRIGHTNESS -2          // Diagonal fog overlay (darken)
+#define UNDERWATER_BRIGHTNESS 5    // Horizontal fog under WEATHER_UNDERWATER_BUBBLES (lighten, like the old clouds)
 
 #define WEATHER_BLEND_EFFECT(brightness) ((brightness) < 0 ? BLDCNT_EFFECT_DARKEN : BLDCNT_EFFECT_LIGHTEN)
 #define WEATHER_BLEND_LEVEL(brightness)  ((brightness) < 0 ? -(brightness) : (brightness))
-
-static u8 sCloudBlendY;
-
-// The clouds are positioned on the map's grid.
-// These coordinates are for the lower half of Route 120.
-static const struct Coords16 sCloudSpriteMapCoords[] =
-{
-    { 0, 66},
-    { 5, 73},
-    {10, 78},
-};
-
-static const struct SpriteSheet sCloudSpriteSheet =
-{
-    .data = gWeatherCloudTiles,
-    .size = sizeof(gWeatherCloudTiles),
-    .tag = GFXTAG_CLOUD
-};
-
-static const struct OamData sCloudSpriteOamData =
-{
-    .y = 0,
-    .affineMode = ST_OAM_AFFINE_OFF,
-    .objMode = ST_OAM_OBJ_WINDOW,
-    .mosaic = FALSE,
-    .bpp = ST_OAM_4BPP,
-    .shape = SPRITE_SHAPE(64x64),
-    .x = 0,
-    .matrixNum = 0,
-    .size = SPRITE_SIZE(64x64),
-    .tileNum = 0,
-    .priority = 0,
-    .paletteNum = 0,
-    .affineParam = 0,
-};
-
-static const union AnimCmd sCloudSpriteAnimCmd[] =
-{
-    ANIMCMD_FRAME(0, 16),
-    ANIMCMD_END,
-};
-
-static const union AnimCmd *const sCloudSpriteAnimCmds[] =
-{
-    sCloudSpriteAnimCmd,
-};
-
-static const struct SpriteTemplate sCloudSpriteTemplate =
-{
-    .tileTag = GFXTAG_CLOUD,
-    .paletteTag = PALTAG_WEATHER_2,
-    .oam = &sCloudSpriteOamData,
-    .anims = sCloudSpriteAnimCmds,
-    .images = NULL,
-    .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = UpdateCloudSprite,
-};
-
-void Clouds_InitVars(void)
-{
-    gWeatherPtr->targetColorMapIndex = 0;
-    gWeatherPtr->colorMapStepDelay = 20;
-    gWeatherPtr->weatherGfxLoaded = FALSE;
-    gWeatherPtr->initStep = 0;
-}
-
-void Clouds_InitAll(void)
-{
-    Clouds_InitVars();
-    while (gWeatherPtr->weatherGfxLoaded == FALSE)
-        Clouds_Main();
-}
-
-void Clouds_Main(void)
-{
-    switch (gWeatherPtr->initStep)
-    {
-    case 0:
-        CreateCloudSprites();
-        sCloudBlendY = 0;
-        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                                   | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(CLOUD_BRIGHTNESS));
-        SetGpuReg(REG_OFFSET_BLDY, 0);
-        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
-                                   | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
-        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
-        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
-        gWeatherPtr->initStep++;
-        break;
-    case 1:
-        if (sCloudBlendY < WEATHER_BLEND_LEVEL(CLOUD_BRIGHTNESS))
-        {
-            sCloudBlendY++;
-            SetGpuReg(REG_OFFSET_BLDY, sCloudBlendY);
-        }
-        else
-        {
-            gWeatherPtr->weatherGfxLoaded = TRUE;
-            gWeatherPtr->initStep++;
-        }
-        break;
-    }
-}
-
-bool8 Clouds_Finish(void)
-{
-    switch (gWeatherPtr->finishStep)
-    {
-    case 0:
-        if (sCloudBlendY != 0)
-        {
-            sCloudBlendY--;
-            SetGpuReg(REG_OFFSET_BLDY, sCloudBlendY);
-            return TRUE;
-        }
-        gWeatherPtr->finishStep++;
-        // fall through
-    case 1:
-        DestroyCloudSprites();
-        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
-                                   | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
-        SetGpuReg(REG_OFFSET_BLDY, 0);
-        SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
-        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
-        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
-        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
-        gWeatherPtr->finishStep++;
-        return TRUE;
-    }
-    return FALSE;
-}
 
 void Sunny_InitVars(void)
 {
@@ -194,60 +56,6 @@ void Sunny_Main(void)
 bool8 Sunny_Finish(void)
 {
     return FALSE;
-}
-
-static void CreateCloudSprites(void)
-{
-    u16 i;
-    u8 spriteId;
-    struct Sprite *sprite;
-
-    if (gWeatherPtr->cloudSpritesCreated == TRUE)
-        return;
-
-    LoadSpriteSheet(&sCloudSpriteSheet);
-    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
-    {
-        spriteId = CreateSprite(&sCloudSpriteTemplate, 0, 0, 0xFF);
-        if (spriteId != MAX_SPRITES)
-        {
-            gWeatherPtr->sprites.s1.cloudSprites[i] = &gSprites[spriteId];
-            sprite = gWeatherPtr->sprites.s1.cloudSprites[i];
-            SetSpritePosToMapCoords(sCloudSpriteMapCoords[i].x + MAP_OFFSET, sCloudSpriteMapCoords[i].y + MAP_OFFSET, &sprite->x, &sprite->y);
-            sprite->coordOffsetEnabled = TRUE;
-        }
-        else
-        {
-            gWeatherPtr->sprites.s1.cloudSprites[i] = NULL;
-        }
-    }
-
-    gWeatherPtr->cloudSpritesCreated = TRUE;
-}
-
-static void DestroyCloudSprites(void)
-{
-    u16 i;
-
-    if (!gWeatherPtr->cloudSpritesCreated)
-        return;
-
-    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
-    {
-        if (gWeatherPtr->sprites.s1.cloudSprites[i] != NULL)
-            DestroySprite(gWeatherPtr->sprites.s1.cloudSprites[i]);
-    }
-
-    FreeSpriteTilesByTag(GFXTAG_CLOUD);
-    gWeatherPtr->cloudSpritesCreated = FALSE;
-}
-
-static void UpdateCloudSprite(struct Sprite *sprite)
-{
-    // Move 1 pixel left every 2 frames.
-    sprite->data[0] = (sprite->data[0] + 1) & 1;
-    if (sprite->data[0])
-        sprite->x--;
 }
 
 //------------------------------------------------------------------------------
@@ -1297,18 +1105,18 @@ static void UpdateThunderSound(void)
 }
 
 //------------------------------------------------------------------------------
-// WEATHER_FOG_HORIZONTAL and WEATHER_UNDERWATER
+// Horizontal fog (used only by WEATHER_UNDERWATER_BUBBLES)
 //------------------------------------------------------------------------------
 
 static const u16 sUnusedData[] = {0, 6, 6, 12, 18, 42, 300, 300};
 
-static u8 sFogBlendY;
+static u8 sFogHBlendY;
 
 static const struct OamData sOamData_FogH =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_OFF,
-    .objMode = ST_OAM_OBJ_BLEND,
+    .objMode = ST_OAM_OBJ_WINDOW,
     .mosaic = FALSE,
     .bpp = ST_OAM_4BPP,
     .shape = SPRITE_SHAPE(64x64),
@@ -1405,17 +1213,11 @@ void FogHorizontal_InitVars(void)
         gWeatherPtr->fogHScrollCounter = 0;
         gWeatherPtr->fogHScrollOffset = 0;
         gWeatherPtr->fogHScrollPosX = 0;
-        Weather_SetBlendCoeffs(0, 16);
     }
 }
 
-void FogHorizontal_InitAll(void)
-{
-    FogHorizontal_InitVars();
-    while (gWeatherPtr->weatherGfxLoaded == FALSE)
-        FogHorizontal_Main();
-}
-
+// The fog sprites are object-window sprites: they carve out moving regions in
+// which the background is brightened, giving a soft cloud-like haze (no alpha).
 void FogHorizontal_Main(void)
 {
     gWeatherPtr->fogHScrollPosX = (gSpriteCoordOffsetX - gWeatherPtr->fogHScrollOffset) & 0xFF;
@@ -1428,38 +1230,23 @@ void FogHorizontal_Main(void)
     {
     case 0:
         CreateFogHorizontalSprites();
-        if (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
-        {
-            sFogBlendY = 0;
-            SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                                       | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(FOG_BRIGHTNESS));
-            SetGpuReg(REG_OFFSET_BLDY, 0);
-            SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
-                                       | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
-            ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
-            SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
-        }
-        else
-        {
-            Weather_SetTargetBlendCoeffs(14, 8, 0);
-        }
+        sFogHBlendY = 0;
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                                   | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(UNDERWATER_BRIGHTNESS));
+        SetGpuReg(REG_OFFSET_BLDY, 0);
+        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
+                                   | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
+        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
         gWeatherPtr->initStep++;
         break;
     case 1:
-        if (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
+        if (sFogHBlendY < WEATHER_BLEND_LEVEL(UNDERWATER_BRIGHTNESS))
         {
-            if (sFogBlendY < WEATHER_BLEND_LEVEL(FOG_BRIGHTNESS))
-            {
-                sFogBlendY++;
-                SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
-            }
-            else
-            {
-                gWeatherPtr->weatherGfxLoaded = TRUE;
-                gWeatherPtr->initStep++;
-            }
+            sFogHBlendY++;
+            SetGpuReg(REG_OFFSET_BLDY, sFogHBlendY);
         }
-        else if (Weather_UpdateBlend())
+        else
         {
             gWeatherPtr->weatherGfxLoaded = TRUE;
             gWeatherPtr->initStep++;
@@ -1477,52 +1264,30 @@ bool8 FogHorizontal_Finish(void)
         gWeatherPtr->fogHScrollOffset++;
     }
 
-    if (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
-    {
-        switch (gWeatherPtr->finishStep)
-        {
-        case 0:
-            if (sFogBlendY != 0)
-            {
-                sFogBlendY--;
-                SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
-                return TRUE;
-            }
-            gWeatherPtr->finishStep++;
-            // fall through
-        case 1:
-            DestroyFogHorizontalSprites();
-            SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
-                                       | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
-            SetGpuReg(REG_OFFSET_BLDY, 0);
-            SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
-            SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
-            ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
-            SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
-            gWeatherPtr->finishStep++;
-            return TRUE;
-        }
-        return FALSE;
-    }
-
     switch (gWeatherPtr->finishStep)
     {
     case 0:
-        Weather_SetTargetBlendCoeffs(0, 16, 3);
+        if (sFogHBlendY != 0)
+        {
+            sFogHBlendY--;
+            SetGpuReg(REG_OFFSET_BLDY, sFogHBlendY);
+            return TRUE;
+        }
         gWeatherPtr->finishStep++;
-        break;
+        // fall through
     case 1:
-        if (Weather_UpdateBlend())
-            gWeatherPtr->finishStep++;
-        break;
-    case 2:
         DestroyFogHorizontalSprites();
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
+                                   | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+        SetGpuReg(REG_OFFSET_BLDY, 0);
+        SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
+        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
+        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
         gWeatherPtr->finishStep++;
-        break;
-    default:
-        return FALSE;
+        return TRUE;
     }
-    return TRUE;
+    return FALSE;
 }
 
 #define tSpriteColumn data[0]
@@ -1546,8 +1311,6 @@ static void CreateFogHorizontalSprites(void)
 
     if (!gWeatherPtr->fogHSpritesCreated)
     {
-        u8 objMode = (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL)
-                   ? ST_OAM_OBJ_WINDOW : ST_OAM_OBJ_BLEND;
         struct SpriteSheet fogHorizontalSpriteSheet = {
             .data = gWeatherFogHorizontalTiles,
             .size = sizeof(gWeatherFogHorizontalTiles),
@@ -1560,7 +1323,6 @@ static void CreateFogHorizontalSprites(void)
             if (spriteId != MAX_SPRITES)
             {
                 sprite = &gSprites[spriteId];
-                sprite->oam.objMode = objMode;
                 sprite->tSpriteColumn = i % 5;
                 sprite->x = (i % 5) * 64 + 32;
                 sprite->y = (i / 5) * 64 + 32;
@@ -1611,11 +1373,6 @@ void Ash_InitVars(void)
     gWeatherPtr->targetColorMapIndex = 0;
     gWeatherPtr->colorMapStepDelay = 20;
     gWeatherPtr->ashUnused = 20; // Never read
-    if (!gWeatherPtr->ashSpritesCreated)
-    {
-        Weather_SetBlendCoeffs(0, 16);
-        SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(64, 63)); // These aren't valid blend coefficients!
-    }
 }
 
 void Ash_InitAll(void)
@@ -1640,46 +1397,16 @@ void Ash_Main(void)
     case 1:
         if (!gWeatherPtr->ashSpritesCreated)
             CreateAshSprites();
-
-        Weather_SetTargetBlendCoeffs(16, 0, 1);
+        gWeatherPtr->weatherGfxLoaded = TRUE;
         gWeatherPtr->initStep++;
-        break;
-    case 2:
-        if (Weather_UpdateBlend())
-        {
-            gWeatherPtr->weatherGfxLoaded = TRUE;
-            gWeatherPtr->initStep++;
-        }
-        break;
-    default:
-        Weather_UpdateBlend();
         break;
     }
 }
 
 bool8 Ash_Finish(void)
 {
-    switch (gWeatherPtr->finishStep)
-    {
-    case 0:
-        Weather_SetTargetBlendCoeffs(0, 16, 1);
-        gWeatherPtr->finishStep++;
-        break;
-    case 1:
-        if (Weather_UpdateBlend())
-        {
-            DestroyAshSprites();
-            gWeatherPtr->finishStep++;
-        }
-        break;
-    case 2:
-        SetGpuReg(REG_OFFSET_BLDALPHA, 0);
-        gWeatherPtr->finishStep++;
-        return FALSE;
-    default:
-        return FALSE;
-    }
-    return TRUE;
+    DestroyAshSprites();
+    return FALSE;
 }
 
 static const struct SpriteSheet sAshSpriteSheet =
@@ -1698,7 +1425,7 @@ static const struct OamData sAshSpriteOamData =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_OFF,
-    .objMode = ST_OAM_OBJ_BLEND,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .bpp = ST_OAM_4BPP,
     .shape = SPRITE_SHAPE(64x64),
     .x = 0,
@@ -1806,7 +1533,7 @@ static void UpdateAshSprite(struct Sprite *sprite)
 #undef tSpriteRow
 
 //------------------------------------------------------------------------------
-// WEATHER_FOG_DIAGONAL
+// Diagonal fog (persistent overlay, always on except for a few weathers)
 //------------------------------------------------------------------------------
 
 static void UpdateFogDiagonalMovement(void);
@@ -1814,92 +1541,114 @@ static void CreateFogDiagonalSprites(void);
 static void DestroyFogDiagonalSprites(void);
 static void UpdateFogDiagonalSprite(struct Sprite *);
 
-void FogDiagonal_InitVars(void)
-{
-    gWeatherPtr->initStep = 0;
-    gWeatherPtr->weatherGfxLoaded = 0;
-    gWeatherPtr->targetColorMapIndex = 0;
-    gWeatherPtr->colorMapStepDelay = 20;
-    gWeatherPtr->fogHScrollCounter = 0;
-    gWeatherPtr->fogHScrollOffset = 1;
-    if (!gWeatherPtr->fogDSpritesCreated)
-    {
-        gWeatherPtr->fogDScrollXCounter = 0;
-        gWeatherPtr->fogDScrollYCounter = 0;
-        gWeatherPtr->fogDXOffset = 0;
-        gWeatherPtr->fogDYOffset = 0;
-        gWeatherPtr->fogDBaseSpritesX = 0;
-        gWeatherPtr->fogDPosY = 0;
-        Weather_SetBlendCoeffs(0, 16);
-    }
-}
+static bool8 sFogDiagonalShown;
 
-void FogDiagonal_InitAll(void)
+// Diagonal fog is a persistent overlay drawn on top of most weathers. It is
+// suppressed for weathers that need the blend registers for themselves.
+static bool8 FogDiagonalActiveForWeather(u8 weather)
 {
-    FogDiagonal_InitVars();
-    while (gWeatherPtr->weatherGfxLoaded == FALSE)
-        FogDiagonal_Main();
-}
-
-void FogDiagonal_Main(void)
-{
-    UpdateFogDiagonalMovement();
-    switch (gWeatherPtr->initStep)
+    switch (weather)
     {
-    case 0:
-        CreateFogDiagonalSprites();
-        sFogBlendY = 0;
-        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                                   | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(FOG_BRIGHTNESS));
-        SetGpuReg(REG_OFFSET_BLDY, 0);
-        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
-                                   | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
-        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
-        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
-        gWeatherPtr->initStep++;
-        break;
-    case 1:
-        if (sFogBlendY < WEATHER_BLEND_LEVEL(FOG_BRIGHTNESS))
-        {
-            sFogBlendY++;
-            SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
-        }
-        else
-        {
-            gWeatherPtr->weatherGfxLoaded = TRUE;
-            gWeatherPtr->initStep++;
-        }
-        break;
-    }
-}
-
-bool8 FogDiagonal_Finish(void)
-{
-    UpdateFogDiagonalMovement();
-    switch (gWeatherPtr->finishStep)
-    {
-    case 0:
-        if (sFogBlendY != 0)
-        {
-            sFogBlendY--;
-            SetGpuReg(REG_OFFSET_BLDY, sFogBlendY);
-            return TRUE;
-        }
-        gWeatherPtr->finishStep++;
-        // fall through
-    case 1:
-        DestroyFogDiagonalSprites();
-        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
-                                   | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
-        SetGpuReg(REG_OFFSET_BLDY, 0);
-        SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
-        SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
-        ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
-        SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
-        gWeatherPtr->finishStep++;
+    case WEATHER_NONE:
+    case WEATHER_DROUGHT:
+    case WEATHER_UNDERWATER_BUBBLES:
+        return FALSE;
+    default:
         return TRUE;
     }
-    return FALSE;
+}
+
+// The overlay only makes sense on open-air overworld maps, so it is limited to
+// the overworld biome group and outdoor location types.
+static bool8 FogDiagonalAllowedOnCurrentMap(void)
+{
+    if (gMapHeader.biomeGroup != BIOME_GROUP_OVERWORLD)
+        return FALSE;
+
+    switch (GetCurrentMapType())
+    {
+    case MAP_TYPE_TOWN:
+    case MAP_TYPE_CITY:
+    case MAP_TYPE_ROUTE:
+    case MAP_TYPE_OCEAN_ROUTE:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+// The sprites persist across weathers, but they must only carve the object
+// window while the overlay is active - otherwise they would leak into another
+// weather that uses the object window itself (e.g. underwater bubbles).
+static void SetFogDiagonalSpritesInvisible(bool8 invisible)
+{
+    u16 i;
+
+    for (i = 0; i < NUM_FOG_DIAGONAL_SPRITES; i++)
+    {
+        if (gWeatherPtr->sprites.s2.fogDSprites[i] != NULL)
+            gWeatherPtr->sprites.s2.fogDSprites[i]->invisible = invisible;
+    }
+}
+
+static void ShowFogDiagonal(void)
+{
+    SetFogDiagonalSpritesInvisible(FALSE);
+    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(FOG_BRIGHTNESS));
+    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(FOG_BRIGHTNESS));
+    SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
+                               | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
+    ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+    SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+}
+
+static void HideFogDiagonal(void)
+{
+    SetFogDiagonalSpritesInvisible(TRUE);
+    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG1 | BLDCNT_TGT2_BG2 | BLDCNT_TGT2_BG3
+                               | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+    SetGpuReg(REG_OFFSET_BLDY, 0);
+    SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
+    SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG0 | WINOUT_WINOBJ_BG0);
+    ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_OBJWIN_ON);
+    SetGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
+}
+
+// Called once from StartWeather. The sprites persist for the life of the
+// weather task (one map session) and stay invisible until shown.
+void InitFogDiagonal(void)
+{
+    sFogDiagonalShown = FALSE;
+    gWeatherPtr->fogDScrollXCounter = 0;
+    gWeatherPtr->fogDScrollYCounter = 0;
+    gWeatherPtr->fogDXOffset = 0;
+    gWeatherPtr->fogDYOffset = 0;
+    gWeatherPtr->fogDBaseSpritesX = 0;
+    gWeatherPtr->fogDPosY = 0;
+    CreateFogDiagonalSprites();
+    SetFogDiagonalSpritesInvisible(TRUE); // Stay hidden until an active weather shows the overlay
+}
+
+// Called every frame from the weather task to toggle the overlay by weather.
+void UpdateFogDiagonal(void)
+{
+    bool8 active = FogDiagonalActiveForWeather(gWeatherPtr->currWeather)
+                && FogDiagonalAllowedOnCurrentMap();
+
+    if (active)
+        UpdateFogDiagonalMovement();
+
+    if (active && !sFogDiagonalShown)
+    {
+        ShowFogDiagonal();
+        sFogDiagonalShown = TRUE;
+    }
+    else if (!active && sFogDiagonalShown)
+    {
+        HideFogDiagonal();
+        sFogDiagonalShown = FALSE;
+    }
 }
 
 static void UpdateFogDiagonalMovement(void)
@@ -2338,31 +2087,6 @@ static void UpdateSandstormSwirlSprite(struct Sprite *sprite)
 #undef tEntranceDelay
 
 //------------------------------------------------------------------------------
-// WEATHER_SHADE
-//------------------------------------------------------------------------------
-
-void Shade_InitVars(void)
-{
-    gWeatherPtr->initStep = 0;
-    gWeatherPtr->targetColorMapIndex = 3;
-    gWeatherPtr->colorMapStepDelay = 20;
-}
-
-void Shade_InitAll(void)
-{
-    Shade_InitVars();
-}
-
-void Shade_Main(void)
-{
-}
-
-bool8 Shade_Finish(void)
-{
-    return FALSE;
-}
-
-//------------------------------------------------------------------------------
 // WEATHER_UNDERWATER_BUBBLES
 //------------------------------------------------------------------------------
 
@@ -2531,83 +2255,12 @@ static void UpdateBubbleSprite(struct Sprite *sprite)
 
 //------------------------------------------------------------------------------
 
-static void UNUSED UnusedSetCurrentAbnormalWeather(u32 weather, u32 unknown)
-{
-    sCurrentAbnormalWeather = weather;
-    sUnusedWeatherRelated = unknown;
-}
-
-#define tState         data[0]
-#define tWeatherA      data[1]
-#define tWeatherB      data[2]
-#define tDelay         data[15]
-
-static void Task_DoAbnormalWeather(u8 taskId)
-{
-    s16 *data = gTasks[taskId].data;
-
-    switch (tState)
-    {
-    case 0:
-        if (tDelay-- <= 0)
-        {
-            SetNextWeather(tWeatherA);
-            sCurrentAbnormalWeather = tWeatherA;
-            tDelay = 600;
-            tState++;
-        }
-        break;
-    case 1:
-        if (tDelay-- <= 0)
-        {
-            SetNextWeather(tWeatherB);
-            sCurrentAbnormalWeather = tWeatherB;
-            tDelay = 600;
-            tState = 0;
-        }
-        break;
-    }
-}
-
-static void CreateAbnormalWeatherTask(void)
-{
-    u8 taskId = CreateTask(Task_DoAbnormalWeather, 0);
-    s16 *data = gTasks[taskId].data;
-
-    tDelay = 600;
-    if (sCurrentAbnormalWeather == WEATHER_DOWNPOUR)
-    {
-        // Currently Downpour, next will be Drought
-        tWeatherA = WEATHER_DROUGHT;
-        tWeatherB = WEATHER_DOWNPOUR;
-    }
-    else if (sCurrentAbnormalWeather == WEATHER_DROUGHT)
-    {
-        // Currently Drought, next will be Downpour
-        tWeatherA = WEATHER_DOWNPOUR;
-        tWeatherB = WEATHER_DROUGHT;
-    }
-    else
-    {
-        // Default to starting with Downpour
-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
-        tWeatherA = WEATHER_DROUGHT;
-        tWeatherB = WEATHER_DOWNPOUR;
-    }
-}
-
-#undef tState
-#undef tWeatherA
-#undef tWeatherB
-#undef tDelay
-
-static u8 TranslateWeatherNum(u8);
 static void UpdateRainCounter(u8, u8);
 
 void SetSavedWeather(u32 weather)
 {
     u8 oldWeather = gSaveBlock1Ptr->weather;
-    gSaveBlock1Ptr->weather = TranslateWeatherNum(weather);
+    gSaveBlock1Ptr->weather = weather;
     UpdateRainCounter(gSaveBlock1Ptr->weather, oldWeather);
 }
 
@@ -2619,7 +2272,7 @@ u8 GetSavedWeather(void)
 void SetSavedWeatherFromCurrMapHeader(void)
 {
     u8 oldWeather = gSaveBlock1Ptr->weather;
-    gSaveBlock1Ptr->weather = TranslateWeatherNum(gMapHeader.weather);
+    gSaveBlock1Ptr->weather = gMapHeader.weather;
     UpdateRainCounter(gSaveBlock1Ptr->weather, oldWeather);
 }
 
@@ -2628,7 +2281,7 @@ void SetSavedWeatherFromCurrMapHeader(void)
 // stays the player's home-map weather.
 void SetNextWeatherFromMapHeader(const struct MapHeader *mapHeader)
 {
-    SetNextWeather(TranslateWeatherNum(mapHeader->weather));
+    SetNextWeather(mapHeader->weather);
 }
 
 void SetWeather(u32 weather)
@@ -2645,21 +2298,7 @@ void SetWeather_Unused(u32 weather)
 
 void DoCurrentWeather(void)
 {
-    u8 weather = GetSavedWeather();
-
-    if (weather == WEATHER_ABNORMAL)
-    {
-        if (!FuncIsActiveTask(Task_DoAbnormalWeather))
-            CreateAbnormalWeatherTask();
-        weather = sCurrentAbnormalWeather;
-    }
-    else
-    {
-        if (FuncIsActiveTask(Task_DoAbnormalWeather))
-            DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
-    }
-    SetNextWeather(weather);
+    SetNextWeather(GetSavedWeather());
 }
 
 void ResumePausedWeather(void)
@@ -2668,71 +2307,9 @@ void ResumePausedWeather(void)
     // not the player's saved weather — display only, the saveblock keeps the player's. On the home map
     // (and on a fresh game/save load, where the camera sits on the player) this is the saved weather.
     const struct MapHeader *roamingMap = GetRoamingCameraMapHeader();
-    u8 weather = (roamingMap != NULL) ? TranslateWeatherNum(roamingMap->weather) : GetSavedWeather();
+    u8 weather = (roamingMap != NULL) ? roamingMap->weather : GetSavedWeather();
 
-    if (weather == WEATHER_ABNORMAL)
-    {
-        if (!FuncIsActiveTask(Task_DoAbnormalWeather))
-            CreateAbnormalWeatherTask();
-        weather = sCurrentAbnormalWeather;
-    }
-    else
-    {
-        if (FuncIsActiveTask(Task_DoAbnormalWeather))
-            DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
-    }
     SetCurrentAndNextWeather(weather);
-}
-
-#define WEATHER_CYCLE_LENGTH  4
-
-static const u8 sWeatherCycleRoute119[WEATHER_CYCLE_LENGTH] =
-{
-    WEATHER_SUNNY,
-    WEATHER_RAIN,
-    WEATHER_RAIN_THUNDERSTORM,
-    WEATHER_RAIN,
-};
-static const u8 sWeatherCycleRoute123[WEATHER_CYCLE_LENGTH] =
-{
-    WEATHER_SUNNY,
-    WEATHER_SUNNY,
-    WEATHER_RAIN,
-    WEATHER_SUNNY,
-};
-
-static u8 TranslateWeatherNum(u8 weather)
-{
-    switch (weather)
-    {
-    case WEATHER_NONE:               return WEATHER_NONE;
-    case WEATHER_SUNNY_CLOUDS:       return WEATHER_SUNNY_CLOUDS;
-    case WEATHER_SUNNY:              return WEATHER_SUNNY;
-    case WEATHER_RAIN:               return WEATHER_RAIN;
-    case WEATHER_SNOW:               return WEATHER_SNOW;
-    case WEATHER_RAIN_THUNDERSTORM:  return WEATHER_RAIN_THUNDERSTORM;
-    case WEATHER_FOG_HORIZONTAL:     return WEATHER_FOG_HORIZONTAL;
-    case WEATHER_VOLCANIC_ASH:       return WEATHER_VOLCANIC_ASH;
-    case WEATHER_SANDSTORM:          return WEATHER_SANDSTORM;
-    case WEATHER_FOG_DIAGONAL:       return WEATHER_FOG_DIAGONAL;
-    case WEATHER_UNDERWATER:         return WEATHER_UNDERWATER;
-    case WEATHER_SHADE:              return WEATHER_SHADE;
-    case WEATHER_DROUGHT:            return WEATHER_DROUGHT;
-    case WEATHER_DOWNPOUR:           return WEATHER_DOWNPOUR;
-    case WEATHER_UNDERWATER_BUBBLES: return WEATHER_UNDERWATER_BUBBLES;
-    case WEATHER_ABNORMAL:           return WEATHER_ABNORMAL;
-    case WEATHER_ROUTE119_CYCLE:     return sWeatherCycleRoute119[gSaveBlock1Ptr->weatherCycleStage];
-    case WEATHER_ROUTE123_CYCLE:     return sWeatherCycleRoute123[gSaveBlock1Ptr->weatherCycleStage];
-    default:                         return WEATHER_NONE;
-    }
-}
-
-void UpdateWeatherPerDay(u16 increment)
-{
-    u16 weatherStage = gSaveBlock1Ptr->weatherCycleStage + increment;
-    weatherStage %= WEATHER_CYCLE_LENGTH;
-    gSaveBlock1Ptr->weatherCycleStage = weatherStage;
 }
 
 static void UpdateRainCounter(u8 newWeather, u8 oldWeather)

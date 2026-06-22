@@ -3,7 +3,7 @@
   "name": "LavaridgeTown_Gym_1F",
   "layout": "LAYOUT_LAVARIDGE_TOWN_GYM_1F",
   "requires_flash": false,
-  "weather": "WEATHER_FOG_HORIZONTAL",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": false,
   "allow_escaping": false,
   "allow_running": false,

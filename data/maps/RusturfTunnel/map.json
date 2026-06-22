@@ -3,7 +3,7 @@
   "name": "RusturfTunnel",
   "layout": "LAYOUT_RUSTURF_TUNNEL",
   "requires_flash": false,
-  "weather": "WEATHER_FOG_HORIZONTAL",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": true,
   "allow_escaping": true,
   "allow_running": true,

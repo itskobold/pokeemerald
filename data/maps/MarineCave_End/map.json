@@ -3,7 +3,7 @@
   "name": "MarineCave_End",
   "layout": "LAYOUT_MARINE_CAVE_END",
   "requires_flash": false,
-  "weather": "WEATHER_FOG_HORIZONTAL",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": false,
   "allow_escaping": true,
   "allow_running": true,

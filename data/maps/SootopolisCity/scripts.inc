@@ -184,7 +184,7 @@ SootopolisCity_EventScript_LegendariesSceneFromPokeCenter::
 	special RemoveCameraObject
 	delay 60
 	fadescreenspeed FADE_TO_BLACK, 8
-	setweather WEATHER_ABNORMAL
+	setweather WEATHER_SUNNY
 	doweather
 	setvar VAR_0x8004, FALSE @ Just do Groudon/Kyogre fight scene
 	special Script_DoRayquazaScene
@@ -283,7 +283,7 @@ SootopolisCity_EventScript_LegendariesSceneFromDive::
 	special RemoveCameraObject
 	delay 60
 	fadescreenspeed FADE_TO_BLACK, 8
-	setweather WEATHER_ABNORMAL
+	setweather WEATHER_SUNNY
 	doweather
 	setvar VAR_0x8004, FALSE @ Just do Groudon/Kyogre fight scene
 	special Script_DoRayquazaScene

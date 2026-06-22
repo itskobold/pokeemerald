@@ -170,10 +170,6 @@ void PreservePaletteInWeather(u8 preservedPalIndex);
 void ResetPreservedPalettesInWeather(void);
 
 // field_weather_effect.c
-void Clouds_InitVars(void);
-void Clouds_Main(void);
-void Clouds_InitAll(void);
-bool8 Clouds_Finish(void);
 void Sunny_InitVars(void);
 void Sunny_Main(void);
 void Sunny_InitAll(void);
@@ -192,7 +188,6 @@ void Thunderstorm_InitAll(void);
 bool8 Thunderstorm_Finish(void);
 void FogHorizontal_InitVars(void);
 void FogHorizontal_Main(void);
-void FogHorizontal_InitAll(void);
 bool8 FogHorizontal_Finish(void);
 void Ash_InitVars(void);
 void Ash_Main(void);
@@ -202,14 +197,8 @@ void Sandstorm_InitVars(void);
 void Sandstorm_Main(void);
 void Sandstorm_InitAll(void);
 bool8 Sandstorm_Finish(void);
-void FogDiagonal_InitVars(void);
-void FogDiagonal_Main(void);
-void FogDiagonal_InitAll(void);
-bool8 FogDiagonal_Finish(void);
-void Shade_InitVars(void);
-void Shade_Main(void);
-void Shade_InitAll(void);
-bool8 Shade_Finish(void);
+void InitFogDiagonal(void);
+void UpdateFogDiagonal(void);
 void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);
@@ -227,7 +216,6 @@ void SetSavedWeatherFromCurrMapHeader(void);
 void SetNextWeatherFromMapHeader(const struct MapHeader *mapHeader);
 void SetWeather(u32 weather);
 void DoCurrentWeather(void);
-void UpdateWeatherPerDay(u16 increment);
 void ResumePausedWeather(void);
 
 #endif // GUARD_WEATHER_H

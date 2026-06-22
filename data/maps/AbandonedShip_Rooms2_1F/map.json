@@ -3,7 +3,7 @@
   "name": "AbandonedShip_Rooms2_1F",
   "layout": "LAYOUT_ABANDONED_SHIP_ROOMS2_1F",
   "requires_flash": false,
-  "weather": "WEATHER_SHADE",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": true,
   "allow_escaping": true,
   "allow_running": true,

@@ -3,7 +3,7 @@
   "name": "SeafloorCavern_Room9",
   "layout": "LAYOUT_SEAFLOOR_CAVERN_ROOM9",
   "requires_flash": false,
-  "weather": "WEATHER_FOG_HORIZONTAL",
+  "weather": "WEATHER_SUNNY",
   "allow_cycling": false,
   "allow_escaping": true,
   "allow_running": true,

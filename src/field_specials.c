@@ -1519,13 +1519,13 @@ bool8 FoundBlackGlasses(void)
 void SetRoute119Weather(void)
 {
     if (IsMapTypeOutdoors(GetLastUsedWarpMapType()) != TRUE)
-        SetSavedWeather(WEATHER_ROUTE119_CYCLE);
+        SetSavedWeather(WEATHER_SUNNY);
 }
 
 void SetRoute123Weather(void)
 {
     if (IsMapTypeOutdoors(GetLastUsedWarpMapType()) != TRUE)
-        SetSavedWeather(WEATHER_ROUTE123_CYCLE);
+        SetSavedWeather(WEATHER_SUNNY);
 }
 
 u8 GetLeadMonIndex(void)
