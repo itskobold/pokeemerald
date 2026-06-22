@@ -477,6 +477,40 @@ void RedrawListMenu(u8 listTaskId)
     CopyWindowToVram(list->template.windowId, COPYWIN_GFX);
 }
 
+// Wraps the cursor to the opposite end when pressing past a list boundary. Returns TRUE if it wrapped.
+bool32 ListMenuTryWrapSelection(u8 listTaskId)
+{
+    struct ListMenu *list = (void *) gTasks[listTaskId].data;
+    u16 totalItems = list->template.totalItems;
+    u16 maxShowed = list->template.maxShowed;
+
+    if (list->scrollOffset + list->selectedRow == 0 && JOY_NEW(DPAD_UP))
+    {
+        if (totalItems <= maxShowed)
+        {
+            list->selectedRow = totalItems - 1;
+        }
+        else
+        {
+            list->scrollOffset = totalItems - maxShowed;
+            list->selectedRow = maxShowed - 1;
+        }
+    }
+    else if (list->scrollOffset + list->selectedRow == totalItems - 1 && JOY_NEW(DPAD_DOWN))
+    {
+        list->scrollOffset = 0;
+        list->selectedRow = 0;
+    }
+    else
+    {
+        return FALSE;
+    }
+
+    PlaySE(SE_SELECT);
+    RedrawListMenu(listTaskId);
+    return TRUE;
+}
+
 // unused
 void ChangeListMenuPals(u8 listTaskId, u8 cursorPal, u8 fillValue, u8 cursorShadowPal)
 {

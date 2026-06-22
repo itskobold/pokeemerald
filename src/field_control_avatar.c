@@ -98,9 +98,9 @@ void FieldGetPlayerInput(struct FieldInput *input, u16 newKeys, u16 heldKeys)
     {
         if (GetPlayerSpeed() != PLAYER_SPEED_FASTEST)
         {
-            // Open the debug menu when L, R and Select are held together.
-            if ((heldKeys & L_BUTTON) && (heldKeys & R_BUTTON) && (heldKeys & SELECT_BUTTON)
-             && (newKeys & (L_BUTTON | R_BUTTON | SELECT_BUTTON)))
+            // Open the debug menu when L and R are held together.
+            if ((heldKeys & L_BUTTON) && (heldKeys & R_BUTTON)
+             && (newKeys & (L_BUTTON | R_BUTTON)))
                 input->pressedLRSelect = TRUE;
             else if (newKeys & START_BUTTON)
                 input->pressedStartButton = TRUE;

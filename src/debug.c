@@ -1,9 +1,13 @@
 #include "global.h"
 #include "debug.h"
 #include "event_data.h"
+#include "event_object_movement.h"
 #include "field_camera.h"
 #include "field_player_avatar.h"
+#include "field_screen_effect.h"
+#include "fieldmap.h"
 #include "field_weather.h"
+#include "overworld.h"
 #include "item.h"
 #include "list_menu.h"
 #include "main.h"
@@ -116,19 +120,20 @@ enum
 enum
 {
     DEBUG_CAMERA_ITEM_TOGGLE_FREECAM,
-    DEBUG_CAMERA_ITEM_TRACK_NPC,
+    DEBUG_CAMERA_ITEM_TRACK_ENTITY,
     DEBUG_CAMERA_ITEM_PAN_TILE,
-    DEBUG_CAMERA_ITEM_PAN_NPC,
+    DEBUG_CAMERA_ITEM_PAN_ENTITY,
+    DEBUG_CAMERA_ITEM_WARP_TILE,
     DEBUG_CAMERA_ITEM_RESET,
     DEBUG_CAMERA_ITEM_CANCEL,
 };
 
-// "Track NPC" / "Pan to NPC" share one numeric scroll box; the mode decides whether choosing
+// "Track Entity" / "Pan to Entity" share one numeric scroll box; the mode decides whether choosing
 // an object jumps the camera live (track) or arms a smooth pan committed with A (pan).
 enum
 {
-    DEBUG_NPC_BOX_MODE_TRACK,
-    DEBUG_NPC_BOX_MODE_PAN,
+    DEBUG_ENTITY_BOX_MODE_TRACK,
+    DEBUG_ENTITY_BOX_MODE_PAN,
 };
 
 // Target duration (frames) for camera pans started from the debug menu, ~0.4s at 60fps.
@@ -137,7 +142,7 @@ enum
 #define tMenuTaskId  data[0]
 #define tWindowId    data[1]
 
-#define TAG_TRACK_NPC_SCROLL_ARROW 2110
+#define TAG_TRACK_ENTITY_SCROLL_ARROW 2110
 #define TAG_CLOUD_COVER_SCROLL_ARROW 2111
 #define TAG_CLOUD_BRIGHTNESS_SCROLL_ARROW 2112
 
@@ -159,12 +164,12 @@ static void Debug_CommitCloudBrightnessBox(u8 taskId);
 static void Debug_CancelCloudBrightnessBox(u8 taskId);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_ReturnCameraToPlayer(u8 taskId);
-static void Debug_OpenNpcBox(u8 mode);
-static void Debug_TearDownNpcBox(u8 taskId);
-static void Debug_CloseTrackNpcBox(u8 taskId);
-static void Debug_CommitPanNpcBox(u8 taskId);
-static void Debug_CancelPanNpcBox(u8 taskId);
-static void Debug_DrawTrackNpcBox(void);
+static void Debug_OpenEntityBox(u8 mode);
+static void Debug_TearDownEntityBox(u8 taskId);
+static void Debug_CloseTrackEntityBox(u8 taskId);
+static void Debug_CommitPanEntityBox(u8 taskId);
+static void Debug_CancelPanEntityBox(u8 taskId);
+static void Debug_DrawTrackEntityBox(void);
 static u8 Debug_TrackedObjectCount(void);
 static u8 Debug_LocalIdForOrder(u8 order);
 static u8 Debug_OrderForLocalId(u8 localId);
@@ -172,7 +177,7 @@ static u8 Debug_OrderForLocalId(u8 localId);
 static void DebugTask_HandleMenuInput_Main(u8 taskId);
 static void DebugTask_HandleMenuInput_Camera(u8 taskId);
 static void DebugTask_HandleMenuInput_Weather(u8 taskId);
-static void DebugTask_TrackNpcInput(u8 taskId);
+static void DebugTask_TrackEntityInput(u8 taskId);
 static void DebugTask_CloudCoverInput(u8 taskId);
 static void DebugTask_CloudBrightnessInput(u8 taskId);
 
@@ -183,9 +188,10 @@ static void DebugAction_Weather_SetCloudBrightness(u8 taskId);
 static void DebugAction_Weather_Cancel(u8 taskId);
 static void DebugAction_Cancel(u8 taskId);
 static void DebugAction_Camera_ToggleFreecam(u8 taskId);
-static void DebugAction_Camera_TrackNPC(u8 taskId);
+static void DebugAction_Camera_TrackEntity(u8 taskId);
 static void DebugAction_Camera_PanTile(u8 taskId);
-static void DebugAction_Camera_PanNPC(u8 taskId);
+static void DebugAction_Camera_PanEntity(u8 taskId);
+static void DebugAction_Camera_WarpTile(u8 taskId);
 static void DebugAction_Camera_Reset(u8 taskId);
 static void DebugAction_Camera_Cancel(u8 taskId);
 static void Debug_OpenPanTileBox(void);
@@ -201,14 +207,14 @@ static void DebugTask_WaitPanToTile(u8 taskId);
 // scrolling pauses); closing it hands input back.
 static bool8 sDebugMenuOpen;
 
-// "Track NPC" numeric scroll box state. sTrackNpcOrder walks the map's object-event
+// "Track Entity" numeric scroll box state. sTrackEntityOrder walks the map's object-event
 // list: 0 = player, 1..N = the N object event templates in order. This covers every
 // object event in the map (spawned or culled) with a contiguous, stable index.
-static u8 sTrackNpcWindowId;
-static u8 sTrackNpcArrowTaskId;
-static u16 sTrackNpcOrder;  // position in the player+templates list
-static u8 sTrackNpcMaxOrder; // == object event count, for the scroll arrows
-static u8 sTrackNpcBoxMode; // DEBUG_NPC_BOX_MODE_*: track (live jump) vs pan (commit with A)
+static u8 sTrackEntityWindowId;
+static u8 sTrackEntityArrowTaskId;
+static u16 sTrackEntityOrder;  // position in the player+templates list
+static u8 sTrackEntityMaxOrder; // == object event count, for the scroll arrows
+static u8 sTrackEntityBoxMode; // DEBUG_ENTITY_BOX_MODE_*: track (live jump) vs pan (commit with A)
 
 // "Pan to tile" coordinate box state. The D-pad edits the destination tile (left/right = X,
 // up/down = Y); A commits the pan, B cancels back to the camera menu.
@@ -242,12 +248,13 @@ static const u8 sDebugText_Minus[] = _("-");
 static const u8 sDebugText_Cancel[] = _("Cancel");
 static const u8 sDebugText_Camera_EnableFreecam[] = _("Enable freecam");
 static const u8 sDebugText_Camera_DisableFreecam[] = _("Disable freecam");
-static const u8 sDebugText_Camera_TrackNPC[] = _("Track NPC");
-static const u8 sDebugText_Camera_PanNPC[] = _("Pan to NPC");
+static const u8 sDebugText_Camera_TrackEntity[] = _("Track entity");
+static const u8 sDebugText_Camera_PanEntity[] = _("Pan to entity");
 static const u8 sDebugText_Camera_PanTile[] = _("Pan to tile");
+static const u8 sDebugText_Camera_WarpTile[] = _("Warp to tile");
 static const u8 sDebugText_Camera_Reset[] = _("Reset camera");
-static const u8 sDebugText_TrackNpc_Label[] = _("Track ");
-static const u8 sDebugText_PanNpc_Label[] = _("Pan ");
+static const u8 sDebugText_TrackEntity_Label[] = _("Track ");
+static const u8 sDebugText_PanEntity_Label[] = _("Pan ");
 static const u8 sDebugText_PanTile_X[] = _("X: ");
 static const u8 sDebugText_PanTile_Y[] = _(", Y: ");
 
@@ -268,9 +275,10 @@ static const struct ListMenuItem sDebugMenuItems_Weather[] =
 static const struct ListMenuItem sDebugMenuItems_Camera[] =
 {
     [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = {sDebugText_Camera_EnableFreecam, DEBUG_CAMERA_ITEM_TOGGLE_FREECAM},
-    [DEBUG_CAMERA_ITEM_TRACK_NPC]      = {sDebugText_Camera_TrackNPC, DEBUG_CAMERA_ITEM_TRACK_NPC},
+    [DEBUG_CAMERA_ITEM_TRACK_ENTITY]      = {sDebugText_Camera_TrackEntity, DEBUG_CAMERA_ITEM_TRACK_ENTITY},
     [DEBUG_CAMERA_ITEM_PAN_TILE]       = {sDebugText_Camera_PanTile, DEBUG_CAMERA_ITEM_PAN_TILE},
-    [DEBUG_CAMERA_ITEM_PAN_NPC]        = {sDebugText_Camera_PanNPC, DEBUG_CAMERA_ITEM_PAN_NPC},
+    [DEBUG_CAMERA_ITEM_PAN_ENTITY]        = {sDebugText_Camera_PanEntity, DEBUG_CAMERA_ITEM_PAN_ENTITY},
+    [DEBUG_CAMERA_ITEM_WARP_TILE]      = {sDebugText_Camera_WarpTile, DEBUG_CAMERA_ITEM_WARP_TILE},
     [DEBUG_CAMERA_ITEM_RESET]          = {sDebugText_Camera_Reset, DEBUG_CAMERA_ITEM_RESET},
     [DEBUG_CAMERA_ITEM_CANCEL]         = {sDebugText_Cancel, DEBUG_CAMERA_ITEM_CANCEL},
 };
@@ -292,9 +300,10 @@ static void (*const sDebugMenuActions_Weather[])(u8) =
 static void (*const sDebugMenuActions_Camera[])(u8) =
 {
     [DEBUG_CAMERA_ITEM_TOGGLE_FREECAM] = DebugAction_Camera_ToggleFreecam,
-    [DEBUG_CAMERA_ITEM_TRACK_NPC]      = DebugAction_Camera_TrackNPC,
+    [DEBUG_CAMERA_ITEM_TRACK_ENTITY]      = DebugAction_Camera_TrackEntity,
     [DEBUG_CAMERA_ITEM_PAN_TILE]       = DebugAction_Camera_PanTile,
-    [DEBUG_CAMERA_ITEM_PAN_NPC]        = DebugAction_Camera_PanNPC,
+    [DEBUG_CAMERA_ITEM_PAN_ENTITY]        = DebugAction_Camera_PanEntity,
+    [DEBUG_CAMERA_ITEM_WARP_TILE]      = DebugAction_Camera_WarpTile,
     [DEBUG_CAMERA_ITEM_RESET]          = DebugAction_Camera_Reset,
     [DEBUG_CAMERA_ITEM_CANCEL]         = DebugAction_Camera_Cancel,
 };
@@ -349,9 +358,14 @@ static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void 
     u8 windowId;
     u8 menuTaskId;
     u8 inputTaskId;
+    int width = 0;
+    u32 i;
 
     LoadMessageBoxAndBorderGfx();
-    windowId = CreateWindowFromRect(0, 0, 14, numItems * 2);
+    // Size the window to its widest item so each menu fits its own text exactly.
+    for (i = 0; i < numItems; i++)
+        width = DisplayTextAndGetWidth(items[i].name, width);
+    windowId = CreateWindowFromRect(0, 0, ConvertPixelWidthToTileWidth(width), numItems * 2);
     DrawStdWindowFrame(windowId, FALSE);
 
     listTemplate = sDebugMenuListTemplate;
@@ -392,7 +406,12 @@ static void Debug_CloseMenu(u8 taskId)
 static void DebugTask_HandleMenuInput_Main(u8 taskId)
 {
     void (*func)(u8);
-    s32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+    s32 input;
+
+    if (ListMenuTryWrapSelection(gTasks[taskId].tMenuTaskId))
+        return;
+
+    input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
 
     if (JOY_NEW(A_BUTTON))
     {
@@ -410,7 +429,12 @@ static void DebugTask_HandleMenuInput_Main(u8 taskId)
 static void DebugTask_HandleMenuInput_Camera(u8 taskId)
 {
     void (*func)(u8);
-    s32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+    s32 input;
+
+    if (ListMenuTryWrapSelection(gTasks[taskId].tMenuTaskId))
+        return;
+
+    input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
 
     if (JOY_NEW(A_BUTTON))
     {
@@ -457,8 +481,8 @@ static void DebugAction_Camera_ToggleFreecam(u8 taskId)
         Debug_EnableFreecam(taskId);
 }
 
-// Detaches the camera from the player and lets the D-pad drive it. When opening from NPC tracking
-// the camera is still anchored to that NPC, so drop the anchor here or the D-pad can't move it.
+// Detaches the camera from the player and lets the D-pad drive it. When opening from Entity tracking
+// the camera is still anchored to that Entity, so drop the anchor here or the D-pad can't move it.
 static void Debug_EnableFreecam(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
@@ -468,7 +492,7 @@ static void Debug_EnableFreecam(u8 taskId)
     UnlockPlayerFieldControls();
 }
 
-// Returns the camera to the player from any detached state (freecam, NPC tracking, or a pan/tile
+// Returns the camera to the player from any detached state (freecam, Entity tracking, or a pan/tile
 // rest) and hands control back. RecenterCameraOnPlayer runs before clearing the freecam flag so the
 // location's graphics swap stays silent. Shared by the freecam toggle and the Reset action.
 static void Debug_ReturnCameraToPlayer(u8 taskId)
@@ -480,10 +504,10 @@ static void Debug_ReturnCameraToPlayer(u8 taskId)
 }
 
 // Opens the numeric scroll box used to pick which object event the camera tracks.
-static void DebugAction_Camera_TrackNPC(u8 taskId)
+static void DebugAction_Camera_TrackEntity(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
-    Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_TRACK);
+    Debug_OpenEntityBox(DEBUG_ENTITY_BOX_MODE_TRACK);
 }
 
 // Tests PanCameraToTile: opens a box to enter a destination tile, then glides the camera there.
@@ -618,10 +642,57 @@ static void DebugTask_WaitPanToTile(u8 taskId)
 
 // Opens the same selection box in "pan" mode: scrolling only previews the choice; A smoothly pans
 // the camera to the picked object, B steps back to the camera menu without moving it.
-static void DebugAction_Camera_PanNPC(u8 taskId)
+static void DebugAction_Camera_PanEntity(u8 taskId)
 {
     Debug_DestroyMenu(taskId);
-    Debug_OpenNpcBox(DEBUG_NPC_BOX_MODE_PAN);
+    Debug_OpenEntityBox(DEBUG_ENTITY_BOX_MODE_PAN);
+}
+
+// Warps the player to the tile the camera is centered on. The camera view anchor names the map the
+// focus tile currently sits on (tracked across any number of connection hops) plus that map's origin
+// offset in the home frame, so the focus resolves to a local tile no matter how far the camera has
+// roamed. A full map warp is always fired, as if walking through a seam: the map loads fresh and
+// ResetCameraTracking re-anchors the camera on the player (so a same-map warp re-centers too, rather
+// than the player snapping in place).
+static void DebugAction_Camera_WarpTile(u8 taskId)
+{
+    struct ViewMap anchor;
+    const struct MapHeader *header;
+    s16 x, y;
+    int width, height;
+
+    GetCameraViewAnchor(&anchor);
+    header = Overworld_GetMapHeaderByGroupAndId(anchor.mapGroup, anchor.mapNum);
+    if (header == NULL || header->mapLayout == NULL)
+    {
+        // Shouldn't happen; fall back to treating the focus as a home-map tile.
+        anchor.mapGroup = gSaveBlock1Ptr->location.mapGroup;
+        anchor.mapNum   = gSaveBlock1Ptr->location.mapNum;
+        anchor.dx = anchor.dy = 0;
+        header = &gMapHeader;
+    }
+
+    // Focus tile, local to the anchor map (anchor.dx/dy is that map's origin in the home frame).
+    x = gCameraPos.x - anchor.dx;
+    y = gCameraPos.y - anchor.dy;
+    width = header->mapLayout->width;
+    height = header->mapLayout->height;
+
+    // Clamp into the map in case the focus drifted just past an edge into a border region.
+    if (x < 0)
+        x = 0;
+    else if (x > width - 1)
+        x = width - 1;
+    if (y < 0)
+        y = 0;
+    else if (y > height - 1)
+        y = height - 1;
+
+    // Preserve the player's avatar state (bike/surf/etc.) across the warp, like an ordinary transition.
+    StoreInitialPlayerAvatarState();
+    SetWarpDestination(anchor.mapGroup, anchor.mapNum, WARP_ID_NONE, x, y);
+    DoWarp();
+    Debug_DestroyMenu(taskId);
 }
 
 static void DebugAction_Camera_Reset(u8 taskId)
@@ -705,31 +776,31 @@ static void Debug_SetCameraTrack(u8 localId)
         SetFreecamActive(FALSE);
 }
 
-static void Debug_DrawTrackNpcBox(void)
+static void Debug_DrawTrackEntityBox(void)
 {
     u8 text[16];
 
-    StringCopy(text, sTrackNpcBoxMode == DEBUG_NPC_BOX_MODE_PAN ? sDebugText_PanNpc_Label : sDebugText_TrackNpc_Label);
-    ConvertIntToDecimalStringN(gStringVar1, Debug_LocalIdForOrder(sTrackNpcOrder), STR_CONV_MODE_LEADING_ZEROS, 3);
+    StringCopy(text, sTrackEntityBoxMode == DEBUG_ENTITY_BOX_MODE_PAN ? sDebugText_PanEntity_Label : sDebugText_TrackEntity_Label);
+    ConvertIntToDecimalStringN(gStringVar1, Debug_LocalIdForOrder(sTrackEntityOrder), STR_CONV_MODE_LEADING_ZEROS, 3);
     StringAppend(text, gStringVar1);
 
-    FillWindowPixelBuffer(sTrackNpcWindowId, PIXEL_FILL(1));
-    AddTextPrinterParameterized(sTrackNpcWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
-    CopyWindowToVram(sTrackNpcWindowId, COPYWIN_GFX);
+    FillWindowPixelBuffer(sTrackEntityWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sTrackEntityWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sTrackEntityWindowId, COPYWIN_GFX);
 }
 
-static void Debug_OpenNpcBox(u8 mode)
+static void Debug_OpenEntityBox(u8 mode)
 {
-    sTrackNpcBoxMode = mode;
+    sTrackEntityBoxMode = mode;
     // Start on whatever the camera is already tracking (the player by default).
-    sTrackNpcOrder = Debug_OrderForLocalId(GetCameraTrackedLocalId());
-    sTrackNpcMaxOrder = Debug_TrackedObjectCount();
+    sTrackEntityOrder = Debug_OrderForLocalId(GetCameraTrackedLocalId());
+    sTrackEntityMaxOrder = Debug_TrackedObjectCount();
 
     LoadMessageBoxAndBorderGfx();
-    sTrackNpcWindowId = CreateWindowFromRect(0, 1, 9, 2);
-    DrawStdWindowFrame(sTrackNpcWindowId, FALSE);
-    Debug_DrawTrackNpcBox();
-    CopyWindowToVram(sTrackNpcWindowId, COPYWIN_FULL);
+    sTrackEntityWindowId = CreateWindowFromRect(0, 1, 9, 2);
+    DrawStdWindowFrame(sTrackEntityWindowId, FALSE);
+    Debug_DrawTrackEntityBox();
+    CopyWindowToVram(sTrackEntityWindowId, COPYWIN_FULL);
 
     // Build the arrow pair by hand so the hide-at-bounds thresholds match the reversed controls (up
     // increases the value, down decreases it): the up arrow hides at the max, the down arrow at 0.
@@ -742,85 +813,85 @@ static void Debug_OpenNpcBox(u8 mode)
         arrows.secondArrowType = SCROLL_ARROW_DOWN;
         arrows.secondX = 44;
         arrows.secondY = 36;
-        arrows.fullyUpThreshold = sTrackNpcMaxOrder;
+        arrows.fullyUpThreshold = sTrackEntityMaxOrder;
         arrows.fullyDownThreshold = 0;
-        arrows.tileTag = TAG_TRACK_NPC_SCROLL_ARROW;
-        arrows.palTag = TAG_TRACK_NPC_SCROLL_ARROW;
+        arrows.tileTag = TAG_TRACK_ENTITY_SCROLL_ARROW;
+        arrows.palTag = TAG_TRACK_ENTITY_SCROLL_ARROW;
         arrows.palNum = 0;
-        sTrackNpcArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sTrackNpcOrder);
+        sTrackEntityArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sTrackEntityOrder);
     }
 
-    CreateTask(DebugTask_TrackNpcInput, 3);
+    CreateTask(DebugTask_TrackEntityInput, 3);
     sDebugMenuOpen = TRUE;
     // Track mode jumps the camera live as you scroll; pan mode only previews and waits for A.
-    if (mode == DEBUG_NPC_BOX_MODE_TRACK)
-        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+    if (mode == DEBUG_ENTITY_BOX_MODE_TRACK)
+        Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackEntityOrder));
 }
 
 // Tears down the box's window, scroll arrows and input task. Shared by every box exit path;
 // the caller decides what field/camera state to restore afterwards.
-static void Debug_TearDownNpcBox(u8 taskId)
+static void Debug_TearDownEntityBox(u8 taskId)
 {
-    RemoveScrollIndicatorArrowPair(sTrackNpcArrowTaskId);
-    ClearStdWindowAndFrameToTransparent(sTrackNpcWindowId, TRUE);
-    RemoveWindow(sTrackNpcWindowId);
+    RemoveScrollIndicatorArrowPair(sTrackEntityArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sTrackEntityWindowId, TRUE);
+    RemoveWindow(sTrackEntityWindowId);
     DestroyTask(taskId);
     sDebugMenuOpen = FALSE;
 }
 
 // Closes the box but leaves the camera tracking the selected object, handing input back. When
-// tracking the player (id 0) this returns normal control; when tracking an NPC the overworld keeps
+// tracking the player (id 0) this returns normal control; when tracking an Entity the overworld keeps
 // the player parked while L+R+Select still reopens the box to change or stop tracking.
-static void Debug_CloseTrackNpcBox(u8 taskId)
+static void Debug_CloseTrackEntityBox(u8 taskId)
 {
-    Debug_TearDownNpcBox(taskId);
+    Debug_TearDownEntityBox(taskId);
     UnlockPlayerFieldControls();
 }
 
 // Commits the pan box (A): starts the camera gliding to the selected object and hands input back so
 // the world runs while it travels. PanCameraToLocalId chases the target's live position and locks
 // on at arrival, after which the overworld keeps the player parked just as ordinary tracking does.
-static void Debug_CommitPanNpcBox(u8 taskId)
+static void Debug_CommitPanEntityBox(u8 taskId)
 {
-    u8 localId = Debug_LocalIdForOrder(sTrackNpcOrder);
+    u8 localId = Debug_LocalIdForOrder(sTrackEntityOrder);
 
-    Debug_TearDownNpcBox(taskId);
+    Debug_TearDownEntityBox(taskId);
     PanCameraToLocalId(localId, DEBUG_PAN_FRAMES);
     UnlockPlayerFieldControls();
 }
 
 // Backs out of the pan box (B) without moving the camera, returning to the camera submenu.
-static void Debug_CancelPanNpcBox(u8 taskId)
+static void Debug_CancelPanEntityBox(u8 taskId)
 {
-    Debug_TearDownNpcBox(taskId);
+    Debug_TearDownEntityBox(taskId);
     Debug_ShowCameraMenu();
 }
 
-static void DebugTask_TrackNpcInput(u8 taskId)
+static void DebugTask_TrackEntityInput(u8 taskId)
 {
-    bool8 trackMode = (sTrackNpcBoxMode == DEBUG_NPC_BOX_MODE_TRACK);
+    bool8 trackMode = (sTrackEntityBoxMode == DEBUG_ENTITY_BOX_MODE_TRACK);
 
-    if (JOY_REPEAT(DPAD_UP) && sTrackNpcOrder < sTrackNpcMaxOrder)
+    if (JOY_REPEAT(DPAD_UP) && sTrackEntityOrder < sTrackEntityMaxOrder)
     {
-        sTrackNpcOrder++;
+        sTrackEntityOrder++;
         PlaySE(SE_SELECT);
-        Debug_DrawTrackNpcBox();
+        Debug_DrawTrackEntityBox();
         if (trackMode)
-            Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+            Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackEntityOrder));
     }
-    else if (JOY_REPEAT(DPAD_DOWN) && sTrackNpcOrder > 0)
+    else if (JOY_REPEAT(DPAD_DOWN) && sTrackEntityOrder > 0)
     {
-        sTrackNpcOrder--;
+        sTrackEntityOrder--;
         PlaySE(SE_SELECT);
-        Debug_DrawTrackNpcBox();
+        Debug_DrawTrackEntityBox();
         if (trackMode)
-            Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackNpcOrder));
+            Debug_SetCameraTrack(Debug_LocalIdForOrder(sTrackEntityOrder));
     }
     else if (!trackMode && JOY_NEW(A_BUTTON))
     {
         // Pan mode commits the selection: glide the camera to the chosen object.
         PlaySE(SE_SELECT);
-        Debug_CommitPanNpcBox(taskId);
+        Debug_CommitPanEntityBox(taskId);
     }
     else if (JOY_NEW(B_BUTTON))
     {
@@ -828,16 +899,21 @@ static void DebugTask_TrackNpcInput(u8 taskId)
         // Track mode keeps its live selection and returns to the field; pan mode discards the
         // (uncommitted) selection and steps back to the camera menu.
         if (trackMode)
-            Debug_CloseTrackNpcBox(taskId);
+            Debug_CloseTrackEntityBox(taskId);
         else
-            Debug_CancelPanNpcBox(taskId);
+            Debug_CancelPanEntityBox(taskId);
     }
 }
 
 static void DebugTask_HandleMenuInput_Weather(u8 taskId)
 {
     void (*func)(u8);
-    s32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+    s32 input;
+
+    if (ListMenuTryWrapSelection(gTasks[taskId].tMenuTaskId))
+        return;
+
+    input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
 
     if (JOY_NEW(A_BUTTON))
     {
@@ -882,7 +958,7 @@ static void Debug_DrawCloudCoverBox(void)
     u8 text[16];
 
     StringCopy(text, sDebugText_CloudCover_Label);
-    ConvertIntToDecimalStringN(gStringVar1, sCloudCoverValue, STR_CONV_MODE_LEADING_ZEROS, 1);
+    ConvertIntToDecimalStringN(gStringVar1, sCloudCoverValue, STR_CONV_MODE_LEADING_ZEROS, 2);
     StringAppend(text, gStringVar1);
 
     FillWindowPixelBuffer(sCloudCoverWindowId, PIXEL_FILL(1));
