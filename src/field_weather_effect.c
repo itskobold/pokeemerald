@@ -1715,6 +1715,11 @@ static void UpdateAshSprite(struct Sprite *sprite)
 #define CLOUD_PARALLAX_DEN  32
 #define CLOUD_IMAGE_TILES   (CLOUD_TILE_4BPP_SIZE / TILE_SIZE_4BPP) // hardware tiles per image
 #define CLOUD_PATTERN_PX    (CLOUD_PATTERN_DIM * CLOUD_TILE)        // pattern period (px)
+// The leftmost column can sit as high as x=-1, leaving no margin past the screen's left edge, so the
+// sway/ripple wobble (x2) occasionally nudges a row right and exposes a 1px seam there. Shift the whole
+// field left by this buffer; every tile moves together so the field stays seamless, and the spare 5th
+// column keeps the right edge covered.
+#define CLOUD_LEFT_BUFFER   1   // px of extra coverage past the left screen edge
 
 // Subtle wobble layered on top of the drift to keep the field from looking frozen. Two pieces, both
 // driven by cloudsWavePhase (one unit/frame) and applied via sprite->x2/y2 so they nudge position only,
@@ -2394,7 +2399,7 @@ static void UpdateCloudsSprite(struct Sprite *sprite)
     s32 row = sprite->tSpriteRow;
     // Tile top-left, aligned to the scroll phase so each sprite shows exactly
     // one source tile; covers [-CLOUD_TILE .. screen) as the phase drifts.
-    s32 x = (baseX & (CLOUD_TILE - 1)) - CLOUD_TILE + col * CLOUD_TILE;
+    s32 x = (baseX & (CLOUD_TILE - 1)) - CLOUD_TILE - CLOUD_LEFT_BUFFER + col * CLOUD_TILE;
     s32 y = (baseY & (CLOUD_TILE - 1)) - CLOUD_TILE + row * CLOUD_TILE;
     // Pattern cell this sprite currently occupies (anchored in world space).
     s32 patternCol = (col - (baseX >> 6) - 1) % CLOUD_PATTERN_DIM;
