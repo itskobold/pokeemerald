@@ -981,6 +981,12 @@ struct ExternalEventFlags
 
 } __attribute__((packed));/*size = 0x15*/
 
+struct WeatherState
+{
+    u8 cloudCover:3;      // persistent cloud tile set (clouds/0..7)
+    u8 cloudBrightness:3; // overlay brightness, raw 0..5 (actual -2..3, see field_weather.h)
+};
+
 struct SaveBlock1
 {
     /*0x00*/ struct Coords16 playerPos; // The player's tile position (map-relative). For the camera's focus tile see gCameraPos.
@@ -993,7 +999,7 @@ struct SaveBlock1
     /*0x2E*/ u8 weather;
     /*0x2F*/ u8 weatherCycleStage;
     /*0x30*/ u8 flashLevel;
-    /*0x31*/ u8 cloudCover; // persistent cloud tile set (clouds/0..7)
+    /*0x31*/ struct WeatherState weatherState; // persistent cloud cover + brightness
     /*0x32*/ u16 mapLayoutId;
     /*0x34*/ u16 mapView[0x100];
     /*0x234*/ u8 playerPartyCount;

@@ -128,7 +128,6 @@ const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", 
 
 // Controls for blending the fog weather effects
 // Set to negative values for darkening, positive for lightening (suggested range [-2, 5])
-#define CLOUDS_BRIGHTNESS 3          // Clouds overlay (darken)
 #define UNDERWATER_BRIGHTNESS 2       // Horizontal fog under WEATHER_UNDERWATER_BUBBLES
 
 #define WEATHER_BLEND_EFFECT(brightness) ((brightness) < 0 ? BLDCNT_EFFECT_DARKEN : BLDCNT_EFFECT_LIGHTEN)
@@ -1640,6 +1639,8 @@ static void UpdateAshSprite(struct Sprite *sprite)
 
 static void UpdateCloudsMovement(void);
 static void UpdateCloudCover(void);
+static void UpdateCloudBrightness(void);
+static void ApplyCloudBrightness(void);
 static void ReloadCloudsTiles(void);
 static void CreateCloudsSprites(void);
 static void DestroyCloudsSprites(void);
@@ -1695,12 +1696,20 @@ static void SetCloudsSpritesInvisible(bool8 invisible)
     }
 }
 
+// Push the current overlay brightness into the blend registers.
+static void ApplyCloudBrightness(void)
+{
+    s8 brightness = gWeatherPtr->cloudBrightness;
+
+    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
+                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(brightness));
+    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(brightness));
+}
+
 static void ShowClouds(void)
 {
     SetCloudsSpritesInvisible(FALSE);
-    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(CLOUDS_BRIGHTNESS));
-    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(CLOUDS_BRIGHTNESS));
+    ApplyCloudBrightness();
     SetGpuReg(REG_OFFSET_WINOUT, WINOUT_WIN01_BG_ALL | WINOUT_WIN01_OBJ
                                | WINOUT_WINOBJ_BG_ALL | WINOUT_WINOBJ_OBJ | WINOUT_WINOBJ_CLR);
     ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_WIN1_ON);
@@ -1724,9 +1733,12 @@ static void HideClouds(void)
 void InitClouds(void)
 {
     sCloudsShown = FALSE;
-    gWeatherPtr->cloudCover = gSaveBlock1Ptr->cloudCover; // persists across map transitions
-    gWeatherPtr->targetCloudCover = gSaveBlock1Ptr->cloudCover;
+    gWeatherPtr->cloudCover = gSaveBlock1Ptr->weatherState.cloudCover; // persists across map transitions
+    gWeatherPtr->targetCloudCover = gSaveBlock1Ptr->weatherState.cloudCover;
     gWeatherPtr->cloudCoverTimer = 0;
+    gWeatherPtr->cloudBrightness = FromCloudBrightnessRaw(gSaveBlock1Ptr->weatherState.cloudBrightness);
+    gWeatherPtr->targetCloudBrightness = gWeatherPtr->cloudBrightness;
+    gWeatherPtr->cloudBrightnessTimer = 0;
     gWeatherPtr->cloudsScrollXCounter = 0;
     gWeatherPtr->cloudsScrollYCounter = 0;
     gWeatherPtr->cloudsXOffset = 0;
@@ -1742,6 +1754,7 @@ void UpdateClouds(void)
                 && CloudsAllowedOnCurrentMap();
 
     UpdateCloudCover();
+    UpdateCloudBrightness();
 
     if (active)
         UpdateCloudsMovement();
@@ -1801,8 +1814,48 @@ static void UpdateCloudCover(void)
     else
         gWeatherPtr->cloudCover--;
 
-    gSaveBlock1Ptr->cloudCover = gWeatherPtr->cloudCover; // persist current level
+    gSaveBlock1Ptr->weatherState.cloudCover = gWeatherPtr->cloudCover; // persist current level
     ReloadCloudsTiles();
+}
+
+// Request a target overlay brightness; it is stepped toward (see UpdateCloudBrightness).
+// Stage 0 is skipped, so 0 is never a valid target.
+void SetCloudBrightness(s8 target)
+{
+    if (target < CLOUD_BRIGHTNESS_MIN)
+        target = CLOUD_BRIGHTNESS_MIN;
+    else if (target > CLOUD_BRIGHTNESS_MAX)
+        target = CLOUD_BRIGHTNESS_MAX;
+    if (target == 0)
+        target = 1;
+    gWeatherPtr->targetCloudBrightness = target;
+}
+
+// Step the brightness one level toward the target every 20 frames, persisting and
+// reapplying it as it changes. Stage 0 is skipped: +1 jumps straight to -1 and back.
+static void UpdateCloudBrightness(void)
+{
+    if (gWeatherPtr->cloudBrightness == gWeatherPtr->targetCloudBrightness)
+        return;
+
+    if (++gWeatherPtr->cloudBrightnessTimer < 20)
+        return;
+    gWeatherPtr->cloudBrightnessTimer = 0;
+
+    if (gWeatherPtr->cloudBrightness < gWeatherPtr->targetCloudBrightness)
+    {
+        if (++gWeatherPtr->cloudBrightness == 0)
+            gWeatherPtr->cloudBrightness = 1;
+    }
+    else
+    {
+        if (--gWeatherPtr->cloudBrightness == 0)
+            gWeatherPtr->cloudBrightness = -1;
+    }
+
+    gSaveBlock1Ptr->weatherState.cloudBrightness = ToCloudBrightnessRaw(gWeatherPtr->cloudBrightness); // persist
+    if (sCloudsShown)
+        ApplyCloudBrightness();
 }
 
 // Overwrite the cloud tiles already in VRAM with the active set's images. The

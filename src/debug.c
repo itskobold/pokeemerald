@@ -107,6 +107,7 @@ enum
 enum
 {
     DEBUG_WEATHER_ITEM_SET_CLOUD_COVER,
+    DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS,
     DEBUG_WEATHER_ITEM_CANCEL,
 };
 
@@ -137,6 +138,7 @@ enum
 
 #define TAG_TRACK_NPC_SCROLL_ARROW 2110
 #define TAG_CLOUD_COVER_SCROLL_ARROW 2111
+#define TAG_CLOUD_BRIGHTNESS_SCROLL_ARROW 2112
 
 static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void (*handleInput)(u8));
 static void Debug_DestroyMenu(u8 taskId);
@@ -149,6 +151,11 @@ static void Debug_DrawCloudCoverBox(void);
 static void Debug_TearDownCloudCoverBox(u8 taskId);
 static void Debug_CommitCloudCoverBox(u8 taskId);
 static void Debug_CancelCloudCoverBox(u8 taskId);
+static void Debug_OpenCloudBrightnessBox(void);
+static void Debug_DrawCloudBrightnessBox(void);
+static void Debug_TearDownCloudBrightnessBox(u8 taskId);
+static void Debug_CommitCloudBrightnessBox(u8 taskId);
+static void Debug_CancelCloudBrightnessBox(u8 taskId);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_ReturnCameraToPlayer(u8 taskId);
 static void Debug_OpenNpcBox(u8 mode);
@@ -166,10 +173,12 @@ static void DebugTask_HandleMenuInput_Camera(u8 taskId);
 static void DebugTask_HandleMenuInput_Weather(u8 taskId);
 static void DebugTask_TrackNpcInput(u8 taskId);
 static void DebugTask_CloudCoverInput(u8 taskId);
+static void DebugTask_CloudBrightnessInput(u8 taskId);
 
 static void DebugAction_OpenCameraMenu(u8 taskId);
 static void DebugAction_OpenWeatherMenu(u8 taskId);
 static void DebugAction_Weather_SetCloudCover(u8 taskId);
+static void DebugAction_Weather_SetCloudBrightness(u8 taskId);
 static void DebugAction_Weather_Cancel(u8 taskId);
 static void DebugAction_Cancel(u8 taskId);
 static void DebugAction_Camera_ToggleFreecam(u8 taskId);
@@ -212,6 +221,12 @@ static u8 sCloudCoverWindowId;
 static u8 sCloudCoverArrowTaskId;
 static u16 sCloudCoverValue;
 
+// "Set Cloud Brightness" numeric scroll box state. The value is an index into the non-zero
+// brightness scale {-2,-1,+1,+2,+3} (stage 0 is skipped); A commits via SetCloudBrightness.
+static u8 sCloudBrightnessWindowId;
+static u8 sCloudBrightnessArrowTaskId;
+static u16 sCloudBrightnessValue; // index in [0, NUM_CLOUD_BRIGHTNESS_LEVELS - 1]
+
 // Writable copy of the camera submenu items, refilled from the const template each time the menu is
 // shown, so the freecam label can be swapped (debug.o's .data is discarded by the linker).
 static struct ListMenuItem sCameraMenuItems[DEBUG_CAMERA_ITEM_CANCEL + 1];
@@ -220,6 +235,9 @@ static const u8 sDebugText_Camera[] = _("Camera");
 static const u8 sDebugText_Weather[] = _("Weather");
 static const u8 sDebugText_Weather_SetCloudCover[] = _("Set Cloud Cover");
 static const u8 sDebugText_CloudCover_Label[] = _("Cover ");
+static const u8 sDebugText_Weather_SetCloudBrightness[] = _("Set Cloud Brightness");
+static const u8 sDebugText_CloudBrightness_Label[] = _("Bright ");
+static const u8 sDebugText_Minus[] = _("-");
 static const u8 sDebugText_Cancel[] = _("Cancel");
 static const u8 sDebugText_Camera_EnableFreecam[] = _("Enable freecam");
 static const u8 sDebugText_Camera_DisableFreecam[] = _("Disable freecam");
@@ -241,8 +259,9 @@ static const struct ListMenuItem sDebugMenuItems_Main[] =
 
 static const struct ListMenuItem sDebugMenuItems_Weather[] =
 {
-    [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER] = {sDebugText_Weather_SetCloudCover, DEBUG_WEATHER_ITEM_SET_CLOUD_COVER},
-    [DEBUG_WEATHER_ITEM_CANCEL]          = {sDebugText_Cancel, DEBUG_WEATHER_ITEM_CANCEL},
+    [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER]      = {sDebugText_Weather_SetCloudCover, DEBUG_WEATHER_ITEM_SET_CLOUD_COVER},
+    [DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS] = {sDebugText_Weather_SetCloudBrightness, DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS},
+    [DEBUG_WEATHER_ITEM_CANCEL]               = {sDebugText_Cancel, DEBUG_WEATHER_ITEM_CANCEL},
 };
 
 static const struct ListMenuItem sDebugMenuItems_Camera[] =
@@ -264,8 +283,9 @@ static void (*const sDebugMenuActions_Main[])(u8) =
 
 static void (*const sDebugMenuActions_Weather[])(u8) =
 {
-    [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER] = DebugAction_Weather_SetCloudCover,
-    [DEBUG_WEATHER_ITEM_CANCEL]          = DebugAction_Weather_Cancel,
+    [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER]      = DebugAction_Weather_SetCloudCover,
+    [DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS] = DebugAction_Weather_SetCloudBrightness,
+    [DEBUG_WEATHER_ITEM_CANCEL]               = DebugAction_Weather_Cancel,
 };
 
 static void (*const sDebugMenuActions_Camera[])(u8) =
@@ -952,6 +972,140 @@ static void DebugTask_CloudCoverInput(u8 taskId)
     {
         PlaySE(SE_SELECT);
         Debug_CancelCloudCoverBox(taskId);
+    }
+}
+
+// Number of selectable brightness stages: the scale {-2,-1,+1,+2,+3} with stage 0 skipped.
+#define NUM_CLOUD_BRIGHTNESS_LEVELS (CLOUD_BRIGHTNESS_MAX - CLOUD_BRIGHTNESS_MIN)
+
+// Map a box index [0, NUM_CLOUD_BRIGHTNESS_LEVELS-1] to its brightness value, skipping stage 0.
+static s8 Debug_CloudBrightnessFromIndex(u16 index)
+{
+    s8 value = CLOUD_BRIGHTNESS_MIN + index;
+    if (value >= 0)
+        value++;
+    return value;
+}
+
+// Inverse of Debug_CloudBrightnessFromIndex.
+static u16 Debug_CloudBrightnessToIndex(s8 value)
+{
+    u16 index = value - CLOUD_BRIGHTNESS_MIN;
+    if (value > 0)
+        index--;
+    return index;
+}
+
+// Opens the numeric scroll box used to pick a target cloud brightness.
+static void DebugAction_Weather_SetCloudBrightness(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenCloudBrightnessBox();
+}
+
+// Redraws the box as "Bright n" from the current index, showing the signed value.
+static void Debug_DrawCloudBrightnessBox(void)
+{
+    u8 text[16];
+    s8 value = Debug_CloudBrightnessFromIndex(sCloudBrightnessValue);
+
+    StringCopy(text, sDebugText_CloudBrightness_Label);
+    if (value < 0)
+    {
+        StringAppend(text, sDebugText_Minus);
+        value = -value;
+    }
+    ConvertIntToDecimalStringN(gStringVar1, value, STR_CONV_MODE_LEADING_ZEROS, 1);
+    StringAppend(text, gStringVar1);
+
+    FillWindowPixelBuffer(sCloudBrightnessWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sCloudBrightnessWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sCloudBrightnessWindowId, COPYWIN_GFX);
+}
+
+// Opens the brightness box, starting on the current target so reopening lands where you left off.
+static void Debug_OpenCloudBrightnessBox(void)
+{
+    sCloudBrightnessValue = Debug_CloudBrightnessToIndex(gWeatherPtr->targetCloudBrightness);
+
+    LoadMessageBoxAndBorderGfx();
+    sCloudBrightnessWindowId = CreateWindowFromRect(0, 1, 10, 2);
+    DrawStdWindowFrame(sCloudBrightnessWindowId, FALSE);
+    Debug_DrawCloudBrightnessBox();
+    CopyWindowToVram(sCloudBrightnessWindowId, COPYWIN_FULL);
+
+    {
+        struct ScrollArrowsTemplate arrows;
+
+        arrows.firstArrowType = SCROLL_ARROW_UP;
+        arrows.firstX = 44;
+        arrows.firstY = 12;
+        arrows.secondArrowType = SCROLL_ARROW_DOWN;
+        arrows.secondX = 44;
+        arrows.secondY = 36;
+        arrows.fullyUpThreshold = NUM_CLOUD_BRIGHTNESS_LEVELS - 1;
+        arrows.fullyDownThreshold = 0;
+        arrows.tileTag = TAG_CLOUD_BRIGHTNESS_SCROLL_ARROW;
+        arrows.palTag = TAG_CLOUD_BRIGHTNESS_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sCloudBrightnessArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sCloudBrightnessValue);
+    }
+
+    CreateTask(DebugTask_CloudBrightnessInput, 3);
+    sDebugMenuOpen = TRUE;
+}
+
+// Tears down the box's window, scroll arrows and input task. The caller decides what to do next.
+static void Debug_TearDownCloudBrightnessBox(u8 taskId)
+{
+    RemoveScrollIndicatorArrowPair(sCloudBrightnessArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sCloudBrightnessWindowId, TRUE);
+    RemoveWindow(sCloudBrightnessWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
+}
+
+// Commits the box (A): sets the target cloud brightness and hands input back to the field.
+static void Debug_CommitCloudBrightnessBox(u8 taskId)
+{
+    s8 value = Debug_CloudBrightnessFromIndex(sCloudBrightnessValue);
+
+    Debug_TearDownCloudBrightnessBox(taskId);
+    SetCloudBrightness(value);
+    UnlockPlayerFieldControls();
+}
+
+// Backs out of the box (B) without changing anything, returning to the weather menu.
+static void Debug_CancelCloudBrightnessBox(u8 taskId)
+{
+    Debug_TearDownCloudBrightnessBox(taskId);
+    Debug_ShowWeatherMenu();
+}
+
+// Up/down step the index (held to repeat); the value scale skips stage 0. A commits, B cancels.
+static void DebugTask_CloudBrightnessInput(u8 taskId)
+{
+    if (JOY_REPEAT(DPAD_UP) && sCloudBrightnessValue < NUM_CLOUD_BRIGHTNESS_LEVELS - 1)
+    {
+        sCloudBrightnessValue++;
+        PlaySE(SE_SELECT);
+        Debug_DrawCloudBrightnessBox();
+    }
+    else if (JOY_REPEAT(DPAD_DOWN) && sCloudBrightnessValue > 0)
+    {
+        sCloudBrightnessValue--;
+        PlaySE(SE_SELECT);
+        Debug_DrawCloudBrightnessBox();
+    }
+    else if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CommitCloudBrightnessBox(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CancelCloudBrightnessBox(taskId);
     }
 }
 

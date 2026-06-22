@@ -103,6 +103,9 @@ struct Weather
     u8 cloudCover:3;            // current tile set clouds/0..7
     u8 targetCloudCover:3;      // set is stepped toward this (see SetCloudCover)
     u8 cloudCoverTimer;         // frame counter; one step per 20 frames
+    s8 cloudBrightness;         // current overlay brightness (actual -2..3, stage 0 skipped)
+    s8 targetCloudBrightness;   // stepped toward this (see SetCloudBrightness)
+    u8 cloudBrightnessTimer;    // frame counter; one step per 20 frames
     u16 cloudsScrollXCounter;
     u16 cloudsScrollYCounter;
     u16 cloudsXOffset;
@@ -198,6 +201,7 @@ bool8 Sandstorm_Finish(void);
 void InitClouds(void);
 void UpdateClouds(void);
 void SetCloudCover(u8 target);
+void SetCloudBrightness(s8 target);
 void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);

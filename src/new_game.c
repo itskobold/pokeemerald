@@ -45,6 +45,7 @@
 #include "mystery_gift.h"
 #include "union_room_chat.h"
 #include "constants/items.h"
+#include "constants/field_weather.h"
 #include "debug.h"
 
 extern const u8 EventScript_ResetAllMapFlags[];
@@ -159,7 +160,8 @@ void NewGameInitData(void)
     ResetPokedex();
     ClearFrontierRecord();
     ClearSav1();
-    gSaveBlock1Ptr->cloudCover = 4;
+    gSaveBlock1Ptr->weatherState.cloudCover = 4;
+    gSaveBlock1Ptr->weatherState.cloudBrightness = ToCloudBrightnessRaw(CLOUD_BRIGHTNESS_DEFAULT);
     ClearAllMail();
     gSaveBlock2Ptr->specialSaveWarpFlags = 0;
     gSaveBlock2Ptr->gcnLinkFlags = 0;
