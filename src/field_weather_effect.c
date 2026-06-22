@@ -1722,7 +1722,7 @@ static bool32 StepCloudCover(u8 target);
 static bool32 StepCloudBrightness(s8 target);
 static void UnpauseClouds(void);
 static void ReleaseCloudBlend(void);
-static void UpdateCloudPauseTrigger(void);
+static void UpdateCloudPauseTrigger(bool32 silhouettesActive);
 static void ApplyCloudBrightness(void);
 static void ApplyCliffSilhouetteBlend(void);
 static void ApplyCloudCover(void);
@@ -1804,34 +1804,61 @@ static void ApplyCloudBrightness(void)
     SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(brightness));
 }
 
-// Fixed darkening applied to the silhouettes of cliff-buried objects (see ShouldDrawCliffSilhouettes).
-#define CLIFF_SILHOUETTE_BRIGHTNESS -6
+// Max darkening magnitude applied to the silhouettes of cliff-buried objects, and the per-frame ramp
+// toward it (see UpdateCliffSilhouetteBrightness). Stored as a positive magnitude, applied as negative.
+#define CLIFF_SILHOUETTE_BRIGHTNESS_MAX 6
+#define CLIFF_SILHOUETTE_STEP 1
 
 // The buried player has hidden the clouds, so the overlay's object window is free: reuse it to darken
 // the BG wherever a buried object's sprite carves it (those sprites are switched to object-window mode
-// in UpdateObjectEventSpriteVisibility), painting each as a flat dark silhouette of itself.
+// in UpdateObjectEventSpriteVisibility), painting each as a flat dark silhouette of itself. The darkening
+// ramps in/out (see UpdateCliffSilhouetteBrightness) rather than snapping to full.
 static void ApplyCliffSilhouetteBlend(void)
 {
+    s8 brightness = -gWeatherPtr->cliffSilhouetteBrightness;
+
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(CLIFF_SILHOUETTE_BRIGHTNESS));
-    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(CLIFF_SILHOUETTE_BRIGHTNESS));
+                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(brightness));
+    SetGpuReg(REG_OFFSET_BLDY, WEATHER_BLEND_LEVEL(brightness));
+}
+
+// Step the silhouette darkening one notch (CLIFF_SILHOUETTE_STEP) toward its max while shown, or back to
+// 0 while hidden, so the silhouettes fade in as the player buries and fade out before the clouds return.
+static void UpdateCliffSilhouetteBrightness(bool32 show)
+{
+    s32 level = gWeatherPtr->cliffSilhouetteBrightness;
+    s32 target = show ? CLIFF_SILHOUETTE_BRIGHTNESS_MAX : 0;
+
+    if (level < target)
+        level = min(level + CLIFF_SILHOUETTE_STEP, target);
+    else if (level > target)
+        level = max(level - CLIFF_SILHOUETTE_STEP, target);
+
+    gWeatherPtr->cliffSilhouetteBrightness = level;
 }
 
 // Clouds tear down the same frame their cover reaches 0, but their sprites' OAM isn't cleared until the
-// next sprite-system pass. Wait this many fully-cleared frames before lighting the silhouettes so the -6
+// next sprite-system pass. Wait this many fully-cleared frames before lighting the silhouettes so the
 // darkening never lands on that lingering final cloud frame (which read as a 1-frame overlap).
 #define CLOUD_CLEARED_SETTLE_FRAMES 2
 
-// Whether buried-object silhouettes should be drawn this frame: the player itself is fully buried in a
-// cliff and the clouds have been fully faded out (see cloudClearedTimer) for long enough to settle, so
-// the overlay's blend/object-window machinery is idle and free for the silhouettes to borrow.
-bool32 ShouldDrawCliffSilhouettes(void)
+// Whether the silhouette ramp should be driving toward full this frame: the player itself is fully buried
+// in a cliff and the clouds have been fully faded out (see cloudClearedTimer) for long enough to settle,
+// so the overlay's blend/object-window machinery is idle and free for the silhouettes to borrow.
+static bool32 ShouldRampUpCliffSilhouettes(void)
 {
     struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
 
     return player->active
         && player->cliffLayer == CLIFF_LAYER_OBSCURED
         && gWeatherPtr->cloudClearedTimer >= CLOUD_CLEARED_SETTLE_FRAMES;
+}
+
+// Whether buried-object silhouettes are visible this frame: true the whole time the darkening is non-zero,
+// so the buried sprites stay in object-window mode through both the ramp-in and the ramp-out fade.
+bool32 ShouldDrawCliffSilhouettes(void)
+{
+    return gWeatherPtr->cliffSilhouetteBrightness > 0;
 }
 
 static void ShowClouds(void)
@@ -1870,6 +1897,7 @@ void InitClouds(void)
     gWeatherPtr->pauseClouds = FALSE;
     gWeatherPtr->unpauseClouds = FALSE;
     gWeatherPtr->cloudClearedTimer = 0;
+    gWeatherPtr->cliffSilhouetteBrightness = 0;
     gWeatherPtr->cloudsScrollXCounter = 0;
     gWeatherPtr->cloudsScrollYCounter = 0;
     gWeatherPtr->cloudsXOffset = 0;
@@ -1886,7 +1914,13 @@ void UpdateClouds(void)
     bool8 silhouettes;
     bool8 active;
 
-    UpdateCloudPauseTrigger();
+    // Ramp the silhouette darkening toward full while the buried player has cleared the clouds, and back
+    // out otherwise (CLIFF_SILHOUETTE_STEP per frame). silhouettes stays set through the ramp-out so the
+    // clouds wait for the fade to finish before they return (see UpdateCloudPauseTrigger).
+    UpdateCliffSilhouetteBrightness(ShouldRampUpCliffSilhouettes());
+    silhouettes = ShouldDrawCliffSilhouettes();
+
+    UpdateCloudPauseTrigger(silhouettes);
 
     // While paused (player buried in a cliff), cover & brightness fade to 0. When the pause lifts they
     // fade back to their targets with the inverse motion (one step per frame, see UnpauseClouds). Only
@@ -1915,7 +1949,6 @@ void UpdateClouds(void)
 
     // Once the clouds have fully faded behind the buried player, keep the object-window overlay up (even
     // on maps with no cloud weather) so the buried-object silhouettes have a window to carve.
-    silhouettes = ShouldDrawCliffSilhouettes();
     active = cloudsActive || silhouettes;
 
     if (cloudsActive)
@@ -1932,7 +1965,7 @@ void UpdateClouds(void)
         sCloudsShown = FALSE;
     }
 
-    // Override the (released) cloud blend with the fixed silhouette darkening while buried.
+    // Override the (released) cloud blend with the ramped silhouette darkening while buried.
     if (silhouettes)
         ApplyCliffSilhouetteBlend();
 }
@@ -2121,18 +2154,21 @@ static void ReleaseCloudBlend(void)
     SetGpuReg(REG_OFFSET_BLDY, 0);
 }
 
-// Pause the clouds once the player is fully buried in a cliff (other object events don't count); on the
-// way out kick off the inverse fade the moment it surfaces. Keyed off the player's cliffLayer rather
-// than its sprite visibility, since once silhouettes show the player's own sprite is drawn (in object-
-// window mode) instead of hidden - so sprite->invisible can no longer stand in for "buried".
-static void UpdateCloudPauseTrigger(void)
+// Keep the clouds paused while the player is buried in a cliff OR the silhouettes are still ramping out;
+// once both are clear, kick off the inverse fade back to the held targets. Holding the pause through the
+// silhouette ramp-out (not just the player's cliffLayer) lets that darkening finish fading before the
+// clouds return.
+static void UpdateCloudPauseTrigger(bool32 silhouettesActive)
 {
     struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+    bool32 keepPaused;
 
     if (!player->active)
         return;
 
-    if (player->cliffLayer == CLIFF_LAYER_OBSCURED)
+    keepPaused = player->cliffLayer == CLIFF_LAYER_OBSCURED || silhouettesActive;
+
+    if (keepPaused)
     {
         gWeatherPtr->pauseClouds = TRUE;
         gWeatherPtr->unpauseClouds = FALSE;
