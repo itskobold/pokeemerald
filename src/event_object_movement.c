@@ -1430,8 +1430,9 @@ static u8 InitObjectEventStateFromTemplateAt(const struct ObjectEventTemplate *t
     objectEvent->currentCoords.y = y;
     objectEvent->previousCoords.x = x;
     objectEvent->previousCoords.y = y;
-    objectEvent->currentElevation = template->elevation;
-    objectEvent->previousElevation = template->elevation;
+    objectEvent->drawAtHighestElevation = (template->elevation & EVENT_ELEVATION_ANY) != 0;
+    objectEvent->currentElevation = template->elevation & EVENT_ELEVATION_MASK;
+    objectEvent->previousElevation = template->elevation & EVENT_ELEVATION_MASK;
     objectEvent->range.rangeX = template->movementRangeX;
     objectEvent->range.rangeY = template->movementRangeY;
     objectEvent->trainerType = template->trainerType;
@@ -3040,8 +3041,11 @@ u8 GetObjectEventIdByPosition(u16 x, u16 y, u8 elevation)
 static bool8 ObjectEventDoesElevationMatch(struct ObjectEvent *objectEvent, u8 elevation)
 {
     // ELEVATION_MATCH_ANY is an occupancy-query wildcard (e.g. decoration placement);
+    // a drawAtHighestElevation ("any elevation") object interacts from any level;
     // otherwise the object must be on exactly that level.
-    return elevation == ELEVATION_MATCH_ANY || objectEvent->currentElevation == elevation;
+    return elevation == ELEVATION_MATCH_ANY
+        || objectEvent->drawAtHighestElevation
+        || objectEvent->currentElevation == elevation;
 }
 
 void UpdateObjectEventsForCameraUpdate(s16 x, s16 y)
@@ -8912,6 +8916,10 @@ static const u8 sElevationToSubspriteTableNum[] = {
     2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
 };
 
+// Render level used by "any elevation" object events (drawAtHighestElevation): the top
+// even level in the tables above, so they draw in front of all terrain and lower objects.
+#define OBJECT_EVENT_HIGHEST_ELEVATION 30
+
 // True when every tile the sprite spans is higher terrain than the frozen base, i.e. the whole sprite
 // sits within the cliff. Bottom-anchored sprites grow north, so an h-px sprite spans ceil(h/16) tile
 // rows up from the feet tile; checking them all keeps this size-independent. A 1-tile sprite is always
@@ -8932,12 +8940,19 @@ static bool32 IsObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
     return TRUE;
 }
 
-static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
+// Set the sprite's draw priority/subsprite table from the object's current elevation and cliff
+// state. Does not touch the elevation value itself.
+static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
-    if (objEvent->fixedPriority)
+    // "Any elevation" object: always draw in front of terrain at the top render level,
+    // ignoring behind-cliff/elevation occlusion entirely.
+    if (objEvent->drawAtHighestElevation)
+    {
+        sprite->subspriteTableNum = sElevationToSubspriteTableNum[OBJECT_EVENT_HIGHEST_ELEVATION];
+        sprite->subspriteMode = SUBSPRITES_ON;
+        sprite->oam.priority = sElevationToPriority[OBJECT_EVENT_HIGHEST_ELEVATION];
         return;
-
-    ObjectEventUpdateElevation(objEvent);
+    }
 
     sprite->subspriteTableNum = sElevationToSubspriteTableNum[objEvent->previousElevation];
 
@@ -8956,12 +8971,56 @@ static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, 
     }
 }
 
+static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
+{
+    if (objEvent->fixedPriority)
+        return;
+
+    ObjectEventUpdateElevation(objEvent);
+    SetObjectEventDrawPriority(objEvent, sprite);
+}
+
+// Resolve the behind-cliff state on spawn directly from the object's (initial) elevation, since
+// there's no step to climb it behind. A tile higher than the object's render base (previousElevation)
+// means the object belongs to the lower level and is drawn behind the cliff; fully buried -> obscured
+// (hidden / silhouetted). Mirrors the step-up climb in UpdateObjectEventBehindCliff.
+static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
+{
+    if (objEvent->drawAtHighestElevation) // "any elevation" objects never go behind a cliff
+    {
+        objEvent->cliffLayer = CLIFF_LAYER_FRONT;
+        return;
+    }
+
+    if (MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y) > objEvent->previousElevation)
+        objEvent->cliffLayer = IsObjectEventFullyBehindCliff(objEvent) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
+    else
+        objEvent->cliffLayer = CLIFF_LAYER_FRONT;
+}
+
+// Run on spawn / map load. NPCs keep their template "initial elevation" instead of snapping to the
+// tile they were placed on, so a designer-assigned object elevation isn't overwritten every load.
+// Only the player derives its elevation from the spawn tile (warp/heal arrival). The behind-cliff
+// state is then resolved from that elevation so a placed object obscures/silhouettes correctly.
+static void InitObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
+{
+    if (objEvent->fixedPriority)
+        return;
+
+    if (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId])
+        ObjectEventUpdateElevation(objEvent);
+    InitObjectEventBehindCliff(objEvent);
+    SetObjectEventDrawPriority(objEvent, sprite);
+}
+
 // Promote/demote OBSCURED while behind a cliff. OBSCURED can't be a priority (OAM maxes at 3, where a
 // tie draws the sprite in front of BG3), so the sprite is hidden instead (see
 // UpdateObjectEventSpriteVisibility). Resolved only on arrival (spawn / finish-step): at begin-step the
 // destination coords are already set, which would hide the sprite the moment it started sliding in.
 static void UpdateObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
 {
+    if (objEvent->drawAtHighestElevation) // "any elevation" objects never go behind a cliff
+        return;
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
         objEvent->cliffLayer = IsObjectEventFullyBehindCliff(objEvent) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
 }
@@ -9032,10 +9091,15 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
 // is a distinct elevation band between the frozen base and the plateau top.
 static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
 {
-    u8 fromElevation = MapGridGetElevationAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
-    u8 toElevation = MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
-    u8 fromBehavior = MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
-    u8 toBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
+    u8 fromElevation, toElevation, fromBehavior, toBehavior;
+
+    if (objEvent->drawAtHighestElevation) // "any elevation" objects never go behind a cliff
+        return;
+
+    fromElevation = MapGridGetElevationAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
+    toElevation = MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
+    fromBehavior = MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
+    toBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
 
     // Stairs carry no elevation of their own: no climb/crest, hold the current state. Cliff-face-side
     // is NOT included: an upward step onto it climbs behind like any other higher tile.
@@ -9076,7 +9140,10 @@ static void ObjectEventUpdateSubpriority(struct ObjectEvent *objEvent, struct Sp
     if (objEvent->fixedPriority)
         return;
 
-    SetObjectSubpriorityByElevation(objEvent->previousElevation, sprite, 1);
+    if (objEvent->drawAtHighestElevation)
+        SetObjectSubpriorityByElevation(OBJECT_EVENT_HIGHEST_ELEVATION, sprite, 1);
+    else
+        SetObjectSubpriorityByElevation(objEvent->previousElevation, sprite, 1);
 }
 
 static bool8 AreElevationsCompatible(u8 a, u8 b)
@@ -9374,7 +9441,7 @@ static void DoGroundEffects_OnSpawn(struct ObjectEvent *objEvent, struct Sprite 
 #endif
     {
         flags = 0;
-        UpdateObjectEventElevationAndPriority(objEvent, sprite);
+        InitObjectEventElevationAndPriority(objEvent, sprite);
         UpdateObjectEventFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnSpawn(objEvent, &flags);
         SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);

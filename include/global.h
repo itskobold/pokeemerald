@@ -578,12 +578,16 @@ struct SecretBase
 #include "global.tv.h"
 #include "pokemon.h"
 
+// Warp arrival elevation: WARP_ELEVATION_NONE keeps the default placement (ELEVATION_DEFAULT);
+// any other value forces the player to that elevation on arrival (used by heal locations).
+#define WARP_ELEVATION_NONE 0xFF
+
 struct WarpData
 {
     s8 mapGroup;
     s8 mapNum;
     s8 warpId;
-    //u8 padding;
+    u8 elevation;
     s16 x, y;
 };
 

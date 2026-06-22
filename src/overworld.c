@@ -207,6 +207,7 @@ static const struct WarpData sDummyWarpData =
     .mapGroup = MAP_GROUP(MAP_UNDEFINED),
     .mapNum = MAP_NUM(MAP_UNDEFINED),
     .warpId = WARP_ID_NONE,
+    .elevation = WARP_ELEVATION_NONE,
     .x = -1,
     .y = -1,
 };
@@ -558,6 +559,7 @@ static void SetWarpData(struct WarpData *warp, s8 mapGroup, s8 mapNum, s8 warpId
     warp->mapGroup = mapGroup;
     warp->mapNum = mapNum;
     warp->warpId = warpId;
+    warp->elevation = WARP_ELEVATION_NONE;
     warp->x = x;
     warp->y = y;
 }
@@ -664,7 +666,10 @@ void SetWarpDestinationToHealLocation(u8 healLocationId)
 {
     const struct HealLocation *healLocation = GetHealLocation(healLocationId);
     if (healLocation)
+    {
         SetWarpDestination(healLocation->mapGroup, healLocation->mapNum, WARP_ID_NONE, healLocation->x, healLocation->y);
+        sWarpDestination.elevation = healLocation->elevation;
+    }
 }
 
 void SetWarpDestinationToLastHealLocation(void)
@@ -676,7 +681,10 @@ void SetLastHealLocationWarp(u8 healLocationId)
 {
     const struct HealLocation *healLocation = GetHealLocation(healLocationId);
     if (healLocation)
+    {
         SetWarpData(&gSaveBlock1Ptr->lastHealLocation, healLocation->mapGroup, healLocation->mapNum, WARP_ID_NONE, healLocation->x, healLocation->y);
+        gSaveBlock1Ptr->lastHealLocation.elevation = healLocation->elevation;
+    }
 }
 
 void UpdateEscapeWarp(s16 x, s16 y)
@@ -734,7 +742,10 @@ void SetContinueGameWarpToHealLocation(u8 healLocationId)
 {
     const struct HealLocation *healLocation = GetHealLocation(healLocationId);
     if (healLocation)
+    {
         SetWarpData(&gSaveBlock1Ptr->continueGameWarp, healLocation->mapGroup, healLocation->mapNum, WARP_ID_NONE, healLocation->x, healLocation->y);
+        gSaveBlock1Ptr->continueGameWarp.elevation = healLocation->elevation;
+    }
 }
 
 void SetContinueGameWarpToDynamicWarp(int unused)

@@ -908,6 +908,15 @@ static bool8 TryDoorWarp(struct MapPosition *position, u16 metatileBehavior, u8 
     return FALSE;
 }
 
+// An event interacts only on the player's elevation, unless its EVENT_ELEVATION_ANY
+// flag is set (then it interacts from any elevation).
+static bool32 EventElevationMatches(u8 eventElevation, u8 playerElevation)
+{
+    if (eventElevation & EVENT_ELEVATION_ANY)
+        return TRUE;
+    return (eventElevation & EVENT_ELEVATION_MASK) == playerElevation;
+}
+
 static s8 GetWarpEventAtPosition(struct MapHeader *mapHeader, u16 x, u16 y, u8 elevation)
 {
     s32 i;
@@ -918,7 +927,7 @@ static s8 GetWarpEventAtPosition(struct MapHeader *mapHeader, u16 x, u16 y, u8 e
     {
         if ((u16)warpEvent->x == x && (u16)warpEvent->y == y)
         {
-            if (warpEvent->elevation == elevation)
+            if (EventElevationMatches(warpEvent->elevation, elevation))
                 return i;
         }
     }
@@ -955,7 +964,7 @@ static const u8 *GetCoordEventScriptAtPosition(struct MapHeader *mapHeader, u16 
     {
         if ((u16)coordEvents[i].x == x && (u16)coordEvents[i].y == y)
         {
-            if (coordEvents[i].elevation == elevation)
+            if (EventElevationMatches(coordEvents[i].elevation, elevation))
             {
                 const u8 *script = TryRunCoordEventScript(&coordEvents[i]);
                 if (script != NULL)
@@ -981,7 +990,7 @@ static const struct BgEvent *GetBackgroundEventAtPosition(struct MapHeader *mapH
     {
         if ((u16)bgEvents[i].x == x && (u16)bgEvents[i].y == y)
         {
-            if (bgEvents[i].elevation == elevation)
+            if (EventElevationMatches(bgEvents[i].elevation, elevation))
                 return &bgEvents[i];
         }
     }

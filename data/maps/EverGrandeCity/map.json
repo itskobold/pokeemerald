@@ -68,14 +68,14 @@
     {
       "x": 18,
       "y": 41,
-      "elevation": 5,
+      "elevation": 7,
       "dest_map": "MAP_VICTORY_ROAD_1F",
       "dest_warp_id": "0"
     },
     {
       "x": 18,
       "y": 27,
-      "elevation": 5,
+      "elevation": 9,
       "dest_map": "MAP_VICTORY_ROAD_1F",
       "dest_warp_id": "1"
     }
@@ -186,7 +186,7 @@
       "type": "sign",
       "x": 19,
       "y": 43,
-      "elevation": 7,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "EverGrandeCity_EventScript_VictoryRoadSign"
     },
@@ -202,7 +202,7 @@
       "type": "sign",
       "x": 18,
       "y": 52,
-      "elevation": 7,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "EverGrandeCity_EventScript_CitySign"
     },

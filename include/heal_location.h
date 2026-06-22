@@ -7,6 +7,7 @@ struct HealLocation
     s8 mapNum;
     u16 x;
     u16 y;
+    u8 elevation; // elevation the player respawns at when healing here
 };
 
 u32 GetHealLocationIndexByMap(u16 mapGroup, u16 mapNum);

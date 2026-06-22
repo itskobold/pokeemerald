@@ -365,7 +365,7 @@
       "type": "trigger",
       "x": 25,
       "y": 25,
-      "elevation": 5,
+      "elevation": 7,
       "var": "VAR_TEMP_1",
       "var_value": "0",
       "script": "MossdeepCity_EventScript_VisitedMossdeep"
@@ -374,7 +374,7 @@
       "type": "trigger",
       "x": 26,
       "y": 25,
-      "elevation": 5,
+      "elevation": 7,
       "var": "VAR_TEMP_1",
       "var_value": "0",
       "script": "MossdeepCity_EventScript_VisitedMossdeep"
@@ -383,7 +383,7 @@
       "type": "trigger",
       "x": 32,
       "y": 27,
-      "elevation": 5,
+      "elevation": 7,
       "var": "VAR_TEMP_1",
       "var_value": "0",
       "script": "MossdeepCity_EventScript_VisitedMossdeep"
@@ -392,7 +392,7 @@
       "type": "trigger",
       "x": 33,
       "y": 27,
-      "elevation": 5,
+      "elevation": 7,
       "var": "VAR_TEMP_1",
       "var_value": "0",
       "script": "MossdeepCity_EventScript_VisitedMossdeep"
@@ -513,7 +513,7 @@
       "type": "sign",
       "x": 57,
       "y": 21,
-      "elevation": 9,
+      "elevation": 5,
       "player_facing_dir": "BG_EVENT_PLAYER_FACING_ANY",
       "script": "MossdeepCity_EventScript_WhiteRock"
     }

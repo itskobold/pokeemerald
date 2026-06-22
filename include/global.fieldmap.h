@@ -45,6 +45,13 @@ enum
 // matches an object at any elevation. Never a real level (those are 0-63).
 #define ELEVATION_MATCH_ANY 0xFF
 
+// Map events (warps, coord/bg events, object templates) store their level in the
+// low bits of their elevation byte. Bit 7 is the "any elevation" flag: when set,
+// the event interacts with the player regardless of elevation (for object events
+// it also forces always-on-top rendering). Levels are 0-63 so bit 7 is free.
+#define EVENT_ELEVATION_ANY  0x80
+#define EVENT_ELEVATION_MASK 0x7F
+
 // PACK_METATILE/PACK_LOCATION/PACK_BIOME operate on a map grid block (map.bin u16);
 // PACK_ELEVATION operates on an attribute byte (attributes.bin u8).
 #define PACK_METATILE(metatileId) PACK(metatileId, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
@@ -301,7 +308,7 @@ struct ObjectEvent
              u32 hideReflection:1;
              u32 surfacingFromCliff:1; // surface condition met at step-commit; defer leaving the cliff until arrival
              u32 cliffLayer:2;         // CLIFF_LAYER_*: render plane relative to a cliff face
-             //u32 padding:1;
+             u32 drawAtHighestElevation:1; // "any elevation" object: always drawn on top, interacts at any elevation
     /*0x04*/ u8 spriteId;
     /*0x05*/ u8 graphicsId;
     /*0x06*/ u8 movementType;

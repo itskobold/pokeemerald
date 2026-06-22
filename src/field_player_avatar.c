@@ -1450,7 +1450,11 @@ void InitPlayerAvatar(s16 x, s16 y, u8 direction, u8 gender)
     playerObjEventTemplate.graphicsId = GetPlayerAvatarGraphicsIdByStateIdAndGender(PLAYER_AVATAR_STATE_NORMAL, gender);
     playerObjEventTemplate.x = x - MAP_OFFSET;
     playerObjEventTemplate.y = y - MAP_OFFSET;
-    playerObjEventTemplate.elevation = ELEVATION_DEFAULT;
+    // A warp may force the arrival elevation (e.g. heal locations); otherwise use the default.
+    if (gSaveBlock1Ptr->location.elevation != WARP_ELEVATION_NONE)
+        playerObjEventTemplate.elevation = gSaveBlock1Ptr->location.elevation & EVENT_ELEVATION_MASK;
+    else
+        playerObjEventTemplate.elevation = ELEVATION_DEFAULT;
     playerObjEventTemplate.movementType = MOVEMENT_TYPE_PLAYER;
     playerObjEventTemplate.movementRangeX = 0;
     playerObjEventTemplate.movementRangeY = 0;

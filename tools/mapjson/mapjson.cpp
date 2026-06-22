@@ -96,6 +96,12 @@ string json_to_string(const Json &data, const string &field = "", bool silent = 
     return output;
 }
 
+// Returns an event's optional "any_elevation" flag as a macro-ready "1"/"0" token,
+// defaulting to "0" when the field is absent.
+string any_elevation_arg(const Json &event) {
+    return event["any_elevation"].bool_value() ? "1" : "0";
+}
+
 string get_generated_warning(const string &filename, bool isAsm) {
     string comment = isAsm ? "@" : "//";
 
@@ -300,7 +306,8 @@ string generate_map_events_text(Json map_data) {
                      << json_to_string(obj_event, "trainer_type") << ", "
                      << json_to_string(obj_event, "trainer_sight_or_berry_tree_id") << ", "
                      << json_to_string(obj_event, "script") << ", "
-                     << json_to_string(obj_event, "flag") << "\n";
+                     << json_to_string(obj_event, "flag") << ", "
+                     << any_elevation_arg(obj_event) << "\n";
             } else if (type == "clone") {
                 text << "\tclone_event " << i + 1 << ", "
                      << json_to_string(obj_event, "graphics_id") << ", "
@@ -326,7 +333,8 @@ string generate_map_events_text(Json map_data) {
                  << json_to_string(warp_event, "y") << ", "
                  << json_to_string(warp_event, "elevation") << ", "
                  << json_to_string(warp_event, "dest_warp_id") << ", "
-                 << json_to_string(warp_event, "dest_map") << "\n";
+                 << json_to_string(warp_event, "dest_map") << ", "
+                 << any_elevation_arg(warp_event) << "\n";
         }
         text << "\n";
     } else {
@@ -345,14 +353,16 @@ string generate_map_events_text(Json map_data) {
                      << json_to_string(coord_event, "elevation") << ", "
                      << json_to_string(coord_event, "var") << ", "
                      << json_to_string(coord_event, "var_value") << ", "
-                     << json_to_string(coord_event, "script") << "\n";
+                     << json_to_string(coord_event, "script") << ", "
+                     << any_elevation_arg(coord_event) << "\n";
             }
             else if (type == "weather") {
                 text << "\tcoord_weather_event "
                      << json_to_string(coord_event, "x") << ", "
                      << json_to_string(coord_event, "y") << ", "
                      << json_to_string(coord_event, "elevation") << ", "
-                     << json_to_string(coord_event, "weather") << "\n";
+                     << json_to_string(coord_event, "weather") << ", "
+                     << any_elevation_arg(coord_event) << "\n";
             } else {
                 FATAL_ERROR("Unknown coord event type '%s'. Expected 'trigger' or 'weather'.\n", type.c_str());
             }
@@ -373,7 +383,8 @@ string generate_map_events_text(Json map_data) {
                      << json_to_string(bg_event, "y") << ", "
                      << json_to_string(bg_event, "elevation") << ", "
                      << json_to_string(bg_event, "player_facing_dir") << ", "
-                     << json_to_string(bg_event, "script") << "\n";
+                     << json_to_string(bg_event, "script") << ", "
+                     << any_elevation_arg(bg_event) << "\n";
             }
             else if (type == "hidden_item") {
                 text << "\tbg_hidden_item_event "
@@ -387,14 +398,15 @@ string generate_map_events_text(Json map_data) {
                          << json_to_string(bg_event, "quantity") << ", "
                          << json_to_string(bg_event, "underfoot");
                 }
-                text << "\n";
+                text << ", " << any_elevation_arg(bg_event) << "\n";
             }
             else if (type == "secret_base") {
                 text << "\tbg_secret_base_event "
                      << json_to_string(bg_event, "x") << ", "
                      << json_to_string(bg_event, "y") << ", "
                      << json_to_string(bg_event, "elevation") << ", "
-                     << json_to_string(bg_event, "secret_base_id") << "\n";
+                     << json_to_string(bg_event, "secret_base_id") << ", "
+                     << any_elevation_arg(bg_event) << "\n";
             } else {
                 FATAL_ERROR("Unknown bg event type '%s'. Expected 'sign', 'hidden_item', or 'secret_base'.\n", type.c_str());
             }

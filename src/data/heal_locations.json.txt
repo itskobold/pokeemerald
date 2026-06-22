@@ -7,6 +7,7 @@ static const struct HealLocation sHealLocations[NUM_HEAL_LOCATIONS - 1] = {
         .mapNum = MAP_NUM({{ heal_location.map }}),
         .x = {{ heal_location.x }},
         .y = {{ heal_location.y }},
+        .elevation = {% if existsIn(heal_location, "elevation") %}{{ heal_location.elevation }}{% else %}ELEVATION_DEFAULT{% endif %},
     },
 ## endfor
 };

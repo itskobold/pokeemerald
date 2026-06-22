@@ -140,7 +140,7 @@
       "graphics_id": "OBJ_EVENT_GFX_WOMAN_5",
       "x": 29,
       "y": 17,
-      "elevation": 5,
+      "elevation": 6,
       "movement_type": "MOVEMENT_TYPE_FACE_RIGHT",
       "movement_range_x": 1,
       "movement_range_y": 1,

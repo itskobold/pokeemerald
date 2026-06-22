@@ -24,13 +24,13 @@
 	.endm
 
 	@ Defines an object event template for map data, to be used by a normal object. Mirrors the struct layout of ObjectEventTemplate in include/global.fieldmap.h
-	.macro object_event index:req, gfx:req, x:req, y:req, elevation:req, movement_type:req, x_radius:req, y_radius:req, trainer_type:req, sight_radius_tree_etc:req, script:req, event_flag:req
+	.macro object_event index:req, gfx:req, x:req, y:req, elevation:req, movement_type:req, x_radius:req, y_radius:req, trainer_type:req, sight_radius_tree_etc:req, script:req, event_flag:req, any_elevation=0
 	.byte \index
 	.byte \gfx
 	.byte OBJ_KIND_NORMAL
 	.space 1  @ Padding
 	.2byte \x, \y
-	.byte \elevation
+	.byte ((\any_elevation & 1) << 7) | (\elevation)  @ bit 7 = "any elevation" flag
 	.byte \movement_type
 	.byte ((\y_radius << 4) | \x_radius)
 	.space 1  @ Padding
@@ -59,9 +59,9 @@
 	.endm
 
 	@ Defines a warp event for map data. Mirrors the struct layout of WarpEvent in include/global.fieldmap.h
-	.macro warp_def x:req, y:req, elevation:req, warpId:req, map_id:req
+	.macro warp_def x:req, y:req, elevation:req, warpId:req, map_id:req, any_elevation=0
 	.2byte \x, \y
-	.byte \elevation
+	.byte ((\any_elevation & 1) << 7) | (\elevation)  @ bit 7 = "any elevation" flag
 	.byte \warpId
 	.byte \map_id & 0xFF  @ map num
 	.byte \map_id >> 8    @ map group
@@ -69,9 +69,9 @@
 	.endm
 
 	@ Defines a coord event for map data. Mirrors the struct layout of CoordEvent in include/global.fieldmap.h
-	.macro coord_event x:req, y:req, elevation:req, var:req, varValue:req, script:req
+	.macro coord_event x:req, y:req, elevation:req, var:req, varValue:req, script:req, any_elevation=0
 	.2byte \x, \y
-	.byte \elevation
+	.byte ((\any_elevation & 1) << 7) | (\elevation)  @ bit 7 = "any elevation" flag
 	.space 1  @ Padding
 	.2byte \var
 	.2byte \varValue
@@ -81,16 +81,16 @@
 	.endm
 
 	@ Defines a weather coord event for map data. Any coord event is treated as a weather coord event if its script is NULL
-	.macro coord_weather_event x:req, y:req, elevation:req, weather:req
-	coord_event \x, \y, \elevation, \weather, 0, NULL
+	.macro coord_weather_event x:req, y:req, elevation:req, weather:req, any_elevation=0
+	coord_event \x, \y, \elevation, \weather, 0, NULL, \any_elevation
 	.endm
 
 	@ Defines a generic background event for map data. Mirrors the struct layout of BgEvent in include/global.fieldmap.h
 	@ 'kind' is any BG_EVENT_* constant (see include/constants/event_bg.h).
 	@ 'arg6' and 'arg7' are used differently depending on the bg event type. See macros below
-	.macro bg_event x:req, y:req, elevation:req, kind:req, arg6:req, arg7
+	.macro bg_event x:req, y:req, elevation:req, kind:req, arg6:req, arg7, any_elevation=0
 	.2byte \x, \y
-	.byte \elevation
+	.byte ((\any_elevation & 1) << 7) | (\elevation)  @ bit 7 = "any elevation" flag
 	.byte \kind
 	.space 2  @ Padding
 	.if \kind != BG_EVENT_HIDDEN_ITEM
@@ -103,21 +103,21 @@
 	.endm
 
 	@ Defines a background sign event for map data. 'facing_dir' is any of the BG_EVENT_PLAYER_FACING_* constants (see include/constants/event_bg.h)
-	.macro bg_sign_event x:req, y:req, elevation:req, facing_dir:req, script:req
-	bg_event \x, \y, \elevation, \facing_dir, \script
+	.macro bg_sign_event x:req, y:req, elevation:req, facing_dir:req, script:req, any_elevation=0
+	bg_event \x, \y, \elevation, \facing_dir, \script, any_elevation=\any_elevation
 	.endm
 
 	@ Defines a background hidden item event for map data
-	.macro bg_hidden_item_event x:req, y:req, elevation:req, item:req, flag:req
+	.macro bg_hidden_item_event x:req, y:req, elevation:req, item:req, flag:req, any_elevation=0
 	.if \flag < FLAG_HIDDEN_ITEMS_START
 	.error "Hidden Item flag \flag is too small. Must be >= FLAG_HIDDEN_ITEMS_START."
 	.endif
-	bg_event \x, \y, \elevation, BG_EVENT_HIDDEN_ITEM, \item, ((\flag) - FLAG_HIDDEN_ITEMS_START)
+	bg_event \x, \y, \elevation, BG_EVENT_HIDDEN_ITEM, \item, ((\flag) - FLAG_HIDDEN_ITEMS_START), any_elevation=\any_elevation
 	.endm
 
 	@ Defines a background secret base event for map data
-	.macro bg_secret_base_event x:req, y:req, elevation:req, secret_base_id:req
-	bg_event \x, \y, \elevation, BG_EVENT_SECRET_BASE, \secret_base_id
+	.macro bg_secret_base_event x:req, y:req, elevation:req, secret_base_id:req, any_elevation=0
+	bg_event \x, \y, \elevation, BG_EVENT_SECRET_BASE, \secret_base_id, any_elevation=\any_elevation
 	.endm
 
 	@ Defines the table of event data for a map. Mirrors the struct layout of MapEvents in include/global.fieldmap.h

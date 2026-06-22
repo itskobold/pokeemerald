@@ -369,7 +369,7 @@
     {
       "x": 11,
       "y": 5,
-      "elevation": 5,
+      "elevation": 7,
       "dest_map": "MAP_LILYCOVE_CITY_LILYCOVE_MUSEUM_1F",
       "dest_warp_id": "0"
     },
@@ -439,7 +439,7 @@
     {
       "x": 12,
       "y": 5,
-      "elevation": 5,
+      "elevation": 7,
       "dest_map": "MAP_LILYCOVE_CITY_LILYCOVE_MUSEUM_1F",
       "dest_warp_id": "1"
     }
