@@ -222,13 +222,13 @@ static u8 sPanTileWindowId;
 static s16 sPanTileX;
 static s16 sPanTileY;
 
-// "Set Cloud Cover" numeric scroll box state. Up/down adjust the value in [0, CLOUD_COVER_SETS-1];
+// "Set cloud cover" numeric scroll box state. Up/down adjust the value in [0, CLOUD_COVER_SETS-1];
 // A commits it via SetCloudCover, B backs out to the weather menu.
 static u8 sCloudCoverWindowId;
 static u8 sCloudCoverArrowTaskId;
 static u16 sCloudCoverValue;
 
-// "Set Cloud Brightness" numeric scroll box state. The value is an index into the non-zero
+// "Set cloud brightness" numeric scroll box state. The value is an index into the non-zero
 // brightness scale {-2,-1,+1,+2,+3} (stage 0 is skipped); A commits via SetCloudBrightness.
 static u8 sCloudBrightnessWindowId;
 static u8 sCloudBrightnessArrowTaskId;
@@ -240,9 +240,9 @@ static struct ListMenuItem sCameraMenuItems[DEBUG_CAMERA_ITEM_CANCEL + 1];
 
 static const u8 sDebugText_Camera[] = _("Camera");
 static const u8 sDebugText_Weather[] = _("Weather");
-static const u8 sDebugText_Weather_SetCloudCover[] = _("Set Cloud Cover");
+static const u8 sDebugText_Weather_SetCloudCover[] = _("Set cloud cover");
 static const u8 sDebugText_CloudCover_Label[] = _("Cover ");
-static const u8 sDebugText_Weather_SetCloudBrightness[] = _("Set Cloud Brightness");
+static const u8 sDebugText_Weather_SetCloudBrightness[] = _("Set cloud brightness");
 static const u8 sDebugText_CloudBrightness_Label[] = _("Bright ");
 static const u8 sDebugText_Minus[] = _("-");
 static const u8 sDebugText_Cancel[] = _("Cancel");
