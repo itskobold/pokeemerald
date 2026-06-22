@@ -5571,10 +5571,12 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // Stairs are walked as same-elevation ground, so they skip the water and elevation gating below.
     if (!isStairs)
     {
-        // Surfable water blocks walking; only the surfing player may step onto it. Ignored behind a cliff.
+        // Surfable water blocks walking onto it from land; the surfing player and objects already
+        // on water (water-dwelling NPCs) may move water->water. Ignored behind a cliff.
         if (!cliffFree
          && MetatileBehavior_IsSurfableWaterOrUnderwater(nextBehavior)
-         && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)))
+         && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))
+         && !MetatileBehavior_IsSurfableWaterOrUnderwater(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y)))
             return COLLISION_IMPASSABLE;
 
         // Block a DOWNWARD step (an UPWARD step is the climb behind the cliff). Skipped behind a cliff,
@@ -5694,7 +5696,8 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
     {
         if (!cliffFree
          && MetatileBehavior_IsSurfableWaterOrUnderwater(nextBehavior)
-         && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)))
+         && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))
+         && !MetatileBehavior_IsSurfableWaterOrUnderwater(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y)))
             flags |= 1 << (COLLISION_IMPASSABLE - 1);
         // Stepping off a stairs tile is not elevation-gated; see GetVanillaCollision.
         if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs && MapGridGetElevationAt(x, y) < objectEvent->previousElevation)
