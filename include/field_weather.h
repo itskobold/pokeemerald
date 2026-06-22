@@ -41,8 +41,7 @@ struct Weather
             struct Sprite *sandstormSprites2[NUM_SWIRL_SANDSTORM_SPRITES];
         } s2;
     } sprites;
-    u8 darkenedContrastColorMaps[NUM_WEATHER_COLOR_MAPS][32];
-    u8 contrastColorMaps[NUM_WEATHER_COLOR_MAPS][32];
+    u8 colorMaps[NUM_WEATHER_COLOR_MAPS][32];
     s8 colorMapIndex;
     s8 targetColorMapIndex;
     u8 colorMapStepDelay;
@@ -61,7 +60,6 @@ struct Weather
     u8 weatherGfxLoaded;
     bool8 weatherChangeComplete;
     u8 weatherPicSpritePalIndex;
-    u8 contrastColorMapSpritePalIndex;
     // Rain
     u16 rainSpriteVisibleCounter;
     u8 curRainSpriteIndex;

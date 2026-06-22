@@ -3,7 +3,7 @@
   "name": "ow_1_0",
   "layout": "LAYOUT_OW_1_0",
   "requires_flash": false,
-  "weather": "WEATHER_SUNNY_CLOUDS",
+  "weather": "WEATHER_RAIN_THUNDERSTORM",
   "allow_cycling": true,
   "allow_escaping": false,
   "allow_running": true,
