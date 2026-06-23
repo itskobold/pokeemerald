@@ -45,6 +45,25 @@ enum
     TIME_OF_DAY_DUSK,     // sunset twilight
 };
 
+// Season, returned by Clock_GetSeason. Boundaries fall on the 1st of the month.
+enum
+{
+    SEASON_SPRING, // Mar 1 - Jun 1
+    SEASON_SUMMER, // Jun 1 - Sep 1
+    SEASON_AUTUMN, // Sep 1 - Dec 1
+    SEASON_WINTER, // Dec 1 - Mar 1
+};
+
+// Phase within a season, returned by Clock_GetSeasonPhase: the first two weeks
+// (early), the last two weeks (late), or the stretch between (mid). Late winter
+// gains a day in leap years so its window keeps the same start date.
+enum
+{
+    SEASON_PHASE_EARLY,
+    SEASON_PHASE_MID,
+    SEASON_PHASE_LATE,
+};
+
 void Clock_Init(void);
 void Clock_Update(void);
 void Clock_AdvanceSeconds(u32 seconds);
@@ -54,6 +73,14 @@ u32 Clock_GetTotalMinutes(void);
 u32 Clock_GetTwilight(void);
 u32 Clock_GetTimeOfDay(void);
 u8 *Clock_GetTimeOfDayString(u8 *dest);
+u32 Clock_GetSeason(void);
+u8 *Clock_GetSeasonString(u8 *dest, bool32 abbreviate);
+u8 *Clock_GetFullSeasonString(u8 *dest, bool32 abbreviate);
+u32 Clock_GetSeasonPhase(void);
+bool32 IsSeason(u32 season);
+bool32 IsEarlySeason(u32 season);
+bool32 IsMidSeason(u32 season);
+bool32 IsLateSeason(u32 season);
 bool32 IsDay(void);
 bool32 IsNight(void);
 bool32 IsMidday(void);

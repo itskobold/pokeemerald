@@ -36,6 +36,9 @@
 #define NOON_MINUTES      (MINUTES_PER_DAY / 2)
 #define SOLAR_BAND_LENGTH 30
 
+// Early season is the first two weeks, late season the last two weeks.
+#define SEASON_PHASE_DAYS 14
+
 // Weekday of year 0, Jan 1 (Monday), used as the day-of-week reference point.
 #define EPOCH_WEEKDAY WEEKDAY_MON
 
@@ -180,6 +183,38 @@ static const u8 *const sTimeOfDayNames[] =
     [TIME_OF_DAY_MIDDAY]   = sTimeOfDayName_Midday,
     [TIME_OF_DAY_DUSK]     = sTimeOfDayName_Dusk,
 };
+
+static const u8 sSeasonName_Spring[] = _("SPRING");
+static const u8 sSeasonName_Summer[] = _("SUMMER");
+static const u8 sSeasonName_Autumn[] = _("AUTUMN");
+static const u8 sSeasonName_Winter[] = _("WINTER");
+
+static const u8 *const sSeasonNames[] =
+{
+    [SEASON_SPRING] = sSeasonName_Spring,
+    [SEASON_SUMMER] = sSeasonName_Summer,
+    [SEASON_AUTUMN] = sSeasonName_Autumn,
+    [SEASON_WINTER] = sSeasonName_Winter,
+};
+
+static const u8 sSeasonNameShort_Spring[] = _("SPRG");
+static const u8 sSeasonNameShort_Summer[] = _("SMMR");
+static const u8 sSeasonNameShort_Autumn[] = _("ATMN");
+static const u8 sSeasonNameShort_Winter[] = _("WNTR");
+
+static const u8 *const sSeasonNamesShort[] =
+{
+    [SEASON_SPRING] = sSeasonNameShort_Spring,
+    [SEASON_SUMMER] = sSeasonNameShort_Summer,
+    [SEASON_AUTUMN] = sSeasonNameShort_Autumn,
+    [SEASON_WINTER] = sSeasonNameShort_Winter,
+};
+
+// Prefixes for the early/late portions of a season; mid has no prefix.
+static const u8 sSeasonPhase_Early[]      = _("EARLY ");
+static const u8 sSeasonPhase_Late[]       = _("LATE ");
+static const u8 sSeasonPhaseShort_Early[] = _("E. ");
+static const u8 sSeasonPhaseShort_Late[]  = _("L. ");
 
 static bool32 IsLeapYear(u16 year)
 {
@@ -365,6 +400,95 @@ u8 *Clock_GetTimeOfDayString(u8 *dest)
     return StringCopy(dest, sTimeOfDayNames[sTimeOfDay]);
 }
 
+// Current season, derived from the month (boundaries on the 1st of Mar/Jun/Sep/Dec).
+u32 Clock_GetSeason(void)
+{
+    u32 month = gSaveBlock1Ptr->gameClock.month;
+
+    if (month < MONTH_JAN || month > MONTH_DEC)
+        month = MONTH_JAN; // defensive: stale clock with an out-of-range month
+    return ((month + 9) % MONTH_COUNT) / 3; // shift Mar to 0, group months in threes
+}
+
+// Writes the current season name to dest ("AUTUMN", or "ATMN" abbreviated).
+// Returns a pointer to the terminator.
+u8 *Clock_GetSeasonString(u8 *dest, bool32 abbreviate)
+{
+    const u8 *const *names = abbreviate ? sSeasonNamesShort : sSeasonNames;
+    return StringCopy(dest, names[Clock_GetSeason()]);
+}
+
+// Day index within the current season (0 = first day), and the season's length
+// in days via lengthOut. Winter spans the year boundary, so its Jan/Feb fall in
+// the year after its December, and it runs a day longer in a leap year.
+static u32 SeasonDayIndex(struct Clock *clock, u32 *lengthOut)
+{
+    u32 season = Clock_GetSeason();
+    u32 startMonth = season * 3 + MONTH_MAR; // MAR, JUN, SEP, or DEC
+    u32 startYear = clock->year;
+    u32 dayInSeason = 0;
+    u32 length = 0;
+    u32 i;
+
+    if (season == SEASON_WINTER && clock->month != MONTH_DEC)
+        startYear = clock->year - 1;
+
+    for (i = 0; i < 3; i++)
+    {
+        u32 month = ((startMonth - 1 + i) % MONTH_COUNT) + 1;
+        u32 year = (season == SEASON_WINTER && month != MONTH_DEC) ? startYear + 1 : startYear;
+
+        if (month == clock->month)
+            dayInSeason = length + (clock->day - 1);
+        length += DaysInMonth(month, year);
+    }
+
+    *lengthOut = length;
+    return dayInSeason;
+}
+
+// Phase within the season (SEASON_PHASE_*): the first or last two weeks, else mid.
+u32 Clock_GetSeasonPhase(void)
+{
+    u32 length;
+    u32 dayInSeason = SeasonDayIndex(&gSaveBlock1Ptr->gameClock, &length);
+    u32 lateDays = SEASON_PHASE_DAYS;
+
+    // The leap day lands at the end of winter (length 91, not 90); extend late
+    // winter by it so the window keeps its usual start date and just absorbs Feb 29.
+    if (Clock_GetSeason() == SEASON_WINTER && length > 90)
+        lateDays++;
+
+    if (dayInSeason < SEASON_PHASE_DAYS)
+        return SEASON_PHASE_EARLY;
+    if (dayInSeason >= length - lateDays)
+        return SEASON_PHASE_LATE;
+    return SEASON_PHASE_MID;
+}
+
+// Writes the phase-prefixed season name ("EARLY AUTUMN", or "E. ATMN" abbreviated;
+// mid season has no prefix). Returns a pointer to the terminator.
+u8 *Clock_GetFullSeasonString(u8 *dest, bool32 abbreviate)
+{
+    switch (Clock_GetSeasonPhase())
+    {
+    case SEASON_PHASE_EARLY:
+        dest = StringCopy(dest, abbreviate ? sSeasonPhaseShort_Early : sSeasonPhase_Early);
+        break;
+    case SEASON_PHASE_LATE:
+        dest = StringCopy(dest, abbreviate ? sSeasonPhaseShort_Late : sSeasonPhase_Late);
+        break;
+    }
+    return Clock_GetSeasonString(dest, abbreviate);
+}
+
+// Season predicates over the given season (SEASON_*). IsSeason matches it in any
+// phase; the others also require that the season be in that early/mid/late phase.
+bool32 IsSeason(u32 season)      { return Clock_GetSeason() == season; }
+bool32 IsEarlySeason(u32 season) { return IsSeason(season) && Clock_GetSeasonPhase() == SEASON_PHASE_EARLY; }
+bool32 IsMidSeason(u32 season)   { return IsSeason(season) && Clock_GetSeasonPhase() == SEASON_PHASE_MID; }
+bool32 IsLateSeason(u32 season)  { return IsSeason(season) && Clock_GetSeasonPhase() == SEASON_PHASE_LATE; }
+
 // Convenience predicates over the current time-of-day band.
 bool32 IsDay(void)      { return sTimeOfDay == TIME_OF_DAY_DAY || sTimeOfDay == TIME_OF_DAY_MIDDAY; }
 bool32 IsNight(void)    { return sTimeOfDay == TIME_OF_DAY_NIGHT || sTimeOfDay == TIME_OF_DAY_MIDNIGHT; }
@@ -476,8 +600,7 @@ static void Clock_On4Months(void)   {}
 static void Clock_On6Months(void)   {}
 static void Clock_OnYear(void)      {}
 
-// Fire when the clock passes the day's sunrise/sunset. Empty by default - fill
-// in a body to drive lighting, weather, encounters, etc. off the sun.
+// Fire when the clock passes the day's sunrise/sunset
 static void Clock_OnSunrise(void)   {}
 static void Clock_OnSunset(void)    {}
 
@@ -626,6 +749,15 @@ void Clock_Update(void)
     Clock_AdvanceSeconds(gSaveBlock1Ptr->gameClock.timeScale);
 }
 
+// Recomputes the RAM-only derived state (twilight window and time-of-day band)
+// from the current clock, so it stays correct after a setter jumps the time.
+// Season and season-phase are derived on demand, so they need no refresh.
+static void Clock_RefreshDerived(struct Clock *clock)
+{
+    Clock_UpdateTwilight(clock);
+    Clock_UpdateTimeOfDay(clock);
+}
+
 // Clamps the day into the current month's valid range; call after changing month/year, since a
 // shorter month (or a non-leap February) can leave the stored day past the end of the month.
 static void ClampDay(struct Clock *clock)
@@ -640,12 +772,18 @@ static void ClampDay(struct Clock *clock)
 
 void Clock_SetMinutes(u32 minutes)
 {
-    gSaveBlock1Ptr->gameClock.minutes = minutes % MINUTES_PER_HOUR;
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+
+    clock->minutes = minutes % MINUTES_PER_HOUR;
+    Clock_RefreshDerived(clock);
 }
 
 void Clock_SetHours(u32 hours)
 {
-    gSaveBlock1Ptr->gameClock.hours = hours % HOURS_PER_DAY;
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+
+    clock->hours = hours % HOURS_PER_DAY;
+    Clock_RefreshDerived(clock);
 }
 
 void Clock_SetDay(u32 day)
@@ -659,6 +797,7 @@ void Clock_SetDay(u32 day)
         day = max;
     clock->day = day;
     Clock_RecalcSunTimes(clock);
+    Clock_RefreshDerived(clock);
 }
 
 void Clock_SetMonth(u32 month)
@@ -672,6 +811,7 @@ void Clock_SetMonth(u32 month)
     clock->month = month;
     ClampDay(clock);
     Clock_RecalcSunTimes(clock);
+    Clock_RefreshDerived(clock);
 }
 
 void Clock_SetYear(u32 year)
@@ -681,6 +821,7 @@ void Clock_SetYear(u32 year)
     clock->year = year;
     ClampDay(clock); // a leap/non-leap change can shorten February
     Clock_RecalcSunTimes(clock);
+    Clock_RefreshDerived(clock);
 }
 
 void Clock_SetTimeScale(u32 scale)

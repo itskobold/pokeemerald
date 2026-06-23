@@ -662,8 +662,9 @@ static void Debug_DrawClockWindow(void)
     ConvertIntToDecimalStringN(gStringVar1, clock->year, STR_CONV_MODE_LEFT_ALIGN, 5);
     StringAppend(line2, gStringVar1);
 
-    // "MIDDAY"
+    // "DAY, EARLY SPRING"
     Clock_GetTimeOfDayString(lineTimeOfDay);
+    Clock_GetFullSeasonString(StringAppend(lineTimeOfDay, sDebugText_Clock_Comma), FALSE);
 
     // "SUNRISE: 7:04AM" / "SUNSET: 5:30PM"
     StringCopy(lineSunrise, sDebugText_Clock_SunriseLabel);
