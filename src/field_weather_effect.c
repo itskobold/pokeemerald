@@ -2778,16 +2778,9 @@ static const union AnimCmd sSandstormSpriteAnimCmd0[] =
     ANIMCMD_END,
 };
 
-static const union AnimCmd sSandstormSpriteAnimCmd1[] =
-{
-    ANIMCMD_FRAME(64, 3),
-    ANIMCMD_END,
-};
-
 static const union AnimCmd *const sSandstormSpriteAnimCmds[] =
 {
     sSandstormSpriteAnimCmd0,
-    sSandstormSpriteAnimCmd1,
 };
 
 static const struct SpriteTemplate sSandstormSpriteTemplate =
