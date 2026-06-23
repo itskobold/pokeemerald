@@ -203,6 +203,18 @@ struct Time
     /*0x04*/ s8 seconds;
 };
 
+// Calendar date + time of day, packed into 6 bytes via u16 bitfields.
+struct GameClock
+{
+    /*0x0*/ u16 seconds:6; // 0-59
+             u16 minutes:6; // 0-59
+    /*0x2*/ u16 hours:5;   // 0-23
+             u16 day:5;     // 1-31
+             u16 month:4;   // 1-12
+    /*0x4*/ u16 year;      // increments from 0
+    /*0x6*/ u8 timeScale;  // in-game seconds per real second
+};
+
 struct Pokedex
 {
     /*0x00*/ u8 order;
@@ -1077,7 +1089,8 @@ struct SaveBlock1
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
     /*0x3598*/ struct ObjectEventWander objectEventWanderStore[OBJECT_EVENT_WANDER_COUNT]; // 0x150 bytes
-    /*0x36E8*/ u8 unused_3598[0x30]; // Remaining filler from the old camera-focus slot (now gCameraPos).
+    /*0x36E8*/ struct GameClock gameClock; // 8 bytes
+    /*0x36F0*/ u8 unused_3598[0x28]; // Remaining filler from the old camera-focus slot (now gCameraPos).
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

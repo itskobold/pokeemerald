@@ -7,6 +7,7 @@
 #include "field_screen_effect.h"
 #include "fieldmap.h"
 #include "field_weather.h"
+#include "game_time.h"
 #include "overworld.h"
 #include "item.h"
 #include "list_menu.h"
@@ -17,6 +18,7 @@
 #include "pokedex.h"
 #include "script.h"
 #include "script_menu.h"
+#include "siirtc.h" // MONTH_* constants for the clock readout
 #include "sound.h"
 #include "string_util.h"
 #include "task.h"
@@ -103,9 +105,33 @@ void SetDebugNewGameFlags()
 // Main menu items
 enum
 {
+    DEBUG_MENU_ITEM_CLOCK,
     DEBUG_MENU_ITEM_CAMERA,
     DEBUG_MENU_ITEM_WEATHER,
     DEBUG_MENU_ITEM_CANCEL,
+};
+
+// Clock submenu items
+enum
+{
+    DEBUG_CLOCK_ITEM_SET_HOURS,
+    DEBUG_CLOCK_ITEM_SET_MINUTES,
+    DEBUG_CLOCK_ITEM_SET_DAY,
+    DEBUG_CLOCK_ITEM_SET_MONTH,
+    DEBUG_CLOCK_ITEM_SET_YEAR,
+    DEBUG_CLOCK_ITEM_SET_TIMESCALE,
+    DEBUG_CLOCK_ITEM_CANCEL,
+};
+
+// Which clock field the shared "set value" scroll box is editing.
+enum
+{
+    CLOCK_FIELD_HOURS,
+    CLOCK_FIELD_MINUTES,
+    CLOCK_FIELD_DAY,
+    CLOCK_FIELD_MONTH,
+    CLOCK_FIELD_YEAR,
+    CLOCK_FIELD_TIMESCALE,
 };
 
 // Weather submenu items
@@ -150,13 +176,23 @@ enum
 #define TAG_WIND_DIRECTION_SCROLL_ARROW 2113
 #define TAG_WIND_DIRECTION_LR_SCROLL_ARROW 2114
 #define TAG_WIND_SPEED_SCROLL_ARROW 2115
+#define TAG_CLOCK_SET_SCROLL_ARROW 2116
 
 static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void (*handleInput)(u8));
 static void Debug_DestroyMenu(u8 taskId);
 static void Debug_CloseMenu(u8 taskId);
 static void Debug_OpenMainMenu(void);
+static void Debug_DrawClockWindow(void);
+static void Debug_RemoveClockWindow(void);
 static void Debug_ShowCameraMenu(void);
 static void Debug_ShowWeatherMenu(void);
+static void Debug_ShowClockMenu(void);
+static void Debug_OpenClockSetBox(u8 field);
+static bool32 Debug_ClockFieldHasCoarseStep(u8 field);
+static void Debug_DrawClockSetBox(void);
+static void Debug_TearDownClockSetBox(u8 taskId);
+static void Debug_CommitClockSetBox(u8 taskId);
+static void Debug_CancelClockSetBox(u8 taskId);
 static void Debug_OpenCloudCoverBox(void);
 static void Debug_DrawCloudCoverBox(void);
 static void Debug_TearDownCloudCoverBox(u8 taskId);
@@ -192,6 +228,8 @@ static u8 Debug_OrderForLocalId(u8 localId);
 static void DebugTask_HandleMenuInput_Main(u8 taskId);
 static void DebugTask_HandleMenuInput_Camera(u8 taskId);
 static void DebugTask_HandleMenuInput_Weather(u8 taskId);
+static void DebugTask_HandleMenuInput_Clock(u8 taskId);
+static void DebugTask_ClockSetInput(u8 taskId);
 static void DebugTask_TrackEntityInput(u8 taskId);
 static void DebugTask_CloudCoverInput(u8 taskId);
 static void DebugTask_CloudBrightnessInput(u8 taskId);
@@ -200,6 +238,14 @@ static void DebugTask_WindSpeedInput(u8 taskId);
 
 static void DebugAction_OpenCameraMenu(u8 taskId);
 static void DebugAction_OpenWeatherMenu(u8 taskId);
+static void DebugAction_OpenClockMenu(u8 taskId);
+static void DebugAction_Clock_SetHours(u8 taskId);
+static void DebugAction_Clock_SetMinutes(u8 taskId);
+static void DebugAction_Clock_SetDay(u8 taskId);
+static void DebugAction_Clock_SetMonth(u8 taskId);
+static void DebugAction_Clock_SetYear(u8 taskId);
+static void DebugAction_Clock_SetTimeScale(u8 taskId);
+static void DebugAction_Clock_Cancel(u8 taskId);
 static void DebugAction_Weather_SetCloudCover(u8 taskId);
 static void DebugAction_Weather_SetCloudBrightness(u8 taskId);
 static void DebugAction_Weather_SetWindDirection(u8 taskId);
@@ -225,6 +271,22 @@ static void DebugTask_WaitPanToTile(u8 taskId);
 // open the player's field controls are locked so the D-pad drives the menu (and freecam
 // scrolling pauses); closing it hands input back.
 static bool8 sDebugMenuOpen;
+
+// Read-only clock readout drawn in the bottom-right while the main menu is open.
+static u8 sClockWindowId;
+
+// Shared "set clock field" numeric scroll box. One field is edited at a time (see CLOCK_FIELD_*);
+// up/down adjust the value by 1 within [sClockSetMin, sClockSetMax], A commits, B returns to the menu.
+// The wide-range fields (year, time scale) also take left/right for a coarse +/-10 step, shown as
+// arrow glyphs flanking the value.
+static u8 sClockSetWindowId;
+static u8 sClockSetArrowTaskId;
+static u16 sClockSetValue;
+static u8 sClockSetField;
+static u16 sClockSetMin;
+static u16 sClockSetMax;
+
+#define CLOCK_SET_COARSE_STEP 10
 
 // "Track Entity" numeric scroll box state. sTrackEntityOrder walks the map's object-event
 // list: 0 = player, 1..N = the N object event templates in order. This covers every
@@ -284,6 +346,93 @@ static const u8 sDebugText_WindDir_Above[] = _(" >"); // suffix: value sits just
 static const u8 sDebugText_Weather_SetWindSpeed[] = _("Set wind speed");
 static const u8 sDebugText_WindSpeed_Label[] = _("Speed ");
 
+// Clock readout pieces, e.g. "9:30AM, MON.\nSEPT. 15, YR. 0".
+static const u8 sDebugText_Clock_Colon[] = _(":");
+static const u8 sDebugText_Clock_AM[] = _("AM");
+static const u8 sDebugText_Clock_PM[] = _("PM");
+static const u8 sDebugText_Clock_Comma[] = _(", ");
+static const u8 sDebugText_Clock_Space[] = _(" ");
+static const u8 sDebugText_Clock_YearSep[] = _(", YR. ");
+static const u8 sDebugText_Clock_Newline[] = _("\n");
+static const u8 sDebugText_Clock_ScaleLabel[] = _("SCALE: ");
+static const u8 sDebugText_Clock_ScaleSuffix[] = _("x");
+
+// Clock submenu labels.
+static const u8 sDebugText_Clock[] = _("Clock");
+static const u8 sDebugText_Clock_SetHours[] = _("Set hours");
+static const u8 sDebugText_Clock_SetMinutes[] = _("Set minutes");
+static const u8 sDebugText_Clock_SetDay[] = _("Set day");
+static const u8 sDebugText_Clock_SetMonth[] = _("Set month");
+static const u8 sDebugText_Clock_SetYear[] = _("Set year");
+static const u8 sDebugText_Clock_SetTimeScale[] = _("Set time scale");
+static const u8 sDebugText_ClockSet_Hours[] = _("Hours ");
+static const u8 sDebugText_ClockSet_Minutes[] = _("Minutes ");
+static const u8 sDebugText_ClockSet_Day[] = _("Day ");
+static const u8 sDebugText_ClockSet_Month[] = _("Month ");
+static const u8 sDebugText_ClockSet_Year[] = _("Year ");
+static const u8 sDebugText_ClockSet_TimeScale[] = _("Scale ");
+static const u8 sDebugText_ClockSet_ArrowL[] = _("{LEFT_ARROW}");  // left/right = coarse +/-10 step
+static const u8 sDebugText_ClockSet_ArrowR[] = _("{RIGHT_ARROW}");
+
+static const u8 sDebugText_Weekday_Sun[] = _("SUN.");
+static const u8 sDebugText_Weekday_Mon[] = _("MON.");
+static const u8 sDebugText_Weekday_Tue[] = _("TUE.");
+static const u8 sDebugText_Weekday_Wed[] = _("WED.");
+static const u8 sDebugText_Weekday_Thu[] = _("THU.");
+static const u8 sDebugText_Weekday_Fri[] = _("FRI.");
+static const u8 sDebugText_Weekday_Sat[] = _("SAT.");
+
+static const u8 *const sDebugClockWeekdays[] =
+{
+    [WEEKDAY_SUN] = sDebugText_Weekday_Sun,
+    [WEEKDAY_MON] = sDebugText_Weekday_Mon,
+    [WEEKDAY_TUE] = sDebugText_Weekday_Tue,
+    [WEEKDAY_WED] = sDebugText_Weekday_Wed,
+    [WEEKDAY_THU] = sDebugText_Weekday_Thu,
+    [WEEKDAY_FRI] = sDebugText_Weekday_Fri,
+    [WEEKDAY_SAT] = sDebugText_Weekday_Sat,
+};
+
+static const u8 sDebugText_Month_Jan[] = _("JAN.");
+static const u8 sDebugText_Month_Feb[] = _("FEB.");
+static const u8 sDebugText_Month_Mar[] = _("MAR.");
+static const u8 sDebugText_Month_Apr[] = _("APR.");
+static const u8 sDebugText_Month_May[] = _("MAY");
+static const u8 sDebugText_Month_Jun[] = _("JUN.");
+static const u8 sDebugText_Month_Jul[] = _("JUL.");
+static const u8 sDebugText_Month_Aug[] = _("AUG.");
+static const u8 sDebugText_Month_Sep[] = _("SEPT.");
+static const u8 sDebugText_Month_Oct[] = _("OCT.");
+static const u8 sDebugText_Month_Nov[] = _("NOV.");
+static const u8 sDebugText_Month_Dec[] = _("DEC.");
+
+static const u8 *const sDebugClockMonths[MONTH_COUNT] =
+{
+    [MONTH_JAN - 1] = sDebugText_Month_Jan,
+    [MONTH_FEB - 1] = sDebugText_Month_Feb,
+    [MONTH_MAR - 1] = sDebugText_Month_Mar,
+    [MONTH_APR - 1] = sDebugText_Month_Apr,
+    [MONTH_MAY - 1] = sDebugText_Month_May,
+    [MONTH_JUN - 1] = sDebugText_Month_Jun,
+    [MONTH_JUL - 1] = sDebugText_Month_Jul,
+    [MONTH_AUG - 1] = sDebugText_Month_Aug,
+    [MONTH_SEP - 1] = sDebugText_Month_Sep,
+    [MONTH_OCT - 1] = sDebugText_Month_Oct,
+    [MONTH_NOV - 1] = sDebugText_Month_Nov,
+    [MONTH_DEC - 1] = sDebugText_Month_Dec,
+};
+
+// Box labels for the shared clock-field setter, indexed by CLOCK_FIELD_*.
+static const u8 *const sClockSetLabels[] =
+{
+    [CLOCK_FIELD_HOURS]   = sDebugText_ClockSet_Hours,
+    [CLOCK_FIELD_MINUTES] = sDebugText_ClockSet_Minutes,
+    [CLOCK_FIELD_DAY]     = sDebugText_ClockSet_Day,
+    [CLOCK_FIELD_MONTH]   = sDebugText_ClockSet_Month,
+    [CLOCK_FIELD_YEAR]    = sDebugText_ClockSet_Year,
+    [CLOCK_FIELD_TIMESCALE] = sDebugText_ClockSet_TimeScale,
+};
+
 // Names for the 16 defined wind directions, indexed by BAM angle >> 4 (see the WIND_DIR_* constants).
 static const u8 sDebugText_WindDir_N[]   = _("NORTH");
 static const u8 sDebugText_WindDir_NNE[] = _("NNE");
@@ -326,7 +475,19 @@ static const struct ListMenuItem sDebugMenuItems_Main[] =
 {
     [DEBUG_MENU_ITEM_CAMERA]  = {sDebugText_Camera, DEBUG_MENU_ITEM_CAMERA},
     [DEBUG_MENU_ITEM_WEATHER] = {sDebugText_Weather, DEBUG_MENU_ITEM_WEATHER},
+    [DEBUG_MENU_ITEM_CLOCK]   = {sDebugText_Clock, DEBUG_MENU_ITEM_CLOCK},
     [DEBUG_MENU_ITEM_CANCEL]  = {sDebugText_Cancel, DEBUG_MENU_ITEM_CANCEL},
+};
+
+static const struct ListMenuItem sDebugMenuItems_Clock[] =
+{
+    [DEBUG_CLOCK_ITEM_SET_HOURS]   = {sDebugText_Clock_SetHours, DEBUG_CLOCK_ITEM_SET_HOURS},
+    [DEBUG_CLOCK_ITEM_SET_MINUTES] = {sDebugText_Clock_SetMinutes, DEBUG_CLOCK_ITEM_SET_MINUTES},
+    [DEBUG_CLOCK_ITEM_SET_DAY]     = {sDebugText_Clock_SetDay, DEBUG_CLOCK_ITEM_SET_DAY},
+    [DEBUG_CLOCK_ITEM_SET_MONTH]   = {sDebugText_Clock_SetMonth, DEBUG_CLOCK_ITEM_SET_MONTH},
+    [DEBUG_CLOCK_ITEM_SET_YEAR]    = {sDebugText_Clock_SetYear, DEBUG_CLOCK_ITEM_SET_YEAR},
+    [DEBUG_CLOCK_ITEM_SET_TIMESCALE] = {sDebugText_Clock_SetTimeScale, DEBUG_CLOCK_ITEM_SET_TIMESCALE},
+    [DEBUG_CLOCK_ITEM_CANCEL]      = {sDebugText_Cancel, DEBUG_CLOCK_ITEM_CANCEL},
 };
 
 static const struct ListMenuItem sDebugMenuItems_Weather[] =
@@ -353,7 +514,19 @@ static void (*const sDebugMenuActions_Main[])(u8) =
 {
     [DEBUG_MENU_ITEM_CAMERA]  = DebugAction_OpenCameraMenu,
     [DEBUG_MENU_ITEM_WEATHER] = DebugAction_OpenWeatherMenu,
+    [DEBUG_MENU_ITEM_CLOCK]   = DebugAction_OpenClockMenu,
     [DEBUG_MENU_ITEM_CANCEL]  = DebugAction_Cancel,
+};
+
+static void (*const sDebugMenuActions_Clock[])(u8) =
+{
+    [DEBUG_CLOCK_ITEM_SET_HOURS]   = DebugAction_Clock_SetHours,
+    [DEBUG_CLOCK_ITEM_SET_MINUTES] = DebugAction_Clock_SetMinutes,
+    [DEBUG_CLOCK_ITEM_SET_DAY]     = DebugAction_Clock_SetDay,
+    [DEBUG_CLOCK_ITEM_SET_MONTH]   = DebugAction_Clock_SetMonth,
+    [DEBUG_CLOCK_ITEM_SET_YEAR]    = DebugAction_Clock_SetYear,
+    [DEBUG_CLOCK_ITEM_SET_TIMESCALE] = DebugAction_Clock_SetTimeScale,
+    [DEBUG_CLOCK_ITEM_CANCEL]      = DebugAction_Clock_Cancel,
 };
 
 static void (*const sDebugMenuActions_Weather[])(u8) =
@@ -418,6 +591,95 @@ void Debug_ShowMainMenu(void)
 static void Debug_OpenMainMenu(void)
 {
     Debug_ShowMenu(sDebugMenuItems_Main, ARRAY_COUNT(sDebugMenuItems_Main), DebugTask_HandleMenuInput_Main);
+    Debug_DrawClockWindow();
+}
+
+// The clock readout has its own baseBlock so its tiles don't collide with the main menu's
+// list window (CreateWindowFromRect hardcodes baseBlock 100). Bottom-right of the screen.
+#define CLOCK_WIN_BASE_BLOCK 0xC0
+#define CLOCK_WIN_HEIGHT     5 // three FONT_SMALL lines (12px line height)
+
+static void Debug_DrawClockWindow(void)
+{
+    struct GameClock *clock = &gSaveBlock1Ptr->gameClock;
+    struct WindowTemplate template;
+    u8 line1[24];
+    u8 line2[24];
+    u8 line3[24];
+    u8 text[72];
+    s32 width, lineWidth;
+    u8 tileWidth;
+    u8 hour = clock->hours % 12;
+    u8 month = clock->month;
+
+    if (hour == 0)
+        hour = 12;
+
+    // Guard the month-name lookup: a save predating the gameClock field has an
+    // uninitialised (often 0) month, which would index out of bounds.
+    if (month < MONTH_JAN || month > MONTH_DEC)
+        month = MONTH_JAN;
+
+    // Line 1: "9:30AM, MON."
+    ConvertIntToDecimalStringN(gStringVar1, hour, STR_CONV_MODE_LEFT_ALIGN, 2);
+    StringCopy(line1, gStringVar1);
+    StringAppend(line1, sDebugText_Clock_Colon);
+    ConvertIntToDecimalStringN(gStringVar1, clock->minutes, STR_CONV_MODE_LEADING_ZEROS, 2);
+    StringAppend(line1, gStringVar1);
+    StringAppend(line1, clock->hours < 12 ? sDebugText_Clock_AM : sDebugText_Clock_PM);
+    StringAppend(line1, sDebugText_Clock_Comma);
+    StringAppend(line1, sDebugClockWeekdays[GameClock_GetDayOfWeek()]);
+
+    // Line 2: "SEPT. 15, YR. 0"
+    StringCopy(line2, sDebugClockMonths[month - 1]);
+    StringAppend(line2, sDebugText_Clock_Space);
+    ConvertIntToDecimalStringN(gStringVar1, clock->day, STR_CONV_MODE_LEFT_ALIGN, 2);
+    StringAppend(line2, gStringVar1);
+    StringAppend(line2, sDebugText_Clock_YearSep);
+    ConvertIntToDecimalStringN(gStringVar1, clock->year, STR_CONV_MODE_LEFT_ALIGN, 5);
+    StringAppend(line2, gStringVar1);
+
+    // Line 3: "SCALE: 20x"
+    StringCopy(line3, sDebugText_Clock_ScaleLabel);
+    ConvertIntToDecimalStringN(gStringVar1, clock->timeScale, STR_CONV_MODE_LEFT_ALIGN, 3);
+    StringAppend(line3, gStringVar1);
+    StringAppend(line3, sDebugText_Clock_ScaleSuffix);
+
+    // Size the window to the widest line so it hugs the text.
+    width = GetStringWidth(FONT_SMALL, line1, 0);
+    lineWidth = GetStringWidth(FONT_SMALL, line2, 0);
+    if (lineWidth > width)
+        width = lineWidth;
+    lineWidth = GetStringWidth(FONT_SMALL, line3, 0);
+    if (lineWidth > width)
+        width = lineWidth;
+    tileWidth = ConvertPixelWidthToTileWidth(width);
+
+    template = CreateWindowTemplate(0, 29 - tileWidth, 19 - CLOCK_WIN_HEIGHT,
+                                    tileWidth, CLOCK_WIN_HEIGHT, 15, CLOCK_WIN_BASE_BLOCK);
+    sClockWindowId = AddWindow(&template);
+    PutWindowTilemap(sClockWindowId);
+    DrawStdWindowFrame(sClockWindowId, FALSE);
+
+    StringCopy(text, line1);
+    StringAppend(text, sDebugText_Clock_Newline);
+    StringAppend(text, line2);
+    StringAppend(text, sDebugText_Clock_Newline);
+    StringAppend(text, line3);
+
+    FillWindowPixelBuffer(sClockWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sClockWindowId, FONT_SMALL, text, 2, 0, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sClockWindowId, COPYWIN_FULL);
+}
+
+static void Debug_RemoveClockWindow(void)
+{
+    if (sClockWindowId == WINDOW_NONE)
+        return;
+
+    ClearStdWindowAndFrameToTransparent(sClockWindowId, TRUE);
+    RemoveWindow(sClockWindowId);
+    sClockWindowId = WINDOW_NONE;
 }
 
 static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void (*handleInput)(u8))
@@ -455,6 +717,7 @@ static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void 
 // so a different submenu (or a terminal close action) can take over.
 static void Debug_DestroyMenu(u8 taskId)
 {
+    Debug_RemoveClockWindow(); // no-op unless the main menu drew it
     DestroyListMenuTask(gTasks[taskId].tMenuTaskId, NULL, NULL);
     ClearStdWindowAndFrameToTransparent(gTasks[taskId].tWindowId, TRUE);
     RemoveWindow(gTasks[taskId].tWindowId);
@@ -1519,6 +1782,271 @@ static void DebugTask_WindSpeedInput(u8 taskId)
     {
         PlaySE(SE_SELECT);
         Debug_CancelWindSpeedBox(taskId);
+    }
+}
+
+// -------------------- Clock submenu --------------------
+
+static void Debug_ShowClockMenu(void)
+{
+    Debug_ShowMenu(sDebugMenuItems_Clock, ARRAY_COUNT(sDebugMenuItems_Clock), DebugTask_HandleMenuInput_Clock);
+}
+
+static void DebugAction_OpenClockMenu(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_ShowClockMenu();
+}
+
+static void DebugAction_Clock_Cancel(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenMainMenu();
+}
+
+static void DebugTask_HandleMenuInput_Clock(u8 taskId)
+{
+    void (*func)(u8);
+    s32 input;
+
+    if (ListMenuTryWrapSelection(gTasks[taskId].tMenuTaskId))
+        return;
+
+    input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+
+    if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        if ((func = sDebugMenuActions_Clock[input]) != NULL)
+            func(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        DebugAction_Clock_Cancel(taskId);
+    }
+}
+
+static void DebugAction_Clock_SetHours(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenClockSetBox(CLOCK_FIELD_HOURS);
+}
+
+static void DebugAction_Clock_SetMinutes(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenClockSetBox(CLOCK_FIELD_MINUTES);
+}
+
+static void DebugAction_Clock_SetDay(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenClockSetBox(CLOCK_FIELD_DAY);
+}
+
+static void DebugAction_Clock_SetMonth(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenClockSetBox(CLOCK_FIELD_MONTH);
+}
+
+static void DebugAction_Clock_SetYear(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenClockSetBox(CLOCK_FIELD_YEAR);
+}
+
+static void DebugAction_Clock_SetTimeScale(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenClockSetBox(CLOCK_FIELD_TIMESCALE);
+}
+
+// Redraws the box as e.g. "Hours 9", the month name for the month field, or value flanked by
+// arrow glyphs for the coarse-step fields, e.g. "Year {<}1995{>}".
+static void Debug_DrawClockSetBox(void)
+{
+    bool32 coarse = Debug_ClockFieldHasCoarseStep(sClockSetField);
+    u8 text[24];
+
+    StringCopy(text, sClockSetLabels[sClockSetField]);
+    if (coarse)
+        StringAppend(text, sDebugText_ClockSet_ArrowL);
+
+    if (sClockSetField == CLOCK_FIELD_MONTH)
+    {
+        StringAppend(text, sDebugClockMonths[sClockSetValue - 1]);
+    }
+    else
+    {
+        ConvertIntToDecimalStringN(gStringVar1, sClockSetValue, STR_CONV_MODE_LEFT_ALIGN, 5);
+        StringAppend(text, gStringVar1);
+    }
+
+    if (coarse)
+        StringAppend(text, sDebugText_ClockSet_ArrowR);
+
+    FillWindowPixelBuffer(sClockSetWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sClockSetWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sClockSetWindowId, COPYWIN_GFX);
+}
+
+// The wide-range fields get left/right arrows for a coarse +/-10 step.
+static bool32 Debug_ClockFieldHasCoarseStep(u8 field)
+{
+    return field == CLOCK_FIELD_YEAR || field == CLOCK_FIELD_TIMESCALE;
+}
+
+// Opens the shared clock-field box on the given CLOCK_FIELD_*, seeded with the current value.
+static void Debug_OpenClockSetBox(u8 field)
+{
+    struct GameClock *clock = &gSaveBlock1Ptr->gameClock;
+
+    sClockSetField = field;
+    switch (field)
+    {
+    case CLOCK_FIELD_HOURS:
+        sClockSetValue = clock->hours;
+        sClockSetMin = 0;
+        sClockSetMax = HOURS_PER_DAY - 1;
+        break;
+    case CLOCK_FIELD_MINUTES:
+        sClockSetValue = clock->minutes;
+        sClockSetMin = 0;
+        sClockSetMax = MINUTES_PER_HOUR - 1;
+        break;
+    case CLOCK_FIELD_DAY:
+        sClockSetValue = clock->day;
+        sClockSetMin = 1;
+        sClockSetMax = 31;
+        break;
+    case CLOCK_FIELD_MONTH:
+        sClockSetValue = clock->month;
+        sClockSetMin = MONTH_JAN;
+        sClockSetMax = MONTH_DEC;
+        break;
+    case CLOCK_FIELD_YEAR:
+        sClockSetValue = clock->year;
+        sClockSetMin = 0;
+        sClockSetMax = 9999;
+        break;
+    case CLOCK_FIELD_TIMESCALE:
+        sClockSetValue = clock->timeScale;
+        sClockSetMin = 0;
+        sClockSetMax = 255; // timeScale is a u8
+        break;
+    }
+
+    LoadMessageBoxAndBorderGfx();
+    sClockSetWindowId = CreateWindowFromRect(0, 1, 12, 2);
+    DrawStdWindowFrame(sClockSetWindowId, FALSE);
+    Debug_DrawClockSetBox();
+    CopyWindowToVram(sClockSetWindowId, COPYWIN_FULL);
+
+    {
+        struct ScrollArrowsTemplate arrows;
+
+        arrows.firstArrowType = SCROLL_ARROW_UP;
+        arrows.firstX = 44;
+        arrows.firstY = 12;
+        arrows.secondArrowType = SCROLL_ARROW_DOWN;
+        arrows.secondX = 44;
+        arrows.secondY = 36;
+        arrows.fullyUpThreshold = sClockSetMax;
+        arrows.fullyDownThreshold = sClockSetMin;
+        arrows.tileTag = TAG_CLOCK_SET_SCROLL_ARROW;
+        arrows.palTag = TAG_CLOCK_SET_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sClockSetArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sClockSetValue);
+    }
+
+    CreateTask(DebugTask_ClockSetInput, 3);
+    sDebugMenuOpen = TRUE;
+}
+
+// Tears down the box's window, scroll arrows and input task. The caller decides what to do next.
+static void Debug_TearDownClockSetBox(u8 taskId)
+{
+    RemoveScrollIndicatorArrowPair(sClockSetArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sClockSetWindowId, TRUE);
+    RemoveWindow(sClockSetWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
+}
+
+// Commits the box (A): writes the edited field through its game_time setter (which clamps the date),
+// then returns to the clock menu so several fields can be set in a row.
+static void Debug_CommitClockSetBox(u8 taskId)
+{
+    u8 field = sClockSetField;
+    u16 value = sClockSetValue;
+
+    Debug_TearDownClockSetBox(taskId);
+    switch (field)
+    {
+    case CLOCK_FIELD_HOURS:   GameClock_SetHours(value);   break;
+    case CLOCK_FIELD_MINUTES: GameClock_SetMinutes(value); break;
+    case CLOCK_FIELD_DAY:     GameClock_SetDay(value);     break;
+    case CLOCK_FIELD_MONTH:   GameClock_SetMonth(value);   break;
+    case CLOCK_FIELD_YEAR:    GameClock_SetYear(value);    break;
+    case CLOCK_FIELD_TIMESCALE: GameClock_SetTimeScale(value); break;
+    }
+    Debug_ShowClockMenu();
+}
+
+// Backs out of the box (B) without changing anything, returning to the clock menu.
+static void Debug_CancelClockSetBox(u8 taskId)
+{
+    Debug_TearDownClockSetBox(taskId);
+    Debug_ShowClockMenu();
+}
+
+// Up/down adjust the value by 1 (held to repeat); on wide-range fields left/right step by 10. All
+// clamped to [sClockSetMin, sClockSetMax]. A commits, B cancels; both return to the clock menu.
+static void DebugTask_ClockSetInput(u8 taskId)
+{
+    bool32 coarse = Debug_ClockFieldHasCoarseStep(sClockSetField);
+
+    if (JOY_REPEAT(DPAD_UP) && sClockSetValue < sClockSetMax)
+    {
+        sClockSetValue++;
+        PlaySE(SE_SELECT);
+        Debug_DrawClockSetBox();
+    }
+    else if (JOY_REPEAT(DPAD_DOWN) && sClockSetValue > sClockSetMin)
+    {
+        sClockSetValue--;
+        PlaySE(SE_SELECT);
+        Debug_DrawClockSetBox();
+    }
+    else if (coarse && JOY_REPEAT(DPAD_RIGHT) && sClockSetValue < sClockSetMax)
+    {
+        if (sClockSetMax - sClockSetValue < CLOCK_SET_COARSE_STEP)
+            sClockSetValue = sClockSetMax;
+        else
+            sClockSetValue += CLOCK_SET_COARSE_STEP;
+        PlaySE(SE_SELECT);
+        Debug_DrawClockSetBox();
+    }
+    else if (coarse && JOY_REPEAT(DPAD_LEFT) && sClockSetValue > sClockSetMin)
+    {
+        if (sClockSetValue - sClockSetMin < CLOCK_SET_COARSE_STEP)
+            sClockSetValue = sClockSetMin;
+        else
+            sClockSetValue -= CLOCK_SET_COARSE_STEP;
+        PlaySE(SE_SELECT);
+        Debug_DrawClockSetBox();
+    }
+    else if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CommitClockSetBox(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CancelClockSetBox(taskId);
     }
 }
 

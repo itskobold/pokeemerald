@@ -114,6 +114,7 @@ SECTIONS {
         src/trade.o(.text);
         src/berry_blender.o(.text);
         src/play_time.o(.text);
+        src/game_time.o(.text);
         src/new_game.o(.text);
         src/overworld.o(.text);
         src/fieldmap.o(.text);
@@ -495,6 +496,7 @@ SECTIONS {
         src/pokeball.o(.rodata);
         src/trade.o(.rodata);
         src/berry_blender.o(.rodata);
+        src/game_time.o(.rodata);
         src/new_game.o(.rodata);
         src/overworld.o(.rodata);
         src/tilesets.o(.rodata);

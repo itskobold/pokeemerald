@@ -15,6 +15,7 @@
 #include "dewford_trend.h"
 #include "berry.h"
 #include "rtc.h"
+#include "game_time.h"
 #include "easy_chat.h"
 #include "event_data.h"
 #include "money.h"
@@ -210,6 +211,7 @@ void NewGameInitData(void)
     WipeTrainerNameRecords();
     ResetTrainerHillResults();
     ResetContestLinkResults();
+    InitGameClock();
 
     SetDebugNewGameFlags();
 }
