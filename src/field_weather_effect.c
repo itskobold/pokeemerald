@@ -1721,9 +1721,13 @@ static void UpdateAshSprite(struct Sprite *sprite)
 // field left by this buffer; every tile moves together so the field stays seamless, and the spare 5th
 // column keeps the right edge covered.
 #define CLOUD_LEFT_BUFFER   1   // px of extra coverage past the left screen edge
+// Wind drift: per frame we accumulate windSpeed * gSineTable[heading] (Q8) into a sub-pixel
+// accumulator and emit one pixel of scroll per CLOUD_WIND_SUBPX_PER_PX. Sized so that at
+// WIND_SPEED_DEFAULT the field scrolls 1px every 3 frames (the old fixed rate).
+#define CLOUD_WIND_SUBPX_PER_PX  (WIND_SPEED_DEFAULT * 256 * 3)
 
 // Subtle wobble layered on top of the drift to keep the field from looking frozen. Two pieces, both
-// driven by cloudsWavePhase (one unit/frame) and applied via sprite->x2/y2 so they nudge position only,
+// driven by cloudsWavePhase (one unit/frame, independent of wind speed) and applied via sprite->x2/y2 so they nudge position only,
 // never the tile-image selection. SWAY is a slow circle the whole field rides together (perfectly
 // seamless). RIPPLE is a horizontal shimmer whose phase tracks screen-Y, so horizontal neighbours share
 // an offset (seam stays shut) while vertical neighbours differ only ~0.1px at this wavelength - reads as
@@ -1735,6 +1739,8 @@ static void UpdateAshSprite(struct Sprite *sprite)
 static void UpdateCloudsMovement(void);
 static void UpdateCloudCover(void);
 static void UpdateCloudBrightness(void);
+static void UpdateWindDirection(void);
+static void UpdateWindSpeed(void);
 static bool32 StepCloudCover(u8 target);
 static bool32 StepCloudBrightness(s8 target);
 static void UnpauseClouds(void);
@@ -1933,11 +1939,17 @@ void InitClouds(void)
     gWeatherPtr->externalPauseClouds = FALSE; // also clears any battle-entry pause when returning to the field
     gWeatherPtr->cloudClearedTimer = 0;
     gWeatherPtr->cliffSilhouetteBrightness = 0;
-    gWeatherPtr->cloudsScrollXCounter = 0;
-    gWeatherPtr->cloudsScrollYCounter = 0;
+    gWeatherPtr->cloudsScrollXAccum = 0;
+    gWeatherPtr->cloudsScrollYAccum = 0;
     gWeatherPtr->cloudsXOffset = 0;
     gWeatherPtr->cloudsYOffset = 0;
     gWeatherPtr->cloudsWavePhase = 0;
+    gWeatherPtr->cloudsRipplePhaseX = 0;
+    gWeatherPtr->cloudsRipplePhaseY = 0;
+    gWeatherPtr->targetWindDirection = gSaveBlock1Ptr->weatherState.windDirection; // hold the saved wind until asked to change
+    gWeatherPtr->targetWindSpeed = gSaveBlock1Ptr->weatherState.windSpeed;
+    gWeatherPtr->windDirectionTimer = 0;
+    gWeatherPtr->windSpeedTimer = 0;
     CreateCloudsSprites(); // allocate the persistent sheet + sprites once for the whole session
     ApplyCloudCover();     // swap in the saved level's tiles; stays hidden until an active weather shows it
 }
@@ -1993,7 +2005,11 @@ void UpdateClouds(void)
         active = FALSE;
 
     if (cloudsActive)
+    {
+        UpdateWindDirection();
+        UpdateWindSpeed();
         UpdateCloudsMovement();
+    }
 
     if (active && !sCloudsShown)
     {
@@ -2021,23 +2037,45 @@ void UpdateClouds(void)
 
 // Drift the clouds diagonally (down-left). The offsets wrap at one full pattern
 // period so the wrap lands on an identical phase and stays seamless.
+// Advance a wrapping [0, CLOUD_PATTERN_PX) pixel offset by whole pixels held in *accum.
+static void StepCloudOffset(u16 *offset, s16 *accum)
+{
+    while (*accum >= CLOUD_WIND_SUBPX_PER_PX)
+    {
+        *accum -= CLOUD_WIND_SUBPX_PER_PX;
+        if (++(*offset) >= CLOUD_PATTERN_PX)
+            *offset -= CLOUD_PATTERN_PX;
+    }
+    while (*accum <= -CLOUD_WIND_SUBPX_PER_PX)
+    {
+        *accum += CLOUD_WIND_SUBPX_PER_PX;
+        if ((*offset)-- == 0)
+            *offset = CLOUD_PATTERN_PX - 1;
+    }
+}
+
 static void UpdateCloudsMovement(void)
 {
-    if (++gWeatherPtr->cloudsScrollXCounter > 2)
-    {
-        gWeatherPtr->cloudsScrollXCounter = 0;
-        if (++gWeatherPtr->cloudsXOffset >= CLOUD_PATTERN_PX)
-            gWeatherPtr->cloudsXOffset -= CLOUD_PATTERN_PX;
-    }
+    u8 heading = gSaveBlock1Ptr->weatherState.windDirection; // BAM angle: 0=N (up), clockwise
+    s32 speed = gSaveBlock1Ptr->weatherState.windSpeed;
+    // Screen unit velocity: +X right, +Y down. East = sin, down = -cos (north is up).
+    s32 dirX = gSineTable[heading];
+    s32 dirY = -gSineTable[(heading + 64) & 0xFF];
 
-    if (++gWeatherPtr->cloudsScrollYCounter > 4)
-    {
-        gWeatherPtr->cloudsScrollYCounter = 0;
-        if (++gWeatherPtr->cloudsYOffset >= CLOUD_PATTERN_PX)
-            gWeatherPtr->cloudsYOffset -= CLOUD_PATTERN_PX;
-    }
+    // cloudsXOffset grows => field moves left, cloudsYOffset grows => field moves down
+    // (see UpdateCloudsSprite), so the screen-x velocity is negated into the X accumulator.
+    gWeatherPtr->cloudsScrollXAccum -= speed * dirX;
+    gWeatherPtr->cloudsScrollYAccum += speed * dirY;
 
-    gWeatherPtr->cloudsWavePhase++; // drives the sway/ripple wobble (see UpdateCloudsSprite)
+    // Integrate the ripple band phases from the wind unit velocity so their travel aims along the wind.
+    // Accumulating per frame (rather than multiplying the free-running phase by the heading) keeps the
+    // ripple smooth when the direction changes - only the increment shifts, not the whole stored phase.
+    gWeatherPtr->cloudsRipplePhaseX += dirY; // x2 band travels vertically (south component)
+    gWeatherPtr->cloudsRipplePhaseY += dirX; // y2 band travels horizontally (east component)
+    StepCloudOffset(&gWeatherPtr->cloudsXOffset, &gWeatherPtr->cloudsScrollXAccum);
+    StepCloudOffset(&gWeatherPtr->cloudsYOffset, &gWeatherPtr->cloudsScrollYAccum);
+
+    gWeatherPtr->cloudsWavePhase++; // fixed rate: the wobble's flow follows wind direction, not its speed
 }
 
 // Request a target cloud cover; the overlay steps toward it (see UpdateCloudCover).
@@ -2127,6 +2165,80 @@ static void UpdateCloudBrightness(void)
     gWeatherPtr->cloudBrightnessTimer = 0;
 
     StepCloudBrightness(gWeatherPtr->targetCloudBrightness);
+}
+
+// Returns the nearest of the 16 defined wind directions (a WIND_DIR_* BAM angle) to the given angle.
+// When offset is non-NULL it receives the signed distance from that direction (angle - nearest, -8..7),
+// so a caller can tell which side of the named direction the angle sits on.
+u8 GetClosestWindDirection(u8 direction, s8 *offset)
+{
+    u8 nearest = (((direction + 8) >> 4) & 15) << 4; // round to nearest multiple of 16, wrapping the circle
+
+    if (offset != NULL)
+        *offset = (s8)(direction - nearest);
+    return nearest;
+}
+
+// Request a target wind direction (BAM angle); the live direction steps toward it (see UpdateWindDirection).
+// Every angle is valid - the circle wraps - so nothing is clamped.
+void SetWindDirection(u8 target)
+{
+    gWeatherPtr->targetWindDirection = target;
+}
+
+// Move the live wind direction one BAM unit toward the target along the shorter arc, persisting it.
+static void StepWindDirection(u8 target)
+{
+    u8 *current = &gSaveBlock1Ptr->weatherState.windDirection;
+    s8 delta = (s8)(target - *current); // u8 wrap then signed cast => shortest path in -128..127
+
+    if (delta == 0)
+        return;
+    *current += (delta > 0) ? 1 : -1; // u8 wraps around the circle
+}
+
+// Step the wind direction one unit toward the target every 5 frames.
+static void UpdateWindDirection(void)
+{
+    if (gSaveBlock1Ptr->weatherState.windDirection == gWeatherPtr->targetWindDirection)
+        return;
+
+    if (++gWeatherPtr->windDirectionTimer < 5)
+        return;
+    gWeatherPtr->windDirectionTimer = 0;
+
+    StepWindDirection(gWeatherPtr->targetWindDirection);
+}
+
+// Request a target wind speed; the live speed steps toward it (see UpdateWindSpeed).
+void SetWindSpeed(u8 target)
+{
+    if (target > WIND_SPEED_MAX)
+        target = WIND_SPEED_MAX;
+    gWeatherPtr->targetWindSpeed = target;
+}
+
+// Move the live wind speed one unit toward the target, persisting it. (windSpeed is a bitfield,
+// so it's stepped in place rather than through a pointer.)
+static void StepWindSpeed(u8 target)
+{
+    if (gSaveBlock1Ptr->weatherState.windSpeed < target)
+        gSaveBlock1Ptr->weatherState.windSpeed++;
+    else if (gSaveBlock1Ptr->weatherState.windSpeed > target)
+        gSaveBlock1Ptr->weatherState.windSpeed--;
+}
+
+// Step the wind speed one unit toward the target every 10 frames.
+static void UpdateWindSpeed(void)
+{
+    if (gSaveBlock1Ptr->weatherState.windSpeed == gWeatherPtr->targetWindSpeed)
+        return;
+
+    if (++gWeatherPtr->windSpeedTimer < 10)
+        return;
+    gWeatherPtr->windSpeedTimer = 0;
+
+    StepWindSpeed(gWeatherPtr->targetWindSpeed);
 }
 
 // Per-frame cover step while (un)pausing: faster at higher levels so the fade in/out is quick.
@@ -2434,17 +2546,21 @@ static void UpdateCloudsSprite(struct Sprite *sprite)
     sprite->y = y + CLOUD_TILE / 2;
 
     // Layer a gentle wobble on top (x2/y2 only, so the tile-image pick above is untouched). Uniform sway
-    // the whole field shares + a directional ripple flowing toward the lower-left. Seam rule for a per-tile
-    // shift: x2 may vary only with y, y2 only with x (a shear) - else neighbours separate normal to their
-    // shared edge and a gap opens. So it's two crossed shear waves: the horizontal-offset bands travel down
-    // (y - phase), the vertical-offset bands travel left (x + phase); together the warp drifts lower-left.
-    // Amplitudes stay small (see CLOUD_*_AMP). gSineTable is Q8 (+/-256), so *AMP >> 8 yields +/-AMP px.
+    // the whole field shares + a directional ripple flowing along the wind. Seam rule for a per-tile shift:
+    // x2 may vary only with y, y2 only with x (a shear) - else neighbours separate normal to their shared
+    // edge and a gap opens. So it's two crossed shear waves: the horizontal-offset (x2) bands travel
+    // vertically and the vertical-offset (y2) bands travel horizontally. Only the travel rate/sign changes
+    // with heading - the spatial coupling is untouched, so seams stay shut. Each band's phase is integrated
+    // from the matching wind unit-velocity component (Q8): x2 by the south component, y2 by east, so the
+    // combined warp drifts toward windDirection. gSineTable is Q8 (+/-256), so *AMP >> 8 = +/-AMP px.
     {
-        u16 phase = gWeatherPtr->cloudsWavePhase;
+        s32 phase = gWeatherPtr->cloudsWavePhase;
+        s32 rippleXPhase = gWeatherPtr->cloudsRipplePhaseX >> 8;
+        s32 rippleYPhase = gWeatherPtr->cloudsRipplePhaseY >> 8;
         s16 swayX = (gSineTable[(phase >> 1) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
         s16 swayY = (gSineTable[((phase >> 1) + 64) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
-        s16 rippleX = (gSineTable[((sprite->y >> CLOUD_RIPPLE_SHIFT) - phase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
-        s16 rippleY = (gSineTable[((sprite->x >> CLOUD_RIPPLE_SHIFT) + phase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
+        s16 rippleX = (gSineTable[((sprite->y >> CLOUD_RIPPLE_SHIFT) - rippleXPhase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
+        s16 rippleY = (gSineTable[((sprite->x >> CLOUD_RIPPLE_SHIFT) - rippleYPhase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
         sprite->x2 = swayX + rippleX;
         sprite->y2 = swayY + rippleY;
     }

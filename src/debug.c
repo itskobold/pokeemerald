@@ -113,6 +113,8 @@ enum
 {
     DEBUG_WEATHER_ITEM_SET_CLOUD_COVER,
     DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS,
+    DEBUG_WEATHER_ITEM_SET_WIND_DIRECTION,
+    DEBUG_WEATHER_ITEM_SET_WIND_SPEED,
     DEBUG_WEATHER_ITEM_CANCEL,
 };
 
@@ -145,6 +147,9 @@ enum
 #define TAG_TRACK_ENTITY_SCROLL_ARROW 2110
 #define TAG_CLOUD_COVER_SCROLL_ARROW 2111
 #define TAG_CLOUD_BRIGHTNESS_SCROLL_ARROW 2112
+#define TAG_WIND_DIRECTION_SCROLL_ARROW 2113
+#define TAG_WIND_DIRECTION_LR_SCROLL_ARROW 2114
+#define TAG_WIND_SPEED_SCROLL_ARROW 2115
 
 static void Debug_ShowMenu(const struct ListMenuItem *items, u16 numItems, void (*handleInput)(u8));
 static void Debug_DestroyMenu(u8 taskId);
@@ -162,6 +167,16 @@ static void Debug_DrawCloudBrightnessBox(void);
 static void Debug_TearDownCloudBrightnessBox(u8 taskId);
 static void Debug_CommitCloudBrightnessBox(u8 taskId);
 static void Debug_CancelCloudBrightnessBox(u8 taskId);
+static void Debug_OpenWindDirectionBox(void);
+static void Debug_DrawWindDirectionBox(void);
+static void Debug_TearDownWindDirectionBox(u8 taskId);
+static void Debug_CommitWindDirectionBox(u8 taskId);
+static void Debug_CancelWindDirectionBox(u8 taskId);
+static void Debug_OpenWindSpeedBox(void);
+static void Debug_DrawWindSpeedBox(void);
+static void Debug_TearDownWindSpeedBox(u8 taskId);
+static void Debug_CommitWindSpeedBox(u8 taskId);
+static void Debug_CancelWindSpeedBox(u8 taskId);
 static void Debug_EnableFreecam(u8 taskId);
 static void Debug_ReturnCameraToPlayer(u8 taskId);
 static void Debug_OpenEntityBox(u8 mode);
@@ -180,11 +195,15 @@ static void DebugTask_HandleMenuInput_Weather(u8 taskId);
 static void DebugTask_TrackEntityInput(u8 taskId);
 static void DebugTask_CloudCoverInput(u8 taskId);
 static void DebugTask_CloudBrightnessInput(u8 taskId);
+static void DebugTask_WindDirectionInput(u8 taskId);
+static void DebugTask_WindSpeedInput(u8 taskId);
 
 static void DebugAction_OpenCameraMenu(u8 taskId);
 static void DebugAction_OpenWeatherMenu(u8 taskId);
 static void DebugAction_Weather_SetCloudCover(u8 taskId);
 static void DebugAction_Weather_SetCloudBrightness(u8 taskId);
+static void DebugAction_Weather_SetWindDirection(u8 taskId);
+static void DebugAction_Weather_SetWindSpeed(u8 taskId);
 static void DebugAction_Weather_Cancel(u8 taskId);
 static void DebugAction_Cancel(u8 taskId);
 static void DebugAction_Camera_ToggleFreecam(u8 taskId);
@@ -234,6 +253,19 @@ static u8 sCloudBrightnessWindowId;
 static u8 sCloudBrightnessArrowTaskId;
 static u16 sCloudBrightnessValue; // index in [0, NUM_CLOUD_BRIGHTNESS_LEVELS - 1]
 
+// "Set wind direction" numeric scroll box state. The value is a BAM angle that wraps [0, 255];
+// A commits it via SetWindDirection.
+static u8 sWindDirectionWindowId;
+static u8 sWindDirectionArrowTaskId;   // up/down: fine 1-unit adjust
+static u8 sWindDirectionLRArrowTaskId; // left/right: jump between defined directions
+static u16 sWindDirectionValue;
+
+// "Set wind speed" numeric scroll box state. Up/down adjust the value in [0, WIND_SPEED_MAX];
+// A commits it via SetWindSpeed.
+static u8 sWindSpeedWindowId;
+static u8 sWindSpeedArrowTaskId;
+static u16 sWindSpeedValue;
+
 // Writable copy of the camera submenu items, refilled from the const template each time the menu is
 // shown, so the freecam label can be swapped (debug.o's .data is discarded by the linker).
 static struct ListMenuItem sCameraMenuItems[DEBUG_CAMERA_ITEM_CANCEL + 1];
@@ -244,6 +276,38 @@ static const u8 sDebugText_Weather_SetCloudCover[] = _("Set cloud cover");
 static const u8 sDebugText_CloudCover_Label[] = _("Cover ");
 static const u8 sDebugText_Weather_SetCloudBrightness[] = _("Set cloud brightness");
 static const u8 sDebugText_CloudBrightness_Label[] = _("Bright ");
+static const u8 sDebugText_Weather_SetWindDirection[] = _("Set wind direction");
+static const u8 sDebugText_WindDirection_Label[] = _("Dir ");
+static const u8 sDebugText_WindDir_Sep[] = _(" ");
+static const u8 sDebugText_WindDir_Below[] = _("< "); // prefix: value sits just above the name (step down to reach it)
+static const u8 sDebugText_WindDir_Above[] = _(" >"); // suffix: value sits just below the name (step up to reach it)
+static const u8 sDebugText_Weather_SetWindSpeed[] = _("Set wind speed");
+static const u8 sDebugText_WindSpeed_Label[] = _("Speed ");
+
+// Names for the 16 defined wind directions, indexed by BAM angle >> 4 (see the WIND_DIR_* constants).
+static const u8 sDebugText_WindDir_N[]   = _("NORTH");
+static const u8 sDebugText_WindDir_NNE[] = _("NNE");
+static const u8 sDebugText_WindDir_NE[]  = _("NORTHEAST");
+static const u8 sDebugText_WindDir_ENE[] = _("ENE");
+static const u8 sDebugText_WindDir_E[]   = _("EAST");
+static const u8 sDebugText_WindDir_ESE[] = _("ESE");
+static const u8 sDebugText_WindDir_SE[]  = _("SOUTHEAST");
+static const u8 sDebugText_WindDir_SSE[] = _("SSE");
+static const u8 sDebugText_WindDir_S[]   = _("SOUTH");
+static const u8 sDebugText_WindDir_SSW[] = _("SSW");
+static const u8 sDebugText_WindDir_SW[]  = _("SOUTHWEST");
+static const u8 sDebugText_WindDir_WSW[] = _("WSW");
+static const u8 sDebugText_WindDir_W[]   = _("WEST");
+static const u8 sDebugText_WindDir_WNW[] = _("WNW");
+static const u8 sDebugText_WindDir_NW[]  = _("NORTHWEST");
+static const u8 sDebugText_WindDir_NNW[] = _("NNW");
+static const u8 *const sWindDirectionNames[16] =
+{
+    sDebugText_WindDir_N,   sDebugText_WindDir_NNE, sDebugText_WindDir_NE,  sDebugText_WindDir_ENE,
+    sDebugText_WindDir_E,   sDebugText_WindDir_ESE, sDebugText_WindDir_SE,  sDebugText_WindDir_SSE,
+    sDebugText_WindDir_S,   sDebugText_WindDir_SSW, sDebugText_WindDir_SW,  sDebugText_WindDir_WSW,
+    sDebugText_WindDir_W,   sDebugText_WindDir_WNW, sDebugText_WindDir_NW,  sDebugText_WindDir_NNW,
+};
 static const u8 sDebugText_Minus[] = _("-");
 static const u8 sDebugText_Cancel[] = _("Cancel");
 static const u8 sDebugText_Camera_EnableFreecam[] = _("Enable freecam");
@@ -269,6 +333,8 @@ static const struct ListMenuItem sDebugMenuItems_Weather[] =
 {
     [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER]      = {sDebugText_Weather_SetCloudCover, DEBUG_WEATHER_ITEM_SET_CLOUD_COVER},
     [DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS] = {sDebugText_Weather_SetCloudBrightness, DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS},
+    [DEBUG_WEATHER_ITEM_SET_WIND_DIRECTION]   = {sDebugText_Weather_SetWindDirection, DEBUG_WEATHER_ITEM_SET_WIND_DIRECTION},
+    [DEBUG_WEATHER_ITEM_SET_WIND_SPEED]       = {sDebugText_Weather_SetWindSpeed, DEBUG_WEATHER_ITEM_SET_WIND_SPEED},
     [DEBUG_WEATHER_ITEM_CANCEL]               = {sDebugText_Cancel, DEBUG_WEATHER_ITEM_CANCEL},
 };
 
@@ -294,6 +360,8 @@ static void (*const sDebugMenuActions_Weather[])(u8) =
 {
     [DEBUG_WEATHER_ITEM_SET_CLOUD_COVER]      = DebugAction_Weather_SetCloudCover,
     [DEBUG_WEATHER_ITEM_SET_CLOUD_BRIGHTNESS] = DebugAction_Weather_SetCloudBrightness,
+    [DEBUG_WEATHER_ITEM_SET_WIND_DIRECTION]   = DebugAction_Weather_SetWindDirection,
+    [DEBUG_WEATHER_ITEM_SET_WIND_SPEED]       = DebugAction_Weather_SetWindSpeed,
     [DEBUG_WEATHER_ITEM_CANCEL]               = DebugAction_Weather_Cancel,
 };
 
@@ -1183,6 +1251,274 @@ static void DebugTask_CloudBrightnessInput(u8 taskId)
     {
         PlaySE(SE_SELECT);
         Debug_CancelCloudBrightnessBox(taskId);
+    }
+}
+
+// Opens the numeric scroll box used to pick a target wind direction.
+static void DebugAction_Weather_SetWindDirection(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenWindDirectionBox();
+}
+
+// Redraws the box as "Dir n NAME" from the current sWindDirectionValue (BAM angle 0..255). NAME is the
+// nearest defined direction; when the value is off that direction, a marker shows which side it sits on
+// (e.g. 1 -> "< NORTH", 255 -> "NORTH >", 0 -> "NORTH").
+static void Debug_DrawWindDirectionBox(void)
+{
+    u8 text[32];
+    s8 offset;
+    u8 nearest = GetClosestWindDirection(sWindDirectionValue, &offset);
+
+    StringCopy(text, sDebugText_WindDirection_Label);
+    ConvertIntToDecimalStringN(gStringVar1, sWindDirectionValue, STR_CONV_MODE_LEADING_ZEROS, 3);
+    StringAppend(text, gStringVar1);
+    StringAppend(text, sDebugText_WindDir_Sep);
+    if (offset > 0)
+        StringAppend(text, sDebugText_WindDir_Below);
+    StringAppend(text, sWindDirectionNames[nearest >> 4]);
+    if (offset < 0)
+        StringAppend(text, sDebugText_WindDir_Above);
+
+    FillWindowPixelBuffer(sWindDirectionWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sWindDirectionWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sWindDirectionWindowId, COPYWIN_GFX);
+}
+
+// Opens the wind direction box, starting on the current target so reopening lands where you left off.
+static void Debug_OpenWindDirectionBox(void)
+{
+    sWindDirectionValue = gWeatherPtr->targetWindDirection;
+
+    LoadMessageBoxAndBorderGfx();
+    sWindDirectionWindowId = CreateWindowFromRect(0, 1, 15, 2); // snug fit for "Dir 255 < NORTHEAST"
+    DrawStdWindowFrame(sWindDirectionWindowId, FALSE);
+    Debug_DrawWindDirectionBox();
+    CopyWindowToVram(sWindDirectionWindowId, COPYWIN_FULL);
+
+    {
+        struct ScrollArrowsTemplate arrows;
+
+        // Up/down flank the box vertically (fine 1-unit adjust).
+        arrows.firstArrowType = SCROLL_ARROW_UP;
+        arrows.firstX = 44;
+        arrows.firstY = 12;
+        arrows.secondArrowType = SCROLL_ARROW_DOWN;
+        arrows.secondX = 44;
+        arrows.secondY = 36;
+        arrows.fullyUpThreshold = 0xFFFF;   // the angle wraps, so no arrow ever hides
+        arrows.fullyDownThreshold = 0xFFFF;
+        arrows.tileTag = TAG_WIND_DIRECTION_SCROLL_ARROW;
+        arrows.palTag = TAG_WIND_DIRECTION_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sWindDirectionArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sWindDirectionValue);
+
+        // Left/right flank the box horizontally (jump between defined directions).
+        arrows.firstArrowType = SCROLL_ARROW_LEFT;
+        arrows.firstX = 4;
+        arrows.firstY = 24;
+        arrows.secondArrowType = SCROLL_ARROW_RIGHT;
+        arrows.secondX = 132;
+        arrows.secondY = 24;
+        arrows.fullyUpThreshold = 0xFFFF;
+        arrows.fullyDownThreshold = 0xFFFF;
+        arrows.tileTag = TAG_WIND_DIRECTION_LR_SCROLL_ARROW;
+        arrows.palTag = TAG_WIND_DIRECTION_LR_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sWindDirectionLRArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sWindDirectionValue);
+    }
+
+    CreateTask(DebugTask_WindDirectionInput, 3);
+    sDebugMenuOpen = TRUE;
+}
+
+// Tears down the box's window, scroll arrows and input task. The caller decides what to do next.
+static void Debug_TearDownWindDirectionBox(u8 taskId)
+{
+    RemoveScrollIndicatorArrowPair(sWindDirectionArrowTaskId);
+    RemoveScrollIndicatorArrowPair(sWindDirectionLRArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sWindDirectionWindowId, TRUE);
+    RemoveWindow(sWindDirectionWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
+}
+
+// Commits the box (A): sets the target wind direction and hands input back to the field.
+static void Debug_CommitWindDirectionBox(u8 taskId)
+{
+    u8 value = sWindDirectionValue;
+
+    Debug_TearDownWindDirectionBox(taskId);
+    SetWindDirection(value);
+    UnlockPlayerFieldControls();
+}
+
+// Backs out of the box (B) without changing anything, returning to the weather menu.
+static void Debug_CancelWindDirectionBox(u8 taskId)
+{
+    Debug_TearDownWindDirectionBox(taskId);
+    Debug_ShowWeatherMenu();
+}
+
+// Up/down fine-step the angle by 1 (held to repeat); left/right jump between the 16 defined directions.
+// Everything wraps around the circle. A commits, B cancels.
+static void DebugTask_WindDirectionInput(u8 taskId)
+{
+    u16 index = sWindDirectionValue >> 4;
+
+    // Skip the frame the box opens on: with the extra left/right arrow task this input task can be placed
+    // later in the frame's task list than the menu that spawned it, which would re-read the selecting A
+    // press here as an immediate commit. data[0] is zeroed by CreateTask, so the first run just arms it.
+    if (gTasks[taskId].data[0] == 0)
+    {
+        gTasks[taskId].data[0] = 1;
+        return;
+    }
+
+    if (JOY_REPEAT(DPAD_UP))
+    {
+        sWindDirectionValue = (sWindDirectionValue + 1) & 0xFF;
+        PlaySE(SE_SELECT);
+        Debug_DrawWindDirectionBox();
+    }
+    else if (JOY_REPEAT(DPAD_DOWN))
+    {
+        sWindDirectionValue = (sWindDirectionValue - 1) & 0xFF;
+        PlaySE(SE_SELECT);
+        Debug_DrawWindDirectionBox();
+    }
+    else if (JOY_NEW(DPAD_RIGHT))
+    {
+        sWindDirectionValue = ((index + 1) & 15) << 4; // next defined direction clockwise
+        PlaySE(SE_SELECT);
+        Debug_DrawWindDirectionBox();
+    }
+    else if (JOY_NEW(DPAD_LEFT))
+    {
+        // Snap down to the current direction if between two; otherwise step to the previous one.
+        if (sWindDirectionValue & 15)
+            sWindDirectionValue = index << 4;
+        else
+            sWindDirectionValue = ((index - 1) & 15) << 4;
+        PlaySE(SE_SELECT);
+        Debug_DrawWindDirectionBox();
+    }
+    else if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CommitWindDirectionBox(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CancelWindDirectionBox(taskId);
+    }
+}
+
+// Opens the numeric scroll box used to pick a target wind speed.
+static void DebugAction_Weather_SetWindSpeed(u8 taskId)
+{
+    Debug_DestroyMenu(taskId);
+    Debug_OpenWindSpeedBox();
+}
+
+// Redraws the box as "Speed n" from the current sWindSpeedValue.
+static void Debug_DrawWindSpeedBox(void)
+{
+    u8 text[16];
+
+    StringCopy(text, sDebugText_WindSpeed_Label);
+    ConvertIntToDecimalStringN(gStringVar1, sWindSpeedValue, STR_CONV_MODE_LEADING_ZEROS, 2);
+    StringAppend(text, gStringVar1);
+
+    FillWindowPixelBuffer(sWindSpeedWindowId, PIXEL_FILL(1));
+    AddTextPrinterParameterized(sWindSpeedWindowId, FONT_NORMAL, text, 4, 1, TEXT_SKIP_DRAW, NULL);
+    CopyWindowToVram(sWindSpeedWindowId, COPYWIN_GFX);
+}
+
+// Opens the wind speed box, starting on the current target so reopening lands where you left off.
+static void Debug_OpenWindSpeedBox(void)
+{
+    sWindSpeedValue = gWeatherPtr->targetWindSpeed;
+
+    LoadMessageBoxAndBorderGfx();
+    sWindSpeedWindowId = CreateWindowFromRect(0, 1, 9, 2);
+    DrawStdWindowFrame(sWindSpeedWindowId, FALSE);
+    Debug_DrawWindSpeedBox();
+    CopyWindowToVram(sWindSpeedWindowId, COPYWIN_FULL);
+
+    {
+        struct ScrollArrowsTemplate arrows;
+
+        arrows.firstArrowType = SCROLL_ARROW_UP;
+        arrows.firstX = 44;
+        arrows.firstY = 12;
+        arrows.secondArrowType = SCROLL_ARROW_DOWN;
+        arrows.secondX = 44;
+        arrows.secondY = 36;
+        arrows.fullyUpThreshold = WIND_SPEED_MAX;
+        arrows.fullyDownThreshold = 0;
+        arrows.tileTag = TAG_WIND_SPEED_SCROLL_ARROW;
+        arrows.palTag = TAG_WIND_SPEED_SCROLL_ARROW;
+        arrows.palNum = 0;
+        sWindSpeedArrowTaskId = AddScrollIndicatorArrowPair(&arrows, &sWindSpeedValue);
+    }
+
+    CreateTask(DebugTask_WindSpeedInput, 3);
+    sDebugMenuOpen = TRUE;
+}
+
+// Tears down the box's window, scroll arrows and input task. The caller decides what to do next.
+static void Debug_TearDownWindSpeedBox(u8 taskId)
+{
+    RemoveScrollIndicatorArrowPair(sWindSpeedArrowTaskId);
+    ClearStdWindowAndFrameToTransparent(sWindSpeedWindowId, TRUE);
+    RemoveWindow(sWindSpeedWindowId);
+    DestroyTask(taskId);
+    sDebugMenuOpen = FALSE;
+}
+
+// Commits the box (A): sets the target wind speed and hands input back to the field.
+static void Debug_CommitWindSpeedBox(u8 taskId)
+{
+    u8 value = sWindSpeedValue;
+
+    Debug_TearDownWindSpeedBox(taskId);
+    SetWindSpeed(value);
+    UnlockPlayerFieldControls();
+}
+
+// Backs out of the box (B) without changing anything, returning to the weather menu.
+static void Debug_CancelWindSpeedBox(u8 taskId)
+{
+    Debug_TearDownWindSpeedBox(taskId);
+    Debug_ShowWeatherMenu();
+}
+
+// Up/down adjust the value (held to repeat), clamped to [0, WIND_SPEED_MAX]. A commits, B cancels.
+static void DebugTask_WindSpeedInput(u8 taskId)
+{
+    if (JOY_REPEAT(DPAD_UP) && sWindSpeedValue < WIND_SPEED_MAX)
+    {
+        sWindSpeedValue++;
+        PlaySE(SE_SELECT);
+        Debug_DrawWindSpeedBox();
+    }
+    else if (JOY_REPEAT(DPAD_DOWN) && sWindSpeedValue > 0)
+    {
+        sWindSpeedValue--;
+        PlaySE(SE_SELECT);
+        Debug_DrawWindSpeedBox();
+    }
+    else if (JOY_NEW(A_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CommitWindSpeedBox(taskId);
+    }
+    else if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        Debug_CancelWindSpeedBox(taskId);
     }
 }
 

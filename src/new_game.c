@@ -162,6 +162,8 @@ void NewGameInitData(void)
     ClearSav1();
     gSaveBlock1Ptr->weatherState.cloudCover = 4;
     gSaveBlock1Ptr->weatherState.cloudBrightness = ToCloudBrightnessRaw(CLOUD_BRIGHTNESS_DEFAULT);
+    gSaveBlock1Ptr->weatherState.windDirection = WIND_DIR_NE; // south-west wind blows toward NE
+    gSaveBlock1Ptr->weatherState.windSpeed = WIND_SPEED_DEFAULT;
     ClearAllMail();
     gSaveBlock2Ptr->specialSaveWarpFlags = 0;
     gSaveBlock2Ptr->gcnLinkFlags = 0;

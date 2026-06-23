@@ -989,6 +989,8 @@ struct WeatherState
 {
     u8 cloudCover:4;      // persistent cloud cover level 0..15 (0 = no clouds, else clouds/1..15)
     u8 cloudBrightness:3; // overlay brightness, raw 0..5 (actual -2..3, see field_weather.h)
+    u8 windSpeed:6;       // wind speed 0..32
+    u8 windDirection;     // wind heading as BAM angle (256 units = 360 deg, wraps)
 };
 
 struct SaveBlock1

@@ -26,6 +26,28 @@
 #define CLOUD_ROWS                   4   // sprite rows (cover screen height + scroll)
 #define NUM_CLOUD_SPRITES            (CLOUD_COLS * CLOUD_ROWS)
 
+// Wind direction as a BAM angle (256 units = 360 deg). 0 = North (up), clockwise.
+// 16-point compass; cardinals/diagonals at 32-unit steps, sub-diagonals between.
+#define WIND_DIR_N      0    // up
+#define WIND_DIR_NNE    16
+#define WIND_DIR_NE     32
+#define WIND_DIR_ENE    48
+#define WIND_DIR_E      64   // right
+#define WIND_DIR_ESE    80
+#define WIND_DIR_SE     96
+#define WIND_DIR_SSE    112
+#define WIND_DIR_S      128  // down
+#define WIND_DIR_SSW    144
+#define WIND_DIR_SW     160
+#define WIND_DIR_WSW    176
+#define WIND_DIR_W      192  // left
+#define WIND_DIR_WNW    208
+#define WIND_DIR_NW     224
+#define WIND_DIR_NNW    240
+
+#define WIND_SPEED_MAX      32
+#define WIND_SPEED_DEFAULT  16
+
 // Controls how the weather should be changing the screen palettes.
 #define WEATHER_PAL_STATE_CHANGING_WEATHER   0
 #define WEATHER_PAL_STATE_SCREEN_FADING_IN   1

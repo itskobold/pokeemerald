@@ -112,11 +112,17 @@ struct Weather
 
     u8 cloudClearedTimer;       // frames the clouds have been fully faded out; gates the cliff silhouettes
     u8 cliffSilhouetteBrightness; // current silhouette darkening magnitude 0..6; ramps in/out at 1 per frame
-    u16 cloudsScrollXCounter;
-    u16 cloudsScrollYCounter;
+    s16 cloudsScrollXAccum;     // sub-pixel wind drift accumulators (see UpdateCloudsMovement)
+    s16 cloudsScrollYAccum;
     u16 cloudsXOffset;
     u16 cloudsYOffset;
-    u16 cloudsWavePhase;        // free-running counter driving the sway/ripple wobble (see UpdateCloudsSprite)
+    u16 cloudsWavePhase;        // free-running counter (1/frame) driving the sway/ripple wobble (see UpdateCloudsSprite)
+    u16 cloudsRipplePhaseX;     // ripple band phases (Q8), integrated per frame from the wind unit velocity
+    u16 cloudsRipplePhaseY;     // (x2 band by south, y2 by east); aims ripple along windDirection smoothly
+    u8 targetWindDirection;     // BAM angle the live wind direction steps toward (see SetWindDirection)
+    u8 targetWindSpeed;         // 0..WIND_SPEED_MAX; live wind speed steps toward this (see SetWindSpeed)
+    u8 windDirectionTimer;      // frame counter; one step per 5 frames
+    u8 windSpeedTimer;          // frame counter; one step per 10 frames
     u8 cloudsSpritesCreated;
     // Bubbles
     u16 bubblesDelayCounter;
@@ -209,6 +215,9 @@ void InitClouds(void);
 void UpdateClouds(void);
 void SetCloudCover(u8 target);
 void SetCloudBrightness(s8 target);
+void SetWindDirection(u8 target);
+void SetWindSpeed(u8 target);
+u8 GetClosestWindDirection(u8 direction, s8 *offset);
 void PauseClouds(void);
 void SetCloudsExternalPause(bool8 paused);
 bool32 AreCloudsClearedForEffect(void);
