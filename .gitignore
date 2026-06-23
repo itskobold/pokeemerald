@@ -44,3 +44,6 @@ prefabs.json
 *.js
 /pokeemerald-*.png
 /pokeemerald_modern-*.png
+
+# clangd compile DB (symlink into ignored build/)
+/compile_commands.json

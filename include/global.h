@@ -195,7 +195,8 @@ struct UCoords32
     u32 y;
 };
 
-// Calendar date + time of day, packed into 6 bytes via u16 bitfields.
+// Calendar date + time of day. Date/time fields are packed into u16 bitfields;
+// timeScale and the cached sun times follow (12 bytes total).
 struct Clock
 {
     /*0x0*/ u16 seconds:6; // 0-59

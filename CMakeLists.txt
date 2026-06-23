@@ -11,6 +11,9 @@ set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 set(CMAKE_C_COMPILER /opt/devkitpro/devkitARM/bin/arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER /opt/devkitpro/devkitARM/bin/arm-none-eabi-g++)
 
+# Emit compile_commands.json so clangd (CLion and other LSPs) picks up the flags below.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(pokeemerald_ide C CXX)
 
 file(GLOB_RECURSE POKEEMERALD_IDE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
@@ -25,6 +28,9 @@ target_compile_options(pokeemerald_ide PRIVATE
     -mtune=arm7tdmi
     -march=armv4t
     -DMODERN=1
+    # Activates the _()/__()/INCBIN IDE stubs in global.h (otherwise gated to
+    # __APPLE__/__CYGWIN__/__INTELLISENSE__), which clangd needs on Linux.
+    -D__INTELLISENSE__=1
 )
 
 # Delegates the actual build to the project's own Makefile.

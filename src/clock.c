@@ -257,12 +257,17 @@ void Clock_Init(void)
 static u32 DaysSinceEpoch(struct Clock *clock)
 {
     u32 days = clock->day - 1;
-    u32 m, y;
+    u32 m;
 
     for (m = MONTH_JAN; m < clock->month; m++)
         days += DaysInMonth(m, clock->year);
-    for (y = 0; y < clock->year; y++)
-        days += IsLeapYear(y) ? 366 : 365;
+
+    // Whole years in [0, year): 365 each, plus one per leap year in that range.
+    if (clock->year > 0)
+    {
+        u32 n = clock->year - 1;
+        days += (u32)clock->year * 365 + (n / 4 - n / 100 + n / 400 + 1);
+    }
 
     return days;
 }
@@ -305,20 +310,22 @@ static s16 SunWaveIndex(struct Clock *clock)
 
 // Sunrise/sunset minutes-of-day for the clock's current date. Cos peaks (+) at
 // the winter solstice and troughs (-) at the summer solstice.
-static u16 CalcSunriseTime(struct Clock *clock)
+static u16 CalcSunriseTime(s16 waveIndex)
 {
-    return SUNRISE_MID + Cos(SunWaveIndex(clock), SUNRISE_AMP);
+    return SUNRISE_MID + Cos(waveIndex, SUNRISE_AMP);
 }
 
-static u16 CalcSunsetTime(struct Clock *clock)
+static u16 CalcSunsetTime(s16 waveIndex)
 {
-    return SUNSET_MID - Cos(SunWaveIndex(clock), SUNSET_AMP);
+    return SUNSET_MID - Cos(waveIndex, SUNSET_AMP);
 }
 
 static void Clock_RecalcSunTimes(struct Clock *clock)
 {
-    clock->sunriseTime = CalcSunriseTime(clock);
-    clock->sunsetTime = CalcSunsetTime(clock);
+    s16 waveIndex = SunWaveIndex(clock);
+
+    clock->sunriseTime = CalcSunriseTime(waveIndex);
+    clock->sunsetTime = CalcSunsetTime(waveIndex);
 }
 
 // Recomputes the twilight counter for the current time of day. Morning twilight
@@ -421,9 +428,8 @@ u8 *Clock_GetSeasonString(u8 *dest, bool32 abbreviate)
 // Day index within the current season (0 = first day), and the season's length
 // in days via lengthOut. Winter spans the year boundary, so its Jan/Feb fall in
 // the year after its December, and it runs a day longer in a leap year.
-static u32 SeasonDayIndex(struct Clock *clock, u32 *lengthOut)
+static u32 SeasonDayIndex(struct Clock *clock, u32 season, u32 *lengthOut)
 {
-    u32 season = Clock_GetSeason();
     u32 startMonth = season * 3 + MONTH_MAR; // MAR, JUN, SEP, or DEC
     u32 startYear = clock->year;
     u32 dayInSeason = 0;
@@ -450,13 +456,14 @@ static u32 SeasonDayIndex(struct Clock *clock, u32 *lengthOut)
 // Phase within the season (SEASON_PHASE_*): the first or last two weeks, else mid.
 u32 Clock_GetSeasonPhase(void)
 {
+    u32 season = Clock_GetSeason();
     u32 length;
-    u32 dayInSeason = SeasonDayIndex(&gSaveBlock1Ptr->gameClock, &length);
+    u32 dayInSeason = SeasonDayIndex(&gSaveBlock1Ptr->gameClock, season, &length);
     u32 lateDays = SEASON_PHASE_DAYS;
 
     // The leap day lands at the end of winter (length 91, not 90); extend late
     // winter by it so the window keeps its usual start date and just absorbs Feb 29.
-    if (Clock_GetSeason() == SEASON_WINTER && length > 90)
+    if (season == SEASON_WINTER && length > 90)
         lateDays++;
 
     if (dayInSeason < SEASON_PHASE_DAYS)
@@ -659,8 +666,8 @@ static bool32 CrossedTimeOfDay(u32 beforeMin, u32 afterMin, u32 timeOfDay)
     return target <= afterMin;
 }
 
-// Fires the sunrise/sunset hooks when the clock crosses either time, then
-// refreshes the stored time so it tracks the date as the seasons drift.
+// Fires the sunrise/sunset hooks when the clock crosses either time. The stored
+// sun times are kept current by Clock_AdvanceSeconds on each day change.
 static void Clock_FireSunEvents(u32 beforeMin, u32 afterMin)
 {
     struct Clock *clock = &gSaveBlock1Ptr->gameClock;
@@ -669,15 +676,9 @@ static void Clock_FireSunEvents(u32 beforeMin, u32 afterMin)
         return;
 
     if (CrossedTimeOfDay(beforeMin, afterMin, clock->sunriseTime))
-    {
         Clock_OnSunrise();
-        clock->sunriseTime = CalcSunriseTime(clock);
-    }
     if (CrossedTimeOfDay(beforeMin, afterMin, clock->sunsetTime))
-    {
         Clock_OnSunset();
-        clock->sunsetTime = CalcSunsetTime(clock);
-    }
 }
 
 // Advances the calendar clock by the given number of seconds, rolling over
@@ -688,7 +689,7 @@ void Clock_AdvanceSeconds(u32 seconds)
     struct Clock *clock = &gSaveBlock1Ptr->gameClock;
     u32 beforeMin = AbsMinutes(clock);
     u32 beforeMonth = AbsMonths(clock);
-    u32 carry;
+    u32 afterMin, carry;
 
     seconds += clock->seconds;
     clock->seconds = seconds % SECONDS_PER_MINUTE;
@@ -722,8 +723,14 @@ void Clock_AdvanceSeconds(u32 seconds)
         }
     }
 
-    Clock_FireIntervals(beforeMin, AbsMinutes(clock), beforeMonth, AbsMonths(clock));
-    Clock_FireSunEvents(beforeMin, AbsMinutes(clock));
+    afterMin = AbsMinutes(clock);
+
+    // Keep the cached sun times aligned to the current date, as the setters do.
+    if (afterMin / MINUTES_PER_DAY != beforeMin / MINUTES_PER_DAY)
+        Clock_RecalcSunTimes(clock);
+
+    Clock_FireIntervals(beforeMin, afterMin, beforeMonth, AbsMonths(clock));
+    Clock_FireSunEvents(beforeMin, afterMin);
 }
 
 // The clock only advances while the player is roaming the overworld freely.
