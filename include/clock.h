@@ -34,12 +34,38 @@ enum
     WEEKDAY_SAT,
 };
 
+// Coarse time-of-day band, returned by Clock_GetTimeOfDay.
+enum
+{
+    TIME_OF_DAY_MIDNIGHT, // 12:00am - 12:30am
+    TIME_OF_DAY_NIGHT,    // 12:30am - dawn, and dusk - midnight
+    TIME_OF_DAY_DAWN,     // sunrise twilight
+    TIME_OF_DAY_DAY,      // end of dawn - noon, and 12:30pm - dusk
+    TIME_OF_DAY_MIDDAY,   // 12:00pm - 12:30pm
+    TIME_OF_DAY_DUSK,     // sunset twilight
+};
+
 void Clock_Init(void);
 void Clock_Update(void);
 void Clock_AdvanceSeconds(u32 seconds);
 u32 Clock_GetDayOfWeek(void);
 u32 Clock_GetDayCount(void);
 u32 Clock_GetTotalMinutes(void);
+u32 Clock_GetTwilight(void);
+u32 Clock_GetTimeOfDay(void);
+u8 *Clock_GetTimeOfDayString(u8 *dest);
+bool32 IsDay(void);
+bool32 IsNight(void);
+bool32 IsMidday(void);
+bool32 IsMidnight(void);
+bool32 IsDawn(void);
+bool32 IsDusk(void);
+bool32 IsTwilight(void);
+bool32 IsMorning(void);
+bool32 IsAfternoon(void);
+u8 *Clock_GetTimeString(u8 *dest);
+u8 *Clock_GetDayString(u8 *dest, bool32 abbreviate);
+u8 *Clock_GetMonthString(u8 *dest, bool32 abbreviate);
 void Clock_SetMinutes(u32 minutes);
 void Clock_SetHours(u32 hours);
 void Clock_SetDay(u32 day);

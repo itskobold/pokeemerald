@@ -355,6 +355,8 @@ static const u8 sDebugText_Clock_YearSep[] = _(", YR. ");
 static const u8 sDebugText_Clock_Newline[] = _("\n");
 static const u8 sDebugText_Clock_ScaleLabel[] = _("SCALE: ");
 static const u8 sDebugText_Clock_ScaleSuffix[] = _("x");
+static const u8 sDebugText_Clock_SunriseLabel[] = _("SUNRISE: ");
+static const u8 sDebugText_Clock_SunsetLabel[] = _("SUNSET: ");
 
 // Clock submenu labels.
 static const u8 sDebugText_Clock[] = _("Clock");
@@ -596,7 +598,26 @@ static void Debug_OpenMainMenu(void)
 // The clock readout has its own baseBlock so its tiles don't collide with the main menu's
 // list window (CreateWindowFromRect hardcodes baseBlock 100). Bottom-right of the screen.
 #define CLOCK_WIN_BASE_BLOCK 0xC0
-#define CLOCK_WIN_HEIGHT     5 // three FONT_SMALL lines (12px line height)
+#define CLOCK_WIN_HEIGHT     9 // six FONT_SMALL lines (12px line height)
+
+// Appends a minutes-past-midnight value to dest as "7:04AM". Returns the end.
+static u8 *Debug_AppendTimeOfDay(u8 *dest, u16 minutes)
+{
+    u8 hour = (minutes / 60) % 24;
+    u8 minute = minutes % 60;
+    bool32 isPm = hour >= 12;
+    u8 hour12 = hour % 12;
+
+    if (hour12 == 0)
+        hour12 = 12;
+
+    ConvertIntToDecimalStringN(gStringVar1, hour12, STR_CONV_MODE_LEFT_ALIGN, 2);
+    dest = StringAppend(dest, gStringVar1);
+    dest = StringAppend(dest, sDebugText_Clock_Colon);
+    ConvertIntToDecimalStringN(gStringVar1, minute, STR_CONV_MODE_LEADING_ZEROS, 2);
+    dest = StringAppend(dest, gStringVar1);
+    return StringAppend(dest, isPm ? sDebugText_Clock_PM : sDebugText_Clock_AM);
+}
 
 static void Debug_DrawClockWindow(void)
 {
@@ -604,8 +625,11 @@ static void Debug_DrawClockWindow(void)
     struct WindowTemplate template;
     u8 line1[24];
     u8 line2[24];
+    u8 lineTimeOfDay[24];
+    u8 lineSunrise[24];
+    u8 lineSunset[24];
     u8 line3[24];
-    u8 text[72];
+    u8 text[144];
     s32 width, lineWidth;
     u8 tileWidth;
     u8 hour = clock->hours % 12;
@@ -638,6 +662,15 @@ static void Debug_DrawClockWindow(void)
     ConvertIntToDecimalStringN(gStringVar1, clock->year, STR_CONV_MODE_LEFT_ALIGN, 5);
     StringAppend(line2, gStringVar1);
 
+    // "MIDDAY"
+    Clock_GetTimeOfDayString(lineTimeOfDay);
+
+    // "SUNRISE: 7:04AM" / "SUNSET: 5:30PM"
+    StringCopy(lineSunrise, sDebugText_Clock_SunriseLabel);
+    Debug_AppendTimeOfDay(lineSunrise, clock->sunriseTime);
+    StringCopy(lineSunset, sDebugText_Clock_SunsetLabel);
+    Debug_AppendTimeOfDay(lineSunset, clock->sunsetTime);
+
     // Line 3: "SCALE: 20x"
     StringCopy(line3, sDebugText_Clock_ScaleLabel);
     ConvertIntToDecimalStringN(gStringVar1, clock->timeScale, STR_CONV_MODE_LEFT_ALIGN, 3);
@@ -647,6 +680,15 @@ static void Debug_DrawClockWindow(void)
     // Size the window to the widest line so it hugs the text.
     width = GetStringWidth(FONT_SMALL, line1, 0);
     lineWidth = GetStringWidth(FONT_SMALL, line2, 0);
+    if (lineWidth > width)
+        width = lineWidth;
+    lineWidth = GetStringWidth(FONT_SMALL, lineTimeOfDay, 0);
+    if (lineWidth > width)
+        width = lineWidth;
+    lineWidth = GetStringWidth(FONT_SMALL, lineSunrise, 0);
+    if (lineWidth > width)
+        width = lineWidth;
+    lineWidth = GetStringWidth(FONT_SMALL, lineSunset, 0);
     if (lineWidth > width)
         width = lineWidth;
     lineWidth = GetStringWidth(FONT_SMALL, line3, 0);
@@ -663,6 +705,12 @@ static void Debug_DrawClockWindow(void)
     StringCopy(text, line1);
     StringAppend(text, sDebugText_Clock_Newline);
     StringAppend(text, line2);
+    StringAppend(text, sDebugText_Clock_Newline);
+    StringAppend(text, lineTimeOfDay);
+    StringAppend(text, sDebugText_Clock_Newline);
+    StringAppend(text, lineSunrise);
+    StringAppend(text, sDebugText_Clock_Newline);
+    StringAppend(text, lineSunset);
     StringAppend(text, sDebugText_Clock_Newline);
     StringAppend(text, line3);
 

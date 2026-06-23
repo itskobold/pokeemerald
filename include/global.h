@@ -205,6 +205,8 @@ struct Clock
              u16 month:4;   // 1-12
     /*0x4*/ u16 year;      // increments from 0
     /*0x6*/ u8 timeScale;  // in-game seconds per real second
+    /*0x8*/ u16 sunriseTime; // minutes past midnight, for the current date
+    /*0xA*/ u16 sunsetTime;  // minutes past midnight, for the current date
 };
 
 struct Pokedex
@@ -1079,8 +1081,8 @@ struct SaveBlock1
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
     /*0x3598*/ struct ObjectEventWander objectEventWanderStore[OBJECT_EVENT_WANDER_COUNT]; // 0x150 bytes
-    /*0x36E8*/ struct Clock gameClock; // 8 bytes
-    /*0x36F0*/ u8 unused_3598[0x28]; // Remaining filler from the old camera-focus slot (now gCameraPos).
+    /*0x36E8*/ struct Clock gameClock; // 12 bytes
+    /*0x36F4*/ u8 unused_3598[0x24]; // Remaining filler from the old camera-focus slot (now gCameraPos).
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

@@ -9,17 +9,45 @@
 #include "overworld.h"
 #include "pokemon.h"
 #include "script.h"
+#include "string_util.h"
 #include "time_events.h"
+#include "trig.h"
 #include "tv.h"
+#include "constants/characters.h"
 
 #define FRAMES_PER_SECOND 60
 #define MINUTES_PER_DAY (HOURS_PER_DAY * MINUTES_PER_HOUR)
+
+// Sunrise/sunset follow a yearly sine wave between the solstices. Times in
+// minutes past midnight: winter (Dec 21) sunrise 8:06 / sunset 4:02, summer
+// (Jun 21) sunrise 4:42 / sunset 9:21. mid is the average of the two extremes,
+// amp is half their swing; the wave peaks at the winter solstice.
+#define SUNRISE_MID 384 // (8:06 + 4:42) / 2
+#define SUNRISE_AMP 102 // (8:06 - 4:42) / 2
+#define SUNSET_MID  1121 // (4:02PM + 9:21PM) / 2
+#define SUNSET_AMP  160  // (9:21PM - 4:02PM) / 2
+
+#define WINTER_SOLSTICE_DOY 354 // 0-based day-of-year of Dec 21 (+1 in a leap year)
+
+// Twilight runs for 128 minutes from sunrise (morning) and up to sunset (evening).
+#define TWILIGHT_MINUTES 128
+
+// Time-of-day bands. Midnight and midday each span the 30 minutes from the hour.
+#define NOON_MINUTES      (MINUTES_PER_DAY / 2)
+#define SOLAR_BAND_LENGTH 30
 
 // Weekday of year 0, Jan 1 (Monday), used as the day-of-week reference point.
 #define EPOCH_WEEKDAY WEEKDAY_MON
 
 // Sub-second frame accumulator. Not saved; losing <1s on save/load is harmless.
 static u8 sClockVBlanks;
+
+// Minutes into the current twilight window (1..TWILIGHT_MINUTES), else 0.
+// RAM-only by design; recomputed each minute, not stored in the save.
+static u8 sTwilightCounter;
+
+// Current time-of-day band (TIME_OF_DAY_*). RAM-only, recomputed each minute.
+static u8 sTimeOfDay;
 
 static const u8 sDaysPerMonth[MONTH_COUNT] =
 {
@@ -37,6 +65,122 @@ static const u8 sDaysPerMonth[MONTH_COUNT] =
     [MONTH_DEC - 1] = 31,
 };
 
+static const u8 sDayName_Sun[] = _("Sunday");
+static const u8 sDayName_Mon[] = _("Monday");
+static const u8 sDayName_Tue[] = _("Tuesday");
+static const u8 sDayName_Wed[] = _("Wednesday");
+static const u8 sDayName_Thu[] = _("Thursday");
+static const u8 sDayName_Fri[] = _("Friday");
+static const u8 sDayName_Sat[] = _("Saturday");
+
+static const u8 *const sDayNames[] =
+{
+    [WEEKDAY_SUN] = sDayName_Sun,
+    [WEEKDAY_MON] = sDayName_Mon,
+    [WEEKDAY_TUE] = sDayName_Tue,
+    [WEEKDAY_WED] = sDayName_Wed,
+    [WEEKDAY_THU] = sDayName_Thu,
+    [WEEKDAY_FRI] = sDayName_Fri,
+    [WEEKDAY_SAT] = sDayName_Sat,
+};
+
+static const u8 sDayNameShort_Sun[] = _("Sun");
+static const u8 sDayNameShort_Mon[] = _("Mon");
+static const u8 sDayNameShort_Tue[] = _("Tue");
+static const u8 sDayNameShort_Wed[] = _("Wed");
+static const u8 sDayNameShort_Thu[] = _("Thu");
+static const u8 sDayNameShort_Fri[] = _("Fri");
+static const u8 sDayNameShort_Sat[] = _("Sat");
+
+static const u8 *const sDayNamesShort[] =
+{
+    [WEEKDAY_SUN] = sDayNameShort_Sun,
+    [WEEKDAY_MON] = sDayNameShort_Mon,
+    [WEEKDAY_TUE] = sDayNameShort_Tue,
+    [WEEKDAY_WED] = sDayNameShort_Wed,
+    [WEEKDAY_THU] = sDayNameShort_Thu,
+    [WEEKDAY_FRI] = sDayNameShort_Fri,
+    [WEEKDAY_SAT] = sDayNameShort_Sat,
+};
+
+static const u8 sMonthName_Jan[] = _("January");
+static const u8 sMonthName_Feb[] = _("February");
+static const u8 sMonthName_Mar[] = _("March");
+static const u8 sMonthName_Apr[] = _("April");
+static const u8 sMonthName_May[] = _("May");
+static const u8 sMonthName_Jun[] = _("June");
+static const u8 sMonthName_Jul[] = _("July");
+static const u8 sMonthName_Aug[] = _("August");
+static const u8 sMonthName_Sep[] = _("September");
+static const u8 sMonthName_Oct[] = _("October");
+static const u8 sMonthName_Nov[] = _("November");
+static const u8 sMonthName_Dec[] = _("December");
+
+static const u8 *const sMonthNames[MONTH_COUNT] =
+{
+    [MONTH_JAN - 1] = sMonthName_Jan,
+    [MONTH_FEB - 1] = sMonthName_Feb,
+    [MONTH_MAR - 1] = sMonthName_Mar,
+    [MONTH_APR - 1] = sMonthName_Apr,
+    [MONTH_MAY - 1] = sMonthName_May,
+    [MONTH_JUN - 1] = sMonthName_Jun,
+    [MONTH_JUL - 1] = sMonthName_Jul,
+    [MONTH_AUG - 1] = sMonthName_Aug,
+    [MONTH_SEP - 1] = sMonthName_Sep,
+    [MONTH_OCT - 1] = sMonthName_Oct,
+    [MONTH_NOV - 1] = sMonthName_Nov,
+    [MONTH_DEC - 1] = sMonthName_Dec,
+};
+
+static const u8 sMonthNameShort_Jan[] = _("Jan");
+static const u8 sMonthNameShort_Feb[] = _("Feb");
+static const u8 sMonthNameShort_Mar[] = _("Mar");
+static const u8 sMonthNameShort_Apr[] = _("Apr");
+static const u8 sMonthNameShort_May[] = _("May");
+static const u8 sMonthNameShort_Jun[] = _("Jun");
+static const u8 sMonthNameShort_Jul[] = _("Jul");
+static const u8 sMonthNameShort_Aug[] = _("Aug");
+static const u8 sMonthNameShort_Sep[] = _("Sep");
+static const u8 sMonthNameShort_Oct[] = _("Oct");
+static const u8 sMonthNameShort_Nov[] = _("Nov");
+static const u8 sMonthNameShort_Dec[] = _("Dec");
+
+static const u8 *const sMonthNamesShort[MONTH_COUNT] =
+{
+    [MONTH_JAN - 1] = sMonthNameShort_Jan,
+    [MONTH_FEB - 1] = sMonthNameShort_Feb,
+    [MONTH_MAR - 1] = sMonthNameShort_Mar,
+    [MONTH_APR - 1] = sMonthNameShort_Apr,
+    [MONTH_MAY - 1] = sMonthNameShort_May,
+    [MONTH_JUN - 1] = sMonthNameShort_Jun,
+    [MONTH_JUL - 1] = sMonthNameShort_Jul,
+    [MONTH_AUG - 1] = sMonthNameShort_Aug,
+    [MONTH_SEP - 1] = sMonthNameShort_Sep,
+    [MONTH_OCT - 1] = sMonthNameShort_Oct,
+    [MONTH_NOV - 1] = sMonthNameShort_Nov,
+    [MONTH_DEC - 1] = sMonthNameShort_Dec,
+};
+
+static const u8 sText_AM[] = _("AM");
+static const u8 sText_PM[] = _("PM");
+
+static const u8 sTimeOfDayName_Midnight[] = _("MIDNIGHT");
+static const u8 sTimeOfDayName_Night[]    = _("NIGHT");
+static const u8 sTimeOfDayName_Dawn[]     = _("DAWN");
+static const u8 sTimeOfDayName_Day[]      = _("DAY");
+static const u8 sTimeOfDayName_Midday[]   = _("MIDDAY");
+static const u8 sTimeOfDayName_Dusk[]     = _("DUSK");
+
+static const u8 *const sTimeOfDayNames[] =
+{
+    [TIME_OF_DAY_MIDNIGHT] = sTimeOfDayName_Midnight,
+    [TIME_OF_DAY_NIGHT]    = sTimeOfDayName_Night,
+    [TIME_OF_DAY_DAWN]     = sTimeOfDayName_Dawn,
+    [TIME_OF_DAY_DAY]      = sTimeOfDayName_Day,
+    [TIME_OF_DAY_MIDDAY]   = sTimeOfDayName_Midday,
+    [TIME_OF_DAY_DUSK]     = sTimeOfDayName_Dusk,
+};
+
 static bool32 IsLeapYear(u16 year)
 {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
@@ -51,6 +195,10 @@ static u8 DaysInMonth(u8 month, u16 year)
     return sDaysPerMonth[month - 1];
 }
 
+static void Clock_RecalcSunTimes(struct Clock *clock);
+static void Clock_UpdateTwilight(struct Clock *clock);
+static void Clock_UpdateTimeOfDay(struct Clock *clock);
+
 void Clock_Init(void)
 {
     struct Clock *clock = &gSaveBlock1Ptr->gameClock;
@@ -62,6 +210,10 @@ void Clock_Init(void)
     clock->month = MONTH_MAY;
     clock->year = 0;
     clock->timeScale = 20;
+
+    Clock_RecalcSunTimes(clock);
+    Clock_UpdateTwilight(clock);
+    Clock_UpdateTimeOfDay(clock);
 
     sClockVBlanks = 0;
 }
@@ -91,6 +243,89 @@ static u32 AbsMonths(struct Clock *clock)
     return clock->year * MONTH_COUNT + (clock->month - 1);
 }
 
+// 0-based day of the year (Jan 1 = 0), used to position the sun-time sine wave.
+static u32 DayOfYear(struct Clock *clock)
+{
+    u32 doy = clock->day - 1;
+    u32 m;
+
+    for (m = MONTH_JAN; m < clock->month; m++)
+        doy += DaysInMonth(m, clock->year);
+
+    return doy;
+}
+
+// Position on the yearly sun-time wave: sine-table index 0..255 spanning the
+// year, 0 at the winter solstice. Uses the actual year length and a shifted
+// solstice day so the leap day keeps the wave aligned to the calendar.
+static s16 SunWaveIndex(struct Clock *clock)
+{
+    bool32 leap = IsLeapYear(clock->year);
+    u32 yearLen = leap ? 366 : 365;
+    u32 solsticeDoy = WINTER_SOLSTICE_DOY + (leap ? 1 : 0);
+    u32 d = (DayOfYear(clock) + yearLen - solsticeDoy) % yearLen;
+
+    return (d * 256) / yearLen;
+}
+
+// Sunrise/sunset minutes-of-day for the clock's current date. Cos peaks (+) at
+// the winter solstice and troughs (-) at the summer solstice.
+static u16 CalcSunriseTime(struct Clock *clock)
+{
+    return SUNRISE_MID + Cos(SunWaveIndex(clock), SUNRISE_AMP);
+}
+
+static u16 CalcSunsetTime(struct Clock *clock)
+{
+    return SUNSET_MID - Cos(SunWaveIndex(clock), SUNSET_AMP);
+}
+
+static void Clock_RecalcSunTimes(struct Clock *clock)
+{
+    clock->sunriseTime = CalcSunriseTime(clock);
+    clock->sunsetTime = CalcSunsetTime(clock);
+}
+
+// Recomputes the twilight counter for the current time of day. Morning twilight
+// runs [sunrise, sunrise + 128); evening twilight runs [sunset - 128, sunset).
+// The counter reads 1 on the first minute, climbs to 128 on the last, else 0.
+static void Clock_UpdateTwilight(struct Clock *clock)
+{
+    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
+
+    if (tod >= clock->sunriseTime && tod < clock->sunriseTime + TWILIGHT_MINUTES)
+        sTwilightCounter = tod - clock->sunriseTime + 1;
+    else if (tod >= clock->sunsetTime - TWILIGHT_MINUTES && tod < clock->sunsetTime)
+        sTwilightCounter = tod - (clock->sunsetTime - TWILIGHT_MINUTES) + 1;
+    else
+        sTwilightCounter = 0;
+}
+
+// Recomputes the time-of-day band for the current time of day. Dawn/dusk are the
+// sunrise/sunset twilight windows; midnight and midday are the first 30 minutes
+// of 12am/12pm; everything else is night (around midnight) or day.
+static void Clock_UpdateTimeOfDay(struct Clock *clock)
+{
+    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
+
+    if (tod < SOLAR_BAND_LENGTH)
+        sTimeOfDay = TIME_OF_DAY_MIDNIGHT;
+    else if (tod < clock->sunriseTime)
+        sTimeOfDay = TIME_OF_DAY_NIGHT;
+    else if (tod < clock->sunriseTime + TWILIGHT_MINUTES)
+        sTimeOfDay = TIME_OF_DAY_DAWN;
+    else if (tod < NOON_MINUTES)
+        sTimeOfDay = TIME_OF_DAY_DAY;
+    else if (tod < NOON_MINUTES + SOLAR_BAND_LENGTH)
+        sTimeOfDay = TIME_OF_DAY_MIDDAY;
+    else if (tod < clock->sunsetTime - TWILIGHT_MINUTES)
+        sTimeOfDay = TIME_OF_DAY_DAY;
+    else if (tod < clock->sunsetTime)
+        sTimeOfDay = TIME_OF_DAY_DUSK;
+    else
+        sTimeOfDay = TIME_OF_DAY_NIGHT;
+}
+
 // Returns the current day of the week (WEEKDAY_SUN..WEEKDAY_SAT), counted
 // from the number of whole days elapsed since the year 0, Jan 1 epoch.
 u32 Clock_GetDayOfWeek(void)
@@ -110,6 +345,89 @@ u32 Clock_GetTotalMinutes(void)
     return AbsMinutes(&gSaveBlock1Ptr->gameClock);
 }
 
+// Minutes into the current twilight window (1..TWILIGHT_MINUTES), or 0 if it is
+// not currently twilight.
+u32 Clock_GetTwilight(void)
+{
+    return sTwilightCounter;
+}
+
+// Current time-of-day band (TIME_OF_DAY_*).
+u32 Clock_GetTimeOfDay(void)
+{
+    return sTimeOfDay;
+}
+
+// Writes the current time-of-day band name to dest (e.g. "MIDDAY"). Returns a
+// pointer to the terminator.
+u8 *Clock_GetTimeOfDayString(u8 *dest)
+{
+    return StringCopy(dest, sTimeOfDayNames[sTimeOfDay]);
+}
+
+// Convenience predicates over the current time-of-day band.
+bool32 IsDay(void)      { return sTimeOfDay == TIME_OF_DAY_DAY || sTimeOfDay == TIME_OF_DAY_MIDDAY; }
+bool32 IsNight(void)    { return sTimeOfDay == TIME_OF_DAY_NIGHT || sTimeOfDay == TIME_OF_DAY_MIDNIGHT; }
+bool32 IsMidday(void)   { return sTimeOfDay == TIME_OF_DAY_MIDDAY; }
+bool32 IsMidnight(void) { return sTimeOfDay == TIME_OF_DAY_MIDNIGHT; }
+bool32 IsDawn(void)     { return sTimeOfDay == TIME_OF_DAY_DAWN; }
+bool32 IsDusk(void)     { return sTimeOfDay == TIME_OF_DAY_DUSK; }
+bool32 IsTwilight(void) { return sTimeOfDay == TIME_OF_DAY_DAWN || sTimeOfDay == TIME_OF_DAY_DUSK; }
+
+// Half-of-day predicates. DAY straddles noon, so these check the clock too.
+bool32 IsMorning(void)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
+
+    return sTimeOfDay == TIME_OF_DAY_DAWN
+        || (sTimeOfDay == TIME_OF_DAY_DAY && tod < NOON_MINUTES);
+}
+
+bool32 IsAfternoon(void)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
+
+    return sTimeOfDay == TIME_OF_DAY_MIDDAY
+        || sTimeOfDay == TIME_OF_DAY_DUSK
+        || (sTimeOfDay == TIME_OF_DAY_DAY && tod >= NOON_MINUTES);
+}
+
+// Writes the current time to dest as "9:30AM" (12-hour, no leading zero on the
+// hour). Returns a pointer to the terminator so calls can be chained.
+u8 *Clock_GetTimeString(u8 *dest)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+    u32 hour12 = clock->hours % 12;
+
+    if (hour12 == 0)
+        hour12 = 12; // midnight and noon read as 12, not 0
+
+    dest = ConvertIntToDecimalStringN(dest, hour12, STR_CONV_MODE_LEFT_ALIGN, 2);
+    *dest++ = CHAR_COLON;
+    dest = ConvertIntToDecimalStringN(dest, clock->minutes, STR_CONV_MODE_LEADING_ZEROS, 2);
+    return StringAppend(dest, clock->hours < 12 ? sText_AM : sText_PM);
+}
+
+// Writes the current day of the week to dest (e.g. "Monday", or "Mon" if
+// abbreviate). Returns a pointer to the terminator.
+u8 *Clock_GetDayString(u8 *dest, bool32 abbreviate)
+{
+    u32 weekday = Clock_GetDayOfWeek();
+
+    return StringCopy(dest, abbreviate ? sDayNamesShort[weekday] : sDayNames[weekday]);
+}
+
+// Writes the current month to dest (e.g. "May", or "May"/"Jan" if abbreviate).
+// Returns a pointer to the terminator.
+u8 *Clock_GetMonthString(u8 *dest, bool32 abbreviate)
+{
+    u32 month = gSaveBlock1Ptr->gameClock.month - 1;
+
+    return StringCopy(dest, abbreviate ? sMonthNamesShort[month] : sMonthNames[month]);
+}
+
 // ---------------------------------------------------------------------------
 // Interval hooks. Each runs when the clock crosses the matching boundary as
 // in-game time passes (aligned to the clock: OnHour at :00, OnDay at midnight,
@@ -120,6 +438,8 @@ u32 Clock_GetTotalMinutes(void)
 static void Clock_OnMinute(void)
 {
     BerryTreeTimeUpdate(1);
+    Clock_UpdateTwilight(&gSaveBlock1Ptr->gameClock);
+    Clock_UpdateTimeOfDay(&gSaveBlock1Ptr->gameClock);
 }
 static void Clock_On5Minutes(void)  {}
 static void Clock_On10Minutes(void) {}
@@ -155,6 +475,11 @@ static void Clock_On3Months(void)   {}
 static void Clock_On4Months(void)   {}
 static void Clock_On6Months(void)   {}
 static void Clock_OnYear(void)      {}
+
+// Fire when the clock passes the day's sunrise/sunset. Empty by default - fill
+// in a body to drive lighting, weather, encounters, etc. off the sun.
+static void Clock_OnSunrise(void)   {}
+static void Clock_OnSunset(void)    {}
 
 // Fires each interval hook whose boundary was crossed between the before/after snapshots. A boundary
 // of N units is crossed when before/N != after/N, so this stays correct even if a tick spans several.
@@ -197,6 +522,39 @@ static void Clock_FireIntervals(u32 beforeMin, u32 afterMin, u32 beforeMonth, u3
 #undef MIN_CROSSED
 #undef DAY_CROSSED
 #undef MONTH_CROSSED
+}
+
+// True if the given time-of-day (minutes past midnight) falls in the half-open
+// span (beforeMin, afterMin] of absolute minutes, i.e. the clock just passed it.
+static bool32 CrossedTimeOfDay(u32 beforeMin, u32 afterMin, u32 timeOfDay)
+{
+    u32 target = (beforeMin / MINUTES_PER_DAY) * MINUTES_PER_DAY + timeOfDay;
+
+    if (target <= beforeMin)
+        target += MINUTES_PER_DAY; // already passed today; check the next occurrence
+
+    return target <= afterMin;
+}
+
+// Fires the sunrise/sunset hooks when the clock crosses either time, then
+// refreshes the stored time so it tracks the date as the seasons drift.
+static void Clock_FireSunEvents(u32 beforeMin, u32 afterMin)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+
+    if (afterMin == beforeMin)
+        return;
+
+    if (CrossedTimeOfDay(beforeMin, afterMin, clock->sunriseTime))
+    {
+        Clock_OnSunrise();
+        clock->sunriseTime = CalcSunriseTime(clock);
+    }
+    if (CrossedTimeOfDay(beforeMin, afterMin, clock->sunsetTime))
+    {
+        Clock_OnSunset();
+        clock->sunsetTime = CalcSunsetTime(clock);
+    }
 }
 
 // Advances the calendar clock by the given number of seconds, rolling over
@@ -242,6 +600,7 @@ void Clock_AdvanceSeconds(u32 seconds)
     }
 
     Clock_FireIntervals(beforeMin, AbsMinutes(clock), beforeMonth, AbsMonths(clock));
+    Clock_FireSunEvents(beforeMin, AbsMinutes(clock));
 }
 
 // The clock only advances while the player is roaming the overworld freely.
@@ -299,6 +658,7 @@ void Clock_SetDay(u32 day)
     else if (day > max)
         day = max;
     clock->day = day;
+    Clock_RecalcSunTimes(clock);
 }
 
 void Clock_SetMonth(u32 month)
@@ -311,6 +671,7 @@ void Clock_SetMonth(u32 month)
         month = MONTH_DEC;
     clock->month = month;
     ClampDay(clock);
+    Clock_RecalcSunTimes(clock);
 }
 
 void Clock_SetYear(u32 year)
@@ -319,6 +680,7 @@ void Clock_SetYear(u32 year)
 
     clock->year = year;
     ClampDay(clock); // a leap/non-leap change can shorten February
+    Clock_RecalcSunTimes(clock);
 }
 
 void Clock_SetTimeScale(u32 scale)
