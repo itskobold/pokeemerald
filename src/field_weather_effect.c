@@ -203,6 +203,27 @@ const u8 gWeatherRainTiles[] = INCGFX_U8("graphics/weather/rain.png", ".4bpp");
 const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", ".4bpp");
 
 //------------------------------------------------------------------------------
+// Weather sprite parallax
+//------------------------------------------------------------------------------
+
+// Weather sprites parallax against the world like the clouds: instead of tracking the camera 1:1
+// (which pins them to the ground) they track at NUM/DEN (1/32) of the camera offset, so they drift
+// slowly as the field scrolls. Substitute these for gSpriteCoordOffsetX/Y wherever a weather sprite is
+// positioned. (The underwater bubbles deliberately keep tracking the world 1:1.)
+#define WEATHER_PARALLAX_NUM  1
+#define WEATHER_PARALLAX_DEN  32
+
+static s16 WeatherParallaxX(void)
+{
+    return gSpriteCoordOffsetX * WEATHER_PARALLAX_NUM / WEATHER_PARALLAX_DEN;
+}
+
+static s16 WeatherParallaxY(void)
+{
+    return gSpriteCoordOffsetY * WEATHER_PARALLAX_NUM / WEATHER_PARALLAX_DEN;
+}
+
+//------------------------------------------------------------------------------
 // Weather blend controls
 //------------------------------------------------------------------------------
 
@@ -612,12 +633,11 @@ static void UpdateRainSprite(struct Sprite *sprite)
 
         if (--sprite->tCounter == 0)
         {
-            // Make raindrop splash on the ground
+            // Make raindrop splash on the ground. Leave it in screen space (no world tracking) for the
+            // brief splash: parallaxing a one-shot from the screen-space drop would jump by the accumulated
+            // parallax offset, and over the splash's lifetime 1/32 tracking is visually nil anyway.
             StartSpriteAnim(sprite, gWeatherPtr->isDownpour + 1);
             sprite->tState = 1;
-            sprite->x -= gSpriteCoordOffsetX;
-            sprite->y -= gSpriteCoordOffsetY;
-            sprite->coordOffsetEnabled = TRUE;
         }
     }
     else if (sprite->animEnded)
@@ -911,7 +931,9 @@ static bool8 CreateSnowflakeSprite(void)
 
     gSprites[spriteId].tSnowflakeId = gWeatherPtr->snowflakeSpriteCount;
     InitSnowflakeSpriteMovement(&gSprites[spriteId]);
-    gSprites[spriteId].coordOffsetEnabled = TRUE;
+    // Parallax (1/32) instead of 1:1 world tracking: coordOffset stays off and the scaled offset is
+    // folded into x2/y2 each frame in UpdateSnowflakeSprite (see WeatherParallaxX/Y).
+    gSprites[spriteId].coordOffsetEnabled = FALSE;
     gWeatherPtr->sprites.s1.snowflakeSprites[gWeatherPtr->snowflakeSpriteCount++] = &gSprites[spriteId];
     return TRUE;
 }
@@ -932,8 +954,8 @@ static void InitSnowflakeSpriteMovement(struct Sprite *sprite)
     u16 rand;
     u16 x = ((sprite->tSnowflakeId * 5) & 7) * 30 + (Random() % 30);
 
-    sprite->y = -3 - (gSpriteCoordOffsetY + sprite->centerToCornerVecY);
-    sprite->x = x - (gSpriteCoordOffsetX + sprite->centerToCornerVecX);
+    sprite->y = -3 - (WeatherParallaxY() + sprite->centerToCornerVecY);
+    sprite->x = x - (WeatherParallaxX() + sprite->centerToCornerVecX);
     sprite->tPosY = sprite->y * 128;
     sprite->x2 = 0;
     rand = Random();
@@ -953,7 +975,7 @@ static void WaitSnowflakeSprite(struct Sprite *sprite)
     {
         sprite->invisible = FALSE;
         sprite->callback = UpdateSnowflakeSprite;
-        sprite->y = 250 - (gSpriteCoordOffsetY + sprite->centerToCornerVecY);
+        sprite->y = 250 - (WeatherParallaxY() + sprite->centerToCornerVecY);
         sprite->tPosY = sprite->y * 128;
         gWeatherPtr->snowflakeTimer = 0;
     }
@@ -963,26 +985,31 @@ static void UpdateSnowflakeSprite(struct Sprite *sprite)
 {
     s16 x;
     s16 y;
+    // coordOffset is off (see CreateSnowflakeSprite), so fold the parallaxed camera offset into x2/y2
+    // to track the world at 1/32 speed. The wave wobble rides along in x2.
+    s16 parX = WeatherParallaxX();
+    s16 parY = WeatherParallaxY();
 
     sprite->tPosY += sprite->tDeltaY;
     sprite->y = sprite->tPosY >> 7;
     sprite->tWaveIndex += sprite->tWaveDelta;
     sprite->tWaveIndex &= 0xFF;
-    sprite->x2 = gSineTable[sprite->tWaveIndex] / 64;
+    sprite->x2 = gSineTable[sprite->tWaveIndex] / 64 + parX;
+    sprite->y2 = parY;
 
-    x = (sprite->x + sprite->centerToCornerVecX + gSpriteCoordOffsetX) & 0x1FF;
+    x = (sprite->x + sprite->centerToCornerVecX + parX) & 0x1FF;
     if (x & 0x100)
         x |= -0x100;
 
     if (x < -3)
-        sprite->x = 242 - (gSpriteCoordOffsetX + sprite->centerToCornerVecX);
+        sprite->x = 242 - (parX + sprite->centerToCornerVecX);
     else if (x > 242)
-        sprite->x = -3 - (gSpriteCoordOffsetX + sprite->centerToCornerVecX);
+        sprite->x = -3 - (parX + sprite->centerToCornerVecX);
 
-    y = (sprite->y + sprite->centerToCornerVecY + gSpriteCoordOffsetY) & 0xFF;
+    y = (sprite->y + sprite->centerToCornerVecY + parY) & 0xFF;
     if (y > 163 && y < 171)
     {
-        sprite->y = 250 - (gSpriteCoordOffsetY + sprite->centerToCornerVecY);
+        sprite->y = 250 - (parY + sprite->centerToCornerVecY);
         sprite->tPosY = sprite->y * 128;
         sprite->tFallCounter = 0;
         sprite->tFallDuration = 220;
@@ -1395,7 +1422,7 @@ void FogHorizontal_InitVars(void)
 // which the background is brightened, giving a soft cloud-like haze (no alpha).
 void FogHorizontal_Main(void)
 {
-    gWeatherPtr->fogHScrollPosX = (gSpriteCoordOffsetX - gWeatherPtr->fogHScrollOffset) & 0xFF;
+    gWeatherPtr->fogHScrollPosX = (WeatherParallaxX() - gWeatherPtr->fogHScrollOffset) & 0xFF;
     if (++gWeatherPtr->fogHScrollCounter > 3)
     {
         gWeatherPtr->fogHScrollCounter = 0;
@@ -1432,7 +1459,7 @@ void FogHorizontal_Main(void)
 
 bool8 FogHorizontal_Finish(void)
 {
-    gWeatherPtr->fogHScrollPosX = (gSpriteCoordOffsetX - gWeatherPtr->fogHScrollOffset) & 0xFF;
+    gWeatherPtr->fogHScrollPosX = (WeatherParallaxX() - gWeatherPtr->fogHScrollOffset) & 0xFF;
     if (++gWeatherPtr->fogHScrollCounter > 3)
     {
         gWeatherPtr->fogHScrollCounter = 0;
@@ -1469,7 +1496,7 @@ bool8 FogHorizontal_Finish(void)
 
 static void FogHorizontalSpriteCallback(struct Sprite *sprite)
 {
-    sprite->y2 = (u8)gSpriteCoordOffsetY;
+    sprite->y2 = (u8)WeatherParallaxY();
     sprite->x = gWeatherPtr->fogHScrollPosX + 32 + sprite->tSpriteColumn * 64;
     if (sprite->x >= DISPLAY_WIDTH + 32)
     {
@@ -1559,7 +1586,7 @@ void Ash_InitAll(void)
 
 void Ash_Main(void)
 {
-    gWeatherPtr->ashBaseSpritesX = gSpriteCoordOffsetX & 0x1FF;
+    gWeatherPtr->ashBaseSpritesX = WeatherParallaxX() & 0x1FF;
     while (gWeatherPtr->ashBaseSpritesX >= DISPLAY_WIDTH)
         gWeatherPtr->ashBaseSpritesX -= DISPLAY_WIDTH;
 
@@ -1693,7 +1720,7 @@ static void UpdateAshSprite(struct Sprite *sprite)
         sprite->tOffsetY++;
     }
 
-    sprite->y = gSpriteCoordOffsetY + sprite->tOffsetY;
+    sprite->y = WeatherParallaxY() + sprite->tOffsetY;
     sprite->x = gWeatherPtr->ashBaseSpritesX + 32 + sprite->tSpriteColumn * 64;
     if (sprite->x >= DISPLAY_WIDTH + 32)
     {
@@ -1712,8 +1739,6 @@ static void UpdateAshSprite(struct Sprite *sprite)
 //------------------------------------------------------------------------------
 
 #define CLOUD_TILE          64                              // size of one cloud tile (px)
-#define CLOUD_PARALLAX_NUM  1                                // clouds track camera at NUM/DEN (1/32) speed
-#define CLOUD_PARALLAX_DEN  32
 #define CLOUD_IMAGE_TILES   (CLOUD_TILE_4BPP_SIZE / TILE_SIZE_4BPP) // hardware tiles per image
 #define CLOUD_PATTERN_PX    (CLOUD_PATTERN_DIM * CLOUD_TILE)        // pattern period (px)
 // The leftmost column can sit as high as x=-1, leaving no margin past the screen's left edge, so the
@@ -1721,10 +1746,13 @@ static void UpdateAshSprite(struct Sprite *sprite)
 // field left by this buffer; every tile moves together so the field stays seamless, and the spare 5th
 // column keeps the right edge covered.
 #define CLOUD_LEFT_BUFFER   1   // px of extra coverage past the left screen edge
-// Wind drift: per frame we accumulate windSpeed * gSineTable[heading] (Q8) into a sub-pixel
-// accumulator and emit one pixel of scroll per CLOUD_WIND_SUBPX_PER_PX. Sized so that at
-// WIND_SPEED_DEFAULT the field scrolls 1px every 3 frames (the old fixed rate).
-#define CLOUD_WIND_SUBPX_PER_PX  (WIND_SPEED_DEFAULT * 256 * 3)
+// Wind drift: per frame we accumulate speed * gSineTable[heading] (Q8) into a sub-pixel accumulator and
+// emit one pixel of scroll per CLOUD_WIND_SUBPX_PER_PX. Kept at the sandstorm's per-level scale: the sand
+// drifts (speed * gust * dir) >> SANDSTORM_WIND_SHIFT(=12) px/frame, i.e. (speed * dir) >> 12 at unit gust,
+// so emitting 1px per 1<<12 accumulated units shares that scale (1<<SANDSTORM_WIND_SHIFT). Clouds then run
+// CLOUD_WIND_SPEED_BONUS levels faster than the sand so they read as a higher, quicker layer.
+#define CLOUD_WIND_SUBPX_PER_PX  4096
+#define CLOUD_WIND_SPEED_BONUS   5   // clouds drift 5 effective wind levels faster than the sandstorm sprites
 
 // Subtle wobble layered on top of the drift to keep the field from looking frozen. Two pieces, both
 // driven by cloudsWavePhase (one unit/frame, independent of wind speed) and applied via sprite->x2/y2 so they nudge position only,
@@ -2057,7 +2085,8 @@ static void StepCloudOffset(u16 *offset, s16 *accum)
 static void UpdateCloudsMovement(void)
 {
     u8 heading = gSaveBlock1Ptr->weatherState.windDirection; // BAM angle: 0=N (up), clockwise
-    s32 speed = gSaveBlock1Ptr->weatherState.windSpeed;
+    // +1: effective never fully still; + bonus: clouds run a few levels faster than the sand (4..36 vs 1..32).
+    s32 speed = gSaveBlock1Ptr->weatherState.windSpeed + 1 + CLOUD_WIND_SPEED_BONUS;
     // Screen unit velocity: +X right, +Y down. East = sin, down = -cos (north is up).
     s32 dirX = gSineTable[heading];
     s32 dirY = -gSineTable[(heading + 64) & 0xFF];
@@ -2521,9 +2550,9 @@ static void DestroyCloudsSprites(void)
 // seamless, scrolling cloud field.
 static void UpdateCloudsSprite(struct Sprite *sprite)
 {
-    // Track the camera at 1.5x speed so the clouds parallax against the world.
-    s32 baseX = (-gSpriteCoordOffsetX * CLOUD_PARALLAX_NUM / CLOUD_PARALLAX_DEN) - gWeatherPtr->cloudsXOffset;
-    s32 baseY = (-gSpriteCoordOffsetY * CLOUD_PARALLAX_NUM / CLOUD_PARALLAX_DEN) + gWeatherPtr->cloudsYOffset;
+    // Track the camera at WEATHER_PARALLAX speed so the clouds parallax against the world.
+    s32 baseX = -WeatherParallaxX() - gWeatherPtr->cloudsXOffset;
+    s32 baseY = -WeatherParallaxY() + gWeatherPtr->cloudsYOffset;
     s32 col = sprite->tSpriteColumn;
     s32 row = sprite->tSpriteRow;
     // Tile top-left, aligned to the scroll phase so each sprite shows exactly
@@ -2582,11 +2611,8 @@ static void UpdateCloudsSprite(struct Sprite *sprite)
 static void UpdateSandstormWaveIndex(void);
 static void UpdateSandstormMovement(void);
 static void CreateSandstormSprites(void);
-static void CreateSwirlSandstormSprites(void);
 static void DestroySandstormSprites(void);
 static void UpdateSandstormSprite(struct Sprite *);
-static void WaitSandSwirlSpriteEntrance(struct Sprite *);
-static void UpdateSandstormSwirlSprite(struct Sprite *);
 
 #define MIN_SANDSTORM_WAVE_INDEX 0x20
 
@@ -2601,6 +2627,9 @@ void Sandstorm_InitVars(void)
         gWeatherPtr->sandstormXOffset = gWeatherPtr->sandstormYOffset = 0;
         gWeatherPtr->sandstormWaveIndex = 8;
         gWeatherPtr->sandstormWaveCounter = 0;
+        gWeatherPtr->sandstormWavePhase = 0;
+        gWeatherPtr->sandstormRipplePhaseX = 0;
+        gWeatherPtr->sandstormRipplePhaseY = 0;
         // Dead code. How does the compiler not optimize this out?
         if (gWeatherPtr->sandstormWaveIndex >= 0x80 - MIN_SANDSTORM_WAVE_INDEX)
             gWeatherPtr->sandstormWaveIndex = 0x80 - gWeatherPtr->sandstormWaveIndex;
@@ -2620,14 +2649,11 @@ void Sandstorm_Main(void)
 {
     UpdateSandstormMovement();
     UpdateSandstormWaveIndex();
-    if (gWeatherPtr->sandstormWaveIndex >= 0x80 - MIN_SANDSTORM_WAVE_INDEX)
-        gWeatherPtr->sandstormWaveIndex = MIN_SANDSTORM_WAVE_INDEX;
 
     switch (gWeatherPtr->initStep)
     {
     case 0:
         CreateSandstormSprites();
-        CreateSwirlSandstormSprites();
         gWeatherPtr->initStep++;
         break;
     case 1:
@@ -2669,6 +2695,11 @@ bool8 Sandstorm_Finish(void)
     return TRUE;
 }
 
+// Advance the gust phase one step every 5 frames, wrapping within the positive (magnitude-only) half of the
+// sine table. Wrapping here - rather than only in Sandstorm_Main - keeps the index bounded during
+// Sandstorm_Finish too. Otherwise it climbs past 0x80 into the negative-sine region, where the gust term
+// flips the drift's sign and the sand blows against the wind (a stale high index can then leak into the
+// next sandstorm start, since InitVars skips its reset while the fade-out's sprites still exist).
 static void UpdateSandstormWaveIndex(void)
 {
     if (gWeatherPtr->sandstormWaveCounter++ > 4)
@@ -2676,14 +2707,38 @@ static void UpdateSandstormWaveIndex(void)
         gWeatherPtr->sandstormWaveIndex++;
         gWeatherPtr->sandstormWaveCounter = 0;
     }
+    if (gWeatherPtr->sandstormWaveIndex >= 0x80 - MIN_SANDSTORM_WAVE_INDEX)
+        gWeatherPtr->sandstormWaveIndex = MIN_SANDSTORM_WAVE_INDEX;
 }
+
+// Tunes the storm's pace: speed * gust * dir (Q8 each) >> this gives ~1px/frame at WIND_SPEED_DEFAULT
+// (~2px at max wind). Each +1 to the shift halves the drift across the whole range.
+#define SANDSTORM_WIND_SHIFT 12
+
+// The sand's own wobble (see UpdateSandstormSprite), independent of and faster than the clouds'.
+#define SANDSTORM_WAVE_SPEED    2   // sway phase units/frame (the clouds sway at 0.5) - a quicker wobble
+#define SANDSTORM_RIPPLE_SPEED  3   // multiplier on the ripple band travel (faster-flowing ripples)
+#define SANDSTORM_RIPPLE_SHIFT  3   // screen pos -> ripple phase; smaller than the clouds' = higher ripple frequency
 
 static void UpdateSandstormMovement(void)
 {
-    gWeatherPtr->sandstormXOffset -= gSineTable[gWeatherPtr->sandstormWaveIndex] * 4;
-    gWeatherPtr->sandstormYOffset -= gSineTable[gWeatherPtr->sandstormWaveIndex];
-    gWeatherPtr->sandstormBaseSpritesX = (gSpriteCoordOffsetX + (gWeatherPtr->sandstormXOffset >> 8)) & 0xFF;
-    gWeatherPtr->sandstormPosY = gSpriteCoordOffsetY + (gWeatherPtr->sandstormYOffset >> 8);
+    u8 heading = gSaveBlock1Ptr->weatherState.windDirection; // BAM angle: 0=N (up), clockwise
+    s32 speed = gSaveBlock1Ptr->weatherState.windSpeed + 1;  // effective 1..32, wind is never fully still
+    s32 gust = gSineTable[gWeatherPtr->sandstormWaveIndex];  // gentle magnitude pulse (the old gust), same on both axes
+    // Screen velocity: +X right, +Y down. East = sin, down = -cos (north is up). Sand blows downwind.
+    s32 dirX = gSineTable[heading];
+    s32 dirY = -gSineTable[(heading + 64) & 0xFF];
+
+    gWeatherPtr->sandstormXOffset += (speed * gust * dirX) >> SANDSTORM_WIND_SHIFT;
+    gWeatherPtr->sandstormYOffset += (speed * gust * dirY) >> SANDSTORM_WIND_SHIFT;
+    gWeatherPtr->sandstormBaseSpritesX = (WeatherParallaxX() + (gWeatherPtr->sandstormXOffset >> 8)) & 0xFF;
+    gWeatherPtr->sandstormPosY = WeatherParallaxY() + (gWeatherPtr->sandstormYOffset >> 8);
+
+    // Advance the sand's own wobble: a quick free-running sway plus ripple bands that flow along the wind
+    // (x2 band by the south component, y2 by east), faster than the clouds (see UpdateSandstormSprite).
+    gWeatherPtr->sandstormWavePhase += SANDSTORM_WAVE_SPEED;
+    gWeatherPtr->sandstormRipplePhaseX += dirY * SANDSTORM_RIPPLE_SPEED;
+    gWeatherPtr->sandstormRipplePhaseY += dirX * SANDSTORM_RIPPLE_SPEED;
 }
 
 static void DestroySandstormSprites(void)
@@ -2700,17 +2755,6 @@ static void DestroySandstormSprites(void)
 
         gWeatherPtr->sandstormSpritesCreated = FALSE;
         FreeSpriteTilesByTag(GFXTAG_SANDSTORM);
-    }
-
-    if (gWeatherPtr->sandstormSwirlSpritesCreated)
-    {
-        for (i = 0; i < NUM_SWIRL_SANDSTORM_SPRITES; i++)
-        {
-            if (gWeatherPtr->sprites.s2.sandstormSprites2[i] != NULL)
-                DestroySprite(gWeatherPtr->sprites.s2.sandstormSprites2[i]);
-        }
-
-        gWeatherPtr->sandstormSwirlSpritesCreated = FALSE;
     }
 }
 
@@ -2768,12 +2812,6 @@ static const struct SpriteSheet sSandstormSpriteSheet =
 #define tSpriteColumn  data[0]
 #define tSpriteRow     data[1]
 
-// Swirly sandstorm sprites
-#define tRadius        data[0]
-#define tWaveIndex     data[1]
-#define tRadiusCounter data[2]
-#define tEntranceDelay data[3]
-
 static void CreateSandstormSprites(void)
 {
     u16 i;
@@ -2802,87 +2840,37 @@ static void CreateSandstormSprites(void)
     }
 }
 
-static const u16 sSwirlEntranceDelays[] = {0, 120, 80, 160, 40, 0};
-
-static void CreateSwirlSandstormSprites(void)
-{
-    u16 i;
-    u8 spriteId;
-
-    if (!gWeatherPtr->sandstormSwirlSpritesCreated)
-    {
-        for (i = 0; i < NUM_SWIRL_SANDSTORM_SPRITES; i++)
-        {
-            spriteId = CreateSpriteAtEnd(&sSandstormSpriteTemplate, i * 48 + 24, 208, 1);
-            if (spriteId != MAX_SPRITES)
-            {
-                gWeatherPtr->sprites.s2.sandstormSprites2[i] = &gSprites[spriteId];
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->oam.size = ST_OAM_SIZE_2;
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->tSpriteRow = i * 51;
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->tRadius = 8;
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->tRadiusCounter = 0;
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->data[4] = 0x6730; // unused value
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->tEntranceDelay = sSwirlEntranceDelays[i];
-                StartSpriteAnim(gWeatherPtr->sprites.s2.sandstormSprites2[i], 1);
-                CalcCenterToCornerVec(gWeatherPtr->sprites.s2.sandstormSprites2[i], SPRITE_SHAPE(32x32), SPRITE_SIZE(32x32), ST_OAM_AFFINE_OFF);
-                gWeatherPtr->sprites.s2.sandstormSprites2[i]->callback = WaitSandSwirlSpriteEntrance;
-            }
-            else
-            {
-                gWeatherPtr->sprites.s2.sandstormSprites2[i] = NULL;
-            }
-
-            gWeatherPtr->sandstormSwirlSpritesCreated = TRUE;
-        }
-    }
-}
-
 static void UpdateSandstormSprite(struct Sprite *sprite)
 {
-    sprite->y2 = gWeatherPtr->sandstormPosY;
+    // The sand's own wobble phases (advanced in UpdateSandstormMovement) - separate from and faster than
+    // the clouds', so the two layers shimmer at different rates.
+    s32 phase = gWeatherPtr->sandstormWavePhase;
+    s32 rippleXPhase = gWeatherPtr->sandstormRipplePhaseX >> 8;
+    s32 rippleYPhase = gWeatherPtr->sandstormRipplePhaseY >> 8;
+    s32 windSpeed = gSaveBlock1Ptr->weatherState.windSpeed; // scales the wobble: 0 = still, WIND_SPEED_MAX = full
+    s16 swayX, swayY, rippleX, rippleY;
+
     sprite->x = gWeatherPtr->sandstormBaseSpritesX + 32 + sprite->tSpriteColumn * 64;
     if (sprite->x >= DISPLAY_WIDTH + 32)
     {
         sprite->x = gWeatherPtr->sandstormBaseSpritesX + (DISPLAY_WIDTH * 2) - (4 - sprite->tSpriteColumn) * 64;
         sprite->x &= 0x1FF;
     }
-}
 
-static void WaitSandSwirlSpriteEntrance(struct Sprite *sprite)
-{
-    if (--sprite->tEntranceDelay == -1)
-        sprite->callback = UpdateSandstormSwirlSprite;
-}
-
-static void UpdateSandstormSwirlSprite(struct Sprite *sprite)
-{
-    u32 x, y;
-
-    if (--sprite->y < -48)
-    {
-        sprite->y = DISPLAY_HEIGHT + 48;
-        sprite->tRadius = 4;
-    }
-
-    x = sprite->tRadius * gSineTable[sprite->tWaveIndex];
-    y = sprite->tRadius * gSineTable[sprite->tWaveIndex + 0x40];
-    sprite->x2 = x >> 8;
-    sprite->y2 = y >> 8;
-    sprite->tWaveIndex = (sprite->tWaveIndex + 10) & 0xFF;
-    if (++sprite->tRadiusCounter > 8)
-    {
-        sprite->tRadiusCounter = 0;
-        sprite->tRadius++;
-    }
+    // Layer the clouds' wavy wobble on top of the drift (x2/y2 only - tile positions above are untouched):
+    // a uniform sway the whole field shares + a directional ripple sheared so 64px tile seams stay shut
+    // (x2 varies only with row, y2 only with column). The vertical sway/ripple folds into the drift offset.
+    // Amplitude scales with wind speed (* windSpeed / WIND_SPEED_MAX): nearly still at 0, full at max wind.
+    swayX = (gSineTable[phase & 0xFF] * CLOUD_SWAY_AMP * windSpeed / WIND_SPEED_MAX) >> 8;
+    swayY = (gSineTable[(phase + 64) & 0xFF] * CLOUD_SWAY_AMP * windSpeed / WIND_SPEED_MAX) >> 8;
+    rippleX = (gSineTable[((sprite->y >> SANDSTORM_RIPPLE_SHIFT) - rippleXPhase) & 0xFF] * CLOUD_RIPPLE_AMP * windSpeed / WIND_SPEED_MAX) >> 8;
+    rippleY = (gSineTable[((sprite->x >> SANDSTORM_RIPPLE_SHIFT) - rippleYPhase) & 0xFF] * CLOUD_RIPPLE_AMP * windSpeed / WIND_SPEED_MAX) >> 8;
+    sprite->x2 = swayX + rippleX;
+    sprite->y2 = gWeatherPtr->sandstormPosY + swayY + rippleY;
 }
 
 #undef tSpriteColumn
 #undef tSpriteRow
-
-#undef tRadius
-#undef tWaveIndex
-#undef tRadiusCounter
-#undef tEntranceDelay
 
 //------------------------------------------------------------------------------
 // WEATHER_UNDERWATER_BUBBLES

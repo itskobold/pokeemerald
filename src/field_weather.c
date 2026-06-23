@@ -157,7 +157,6 @@ void StartWeather(void)
         gWeatherPtr->fogHSpritesCreated = 0;
         gWeatherPtr->cloudsSpritesCreated = 0;
         gWeatherPtr->sandstormSpritesCreated = 0;
-        gWeatherPtr->sandstormSwirlSpritesCreated = 0;
         gWeatherPtr->bubblesSpritesCreated = 0;
         gWeatherPtr->lightenedFogSpritePalsCount = 0;
         InitClouds(); // Persistent overlay, shown for most weathers

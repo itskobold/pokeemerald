@@ -5,7 +5,6 @@
 #define NUM_FOG_HORIZONTAL_SPRITES   20
 #define NUM_ASH_SPRITES              20
 #define NUM_SANDSTORM_SPRITES        20
-#define NUM_SWIRL_SANDSTORM_SPRITES  5
 #define NUM_SNOWFLAKE_SPRITES        16
 
 // Clouds: a 3x3 set of seamlessly tiling 64x64 images, drawn as a grid of
@@ -45,7 +44,7 @@
 #define WIND_DIR_NW     224
 #define WIND_DIR_NNW    240
 
-#define WIND_SPEED_MAX      32
+#define WIND_SPEED_MAX      31  // user-facing cap (debug/normal); effective speed is windSpeed+1 (1..32), never still
 #define WIND_SPEED_DEFAULT  16
 
 // Controls how the weather should be changing the screen palettes.

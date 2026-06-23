@@ -36,7 +36,6 @@ struct Weather
             struct Sprite *ashSprites[NUM_ASH_SPRITES];
             struct Sprite *cloudSprites[NUM_CLOUD_SPRITES];
             struct Sprite *sandstormSprites1[NUM_SANDSTORM_SPRITES];
-            struct Sprite *sandstormSprites2[NUM_SWIRL_SANDSTORM_SPRITES];
         } s2;
     } sprites;
     u8 colorMaps[NUM_WEATHER_COLOR_MAPS][32];
@@ -97,8 +96,10 @@ struct Weather
     u16 sandstormPosY;
     u16 sandstormWaveIndex;
     u16 sandstormWaveCounter;
+    u16 sandstormWavePhase;     // own wobble sway phase, free-running (separate from the clouds', advances faster)
+    u16 sandstormRipplePhaseX;  // own ripple band phases (Q8), integrated from wind velocity like the clouds but quicker
+    u16 sandstormRipplePhaseY;
     u8 sandstormSpritesCreated;
-    u8 sandstormSwirlSpritesCreated;
     // Clouds
     u8 cloudCover:4;            // current cover level 0..15 (0 = no clouds, else clouds/1..15)
     u8 targetCloudCover:4;      // set is stepped toward this (see SetCloudCover)
