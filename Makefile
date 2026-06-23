@@ -160,7 +160,7 @@ MAKEFLAGS += --no-print-directory
 .DELETE_ON_ERROR:
 
 RULES_NO_SCAN += libagbsyscall clean clean-assets tidy tidymodern tidynonmodern generated clean-generated
-.PHONY: all rom modern compare
+.PHONY: all rom modern compare compile_commands
 .PHONY: $(RULES_NO_SCAN)
 
 infoshell = $(foreach line, $(shell $1 | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
@@ -227,6 +227,12 @@ ifeq ($(COMPARE),1)
 endif
 
 syms: $(SYM)
+
+# Regenerate the clangd compile DB (header/macro resolution for IDEs). Driven by
+# CMakeLists.txt; symlinked into the repo root where clangd looks for it.
+compile_commands:
+	cmake -S . -B build/cmake-ide -DCMAKE_BUILD_TYPE=Debug
+	ln -sf build/cmake-ide/compile_commands.json compile_commands.json
 
 clean: tidy clean-tools clean-generated clean-assets
 	@$(MAKE) clean -C libagbsyscall

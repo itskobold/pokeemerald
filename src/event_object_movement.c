@@ -126,6 +126,7 @@ static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *);
 static u8 GetReflectionTypeByMetatileBehavior(u32);
 static void InitObjectPriorityByElevation(struct Sprite *, u8);
 static void ObjectEventUpdateSubpriority(struct ObjectEvent *, struct Sprite *);
+static void SetObjectEventSubpriority(struct ObjectEvent *, struct Sprite *);
 static void DoTracksGroundEffect_None(struct ObjectEvent *, struct Sprite *, u8);
 static void DoTracksGroundEffect_Footprints(struct ObjectEvent *, struct Sprite *, u8);
 static void DoTracksGroundEffect_BikeTireTracks(struct ObjectEvent *, struct Sprite *, u8);
@@ -1608,7 +1609,7 @@ static u8 TrySetupObjectEventSpriteAt(const struct ObjectEventTemplate *objectEv
     if (!objectEvent->inanimate)
         StartSpriteAnim(sprite, GetFaceDirectionAnimNum(objectEvent->facingDirection));
 
-    SetObjectSubpriorityByElevation(objectEvent->previousElevation, sprite, 1);
+    SetObjectEventSubpriority(objectEvent, sprite);
     UpdateObjectEventVisibility(objectEvent, sprite);
     return objectEventId;
 }
@@ -2616,7 +2617,7 @@ static void SpawnObjectEventOnReturnToField(u8 objectEventId, s16 x, s16 y)
             StartSpriteAnim(sprite, GetFaceDirectionAnimNum(objectEvent->facingDirection));
 
         ResetObjectEventFldEffData(objectEvent);
-        SetObjectSubpriorityByElevation(objectEvent->previousElevation, sprite, 1);
+        SetObjectEventSubpriority(objectEvent, sprite);
     }
 }
 
@@ -9138,15 +9139,22 @@ void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 sub
     sprite->subpriority = sElevationToSubpriority[elevation] + y + subpriority;
 }
 
+// Subpriority for an "any elevation" object: 0 is the frontmost value, so it draws on
+// top of every other object instead of sorting among them by screen Y.
+static void SetObjectEventSubpriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
+{
+    if (objEvent->drawAtHighestElevation)
+        sprite->subpriority = 0;
+    else
+        SetObjectSubpriorityByElevation(objEvent->previousElevation, sprite, 1);
+}
+
 static void ObjectEventUpdateSubpriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
     if (objEvent->fixedPriority)
         return;
 
-    if (objEvent->drawAtHighestElevation)
-        SetObjectSubpriorityByElevation(OBJECT_EVENT_HIGHEST_ELEVATION, sprite, 1);
-    else
-        SetObjectSubpriorityByElevation(objEvent->previousElevation, sprite, 1);
+    SetObjectEventSubpriority(objEvent, sprite);
 }
 
 static bool8 AreElevationsCompatible(u8 a, u8 b)
