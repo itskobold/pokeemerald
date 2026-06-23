@@ -285,6 +285,10 @@ EWRAM_DATA static u8 sSpriteCopyRequestCount = 0;
 EWRAM_DATA static struct SpriteCopyRequest sSpriteCopyRequests[MAX_SPRITES] = {0};
 EWRAM_DATA u8 gOamLimit = 0;
 EWRAM_DATA u16 gReservedSpriteTileCount = 0;
+// Debug instrumentation: peak OAM entries used last frame and how many visible sprites were dropped
+// when the buffer overflowed gOamLimit (set in AddSpritesToOamBuffer).
+EWRAM_DATA u8 gOamPeakUsed = 0;
+EWRAM_DATA u8 gOamOverflowDropped = 0;
 EWRAM_DATA static u8 sSpriteTileAllocBitmap[128] = {0};
 EWRAM_DATA s16 gSpriteCoordOffsetX = 0;
 EWRAM_DATA s16 gSpriteCoordOffsetY = 0;
@@ -488,9 +492,24 @@ void AddSpritesToOamBuffer(void)
     {
         struct Sprite *sprite = &gSprites[sSpriteOrder[i]];
         if (sprite->inUse && !sprite->invisible && AddSpriteToOamBuffer(sprite, &oamIndex))
+        {
+            // OAM overflow: every remaining visible sprite in sort order is dropped (blanked).
+            u8 k;
+            gOamOverflowDropped = 0;
+            for (k = i; k < MAX_SPRITES; k++)
+            {
+                struct Sprite *s = &gSprites[sSpriteOrder[k]];
+                if (s->inUse && !s->invisible)
+                    gOamOverflowDropped++;
+            }
+            gOamPeakUsed = oamIndex;
             return;
+        }
         i++;
     }
+
+    gOamPeakUsed = oamIndex;
+    gOamOverflowDropped = 0;
 
     while (oamIndex < gOamLimit)
     {

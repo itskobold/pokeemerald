@@ -6,6 +6,7 @@
 #include "bg.h"
 #include "cable_club.h"
 #include "debug.h"
+#include "dma3.h"
 #include "event_data.h"
 #include "event_object_movement.h"
 #include "event_scripts.h"
@@ -1668,6 +1669,44 @@ static void OverworldBasic(void)
     UpdatePaletteFade();
     UpdateTilesetAnimations();
     DoScheduledBgTilemapCopiesToVram();
+
+#ifndef NDEBUG
+    // DMA3 queue instrumentation: report the prior VBlank's transfer when it couldn't drain the
+    // queue (work slips to the next frame -> the "BG one frame behind the sprites" lag), or whenever
+    // the queue runs hot. Values are in bytes; 40 KiB is the per-VBlank cap in ProcessDma3Requests.
+    // Identify the dominant "other" (non-object-event) visible sprites by callback address: tally up to
+    // 6 distinct callbacks and report the busiest. Map the printed address against pokeemerald.elf to
+    // name the sprite type that's flooding OAM.
+    if (gOamPeakUsed > 90 || gOamOverflowDropped != 0)
+    {
+        u32 i, j, visObj = 0;
+        u32 cbAddr[6] = {0};
+        u32 cbCount[6] = {0};
+        u32 nCb = 0;
+        for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+            if (gObjectEvents[i].active && gObjectEvents[i].spriteId < MAX_SPRITES
+             && !gSprites[gObjectEvents[i].spriteId].invisible)
+                visObj++;
+        for (i = 0; i < MAX_SPRITES; i++)
+        {
+            u32 addr;
+            bool32 isObj = FALSE;
+            if (!gSprites[i].inUse || gSprites[i].invisible)
+                continue;
+            for (j = 0; j < OBJECT_EVENTS_COUNT; j++)
+                if (gObjectEvents[j].active && gObjectEvents[j].spriteId == i) { isObj = TRUE; break; }
+            if (isObj)
+                continue;
+            addr = (u32)gSprites[i].callback;
+            for (j = 0; j < nCb; j++)
+                if (cbAddr[j] == addr) { cbCount[j]++; break; }
+            if (j == nCb && nCb < 6) { cbAddr[nCb] = addr; cbCount[nCb] = 1; nCb++; }
+        }
+        DebugPrintfLevel(MGBA_LOG_WARN, "##SPR## oam=%d visObj=%d | cb0=%x(%d) cb1=%x(%d) cb2=%x(%d) cb3=%x(%d)",
+            gOamPeakUsed, visObj,
+            cbAddr[0], cbCount[0], cbAddr[1], cbCount[1], cbAddr[2], cbCount[2], cbAddr[3], cbCount[3]);
+    }
+#endif
 }
 
 // This CB2 is used when starting

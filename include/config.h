@@ -6,7 +6,9 @@
 // still has them in the ROM. This is because the developers forgot
 // to define NDEBUG before release, however this has been changed as
 // Ruby's actual debug build does not use the AGBPrint features.
-#define NDEBUG
+// NOTE: temporarily disabled to enable DMA3 queue instrumentation (DebugPrintf -> mGBA log).
+// Re-enable (uncomment) to restore the normal release build.
+// #define NDEBUG
 
 // To enable printf debugging, comment out "#define NDEBUG". This allows
 // the various AGBPrint functions to be used. (See include/gba/isagbprint.h).

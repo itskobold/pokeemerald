@@ -52,4 +52,11 @@ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u8 mode);
 s16 RequestDma3Fill(s32 value, void *dest, u16 size, u8 mode);
 s16 CheckForSpaceForDma3Request(s16 index);
 
+// DMA3 queue instrumentation (debug), snapshotted each VBlank by ProcessDma3Requests.
+extern u32 gDma3QueuedAtVBlank;
+extern u32 gDma3TransferredAtVBlank;
+extern u32 gDma3DeferredAtVBlank;
+extern u32 gDma3PeakQueuedBytes;
+extern u8 gDma3BailReason;
+
 #endif // GUARD_DMA3_H

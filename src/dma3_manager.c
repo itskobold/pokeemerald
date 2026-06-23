@@ -22,12 +22,25 @@ static struct Dma3Request sDma3Requests[MAX_DMA_REQUESTS];
 static vbool8 sDma3ManagerLocked;
 static u8 sDma3RequestCursor;
 
+// --- DMA3 queue instrumentation (debug only) ---
+// sDma3QueuedBytes tracks the total bytes of all pending requests (incremented on enqueue,
+// decremented as each is transferred). The g* values are snapshotted each VBlank by
+// ProcessDma3Requests for the main loop to read/print. gDma3BailReason: 0 = queue fully
+// drained this VBlank, 1 = hit the 40 KiB cap, 2 = hit the VCOUNT > 224 cutoff.
+static u32 sDma3QueuedBytes;
+u32 gDma3QueuedAtVBlank;       // bytes pending when this VBlank's processing started
+u32 gDma3TransferredAtVBlank;  // bytes actually copied this VBlank
+u32 gDma3DeferredAtVBlank;     // bytes still pending after processing returned (slip to next frame)
+u32 gDma3PeakQueuedBytes;      // high-water mark of gDma3QueuedAtVBlank since last reset
+u8 gDma3BailReason;
+
 void ClearDma3Requests(void)
 {
     int i;
 
     sDma3ManagerLocked = TRUE;
     sDma3RequestCursor = 0;
+    sDma3QueuedBytes = 0;
 
     for (i = 0; i < MAX_DMA_REQUESTS; i++)
     {
@@ -48,15 +61,30 @@ void ProcessDma3Requests(void)
 
     bytesTransferred = 0;
 
+    gDma3QueuedAtVBlank = sDma3QueuedBytes;
+    if (sDma3QueuedBytes > gDma3PeakQueuedBytes)
+        gDma3PeakQueuedBytes = sDma3QueuedBytes;
+
     // as long as there are DMA requests to process (unless size or vblank is an issue), do not exit
     while (sDma3Requests[sDma3RequestCursor].size != 0)
     {
-        bytesTransferred += sDma3Requests[sDma3RequestCursor].size;
+        u16 reqSize = sDma3Requests[sDma3RequestCursor].size;
+        bytesTransferred += reqSize;
 
         if (bytesTransferred > 40 * 1024)
+        {
+            gDma3BailReason = 1; // hit the 40 KiB cap
+            gDma3TransferredAtVBlank = gDma3QueuedAtVBlank - sDma3QueuedBytes;
+            gDma3DeferredAtVBlank = sDma3QueuedBytes;
             return; // don't transfer more than 40 KiB
+        }
         if (*(u8 *)REG_ADDR_VCOUNT > 224)
+        {
+            gDma3BailReason = 2; // ran out of vblank time
+            gDma3TransferredAtVBlank = gDma3QueuedAtVBlank - sDma3QueuedBytes;
+            gDma3DeferredAtVBlank = sDma3QueuedBytes;
             return; // we're about to leave vblank, stop
+        }
 
         switch (sDma3Requests[sDma3RequestCursor].mode)
         {
@@ -88,11 +116,17 @@ void ProcessDma3Requests(void)
         sDma3Requests[sDma3RequestCursor].size = 0;
         sDma3Requests[sDma3RequestCursor].mode = 0;
         sDma3Requests[sDma3RequestCursor].value = 0;
+        sDma3QueuedBytes -= reqSize;
         sDma3RequestCursor++;
 
         if (sDma3RequestCursor >= MAX_DMA_REQUESTS) // loop back to the first DMA request
             sDma3RequestCursor = 0;
     }
+
+    // Queue fully drained this VBlank — nothing deferred.
+    gDma3BailReason = 0;
+    gDma3TransferredAtVBlank = gDma3QueuedAtVBlank - sDma3QueuedBytes;
+    gDma3DeferredAtVBlank = 0;
 }
 
 s16 RequestDma3Copy(const void *src, void *dest, u16 size, u8 mode)
@@ -116,6 +150,7 @@ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u8 mode)
             else
                 sDma3Requests[cursor].mode = DMA_REQUEST_COPY16;
 
+            sDma3QueuedBytes += size;
             sDma3ManagerLocked = FALSE;
             return cursor;
         }
@@ -149,6 +184,7 @@ s16 RequestDma3Fill(s32 value, void *dest, u16 size, u8 mode)
             else
                 sDma3Requests[cursor].mode = DMA_REQUEST_FILL16;
 
+            sDma3QueuedBytes += size;
             sDma3ManagerLocked = FALSE;
             return cursor;
         }

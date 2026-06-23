@@ -1527,6 +1527,9 @@ void RemoveObjectEventByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
 static void RemoveObjectEventInternal(struct ObjectEvent *objectEvent)
 {
     struct SpriteFrameImage image;
+
+    RemoveFollowerFieldEffectSprites(objectEvent);
+
     image.size = GetObjectEventGraphicsInfo(objectEvent->graphicsId)->size;
     gSprites[objectEvent->spriteId].images = &image;
     DestroySprite(&gSprites[objectEvent->spriteId]);
@@ -2625,6 +2628,10 @@ static void ResetObjectEventFldEffData(struct ObjectEvent *objectEvent)
 {
     objectEvent->singleMovementActive = FALSE;
     objectEvent->triggerGroundEffectsOnMove = TRUE;
+    // Free the object's live follower field-effect sprites before clearing the flags below, or the
+    // orphaned sprites leak (see RemoveFollowerFieldEffectSprites). This path runs for every object on
+    // every camera jump, so it's the main accumulation point.
+    RemoveFollowerFieldEffectSprites(objectEvent);
     objectEvent->hasShadow = FALSE;
     objectEvent->hasReflection = FALSE;
     objectEvent->inShortGrass = FALSE;

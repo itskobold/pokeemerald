@@ -1255,6 +1255,67 @@ void UpdateSandPileFieldEffect(struct Sprite *sprite)
 #undef sPrevX
 #undef sPrevY
 
+// Free every per-object follower field-effect sprite bound to objectEvent. Followers (short/tall/long
+// grass, sand pile, hot springs, flowing-water feet, shadow, reflection) normally self-destruct a frame
+// after their parent leaves the terrain. But the paths that reset an object's ground-effect state in
+// place — ResetObjectEventFldEffData, run for every object on every camera jump, and object removal —
+// clear the gating flags / re-arm the spawn without giving the follower that frame to clean up. The
+// orphan then re-adopts the same object while a fresh follower spawns alongside it, leaking one sprite
+// per object per event until OAM saturates and the per-scanline OBJ limit starts dropping other sprites.
+// Reaping here ties each follower's lifetime to the object. Followers store their parent link in their
+// sprite data; the layout differs by effect (see each effect's data macros above).
+void RemoveFollowerFieldEffectSprites(struct ObjectEvent *objectEvent)
+{
+    u8 i;
+    u8 objEventId = (u8)(objectEvent - gObjectEvents);
+    u8 localId = objectEvent->localId;
+    u8 mapNum = objectEvent->mapNum;
+    u8 mapGroup = objectEvent->mapGroup;
+
+    for (i = 0; i < MAX_SPRITES; i++)
+    {
+        struct Sprite *sprite = &gSprites[i];
+
+        if (!sprite->inUse)
+            continue;
+
+        // Followers tagged with the parent's (localId, mapNum, mapGroup) in data[0..2].
+        if (sprite->callback == UpdateShortGrassFieldEffect
+         || sprite->callback == UpdateSandPileFieldEffect
+         || sprite->callback == UpdateHotSpringsWaterFieldEffect
+         || sprite->callback == UpdateFeetInFlowingWaterFieldEffect
+         || sprite->callback == UpdateShadowFieldEffect)
+        {
+            if ((u8)sprite->data[0] != localId || (u8)sprite->data[1] != mapNum || (u8)sprite->data[2] != mapGroup)
+                continue;
+            if (sprite->callback == UpdateShortGrassFieldEffect)
+                FieldEffectStop(sprite, FLDEFF_SHORT_GRASS);
+            else if (sprite->callback == UpdateSandPileFieldEffect)
+                FieldEffectStop(sprite, FLDEFF_SAND_PILE);
+            else if (sprite->callback == UpdateHotSpringsWaterFieldEffect)
+                FieldEffectStop(sprite, FLDEFF_HOT_SPRINGS_WATER);
+            else if (sprite->callback == UpdateFeetInFlowingWaterFieldEffect)
+                FieldEffectStop(sprite, FLDEFF_FEET_IN_FLOWING_WATER);
+            else
+                FieldEffectStop(sprite, FLDEFF_SHADOW);
+        }
+        // Tall/long grass: localId = data[3] >> 8, mapNum = data[3] (low byte), mapGroup = data[4].
+        else if (sprite->callback == UpdateTallGrassFieldEffect || sprite->callback == UpdateLongGrassFieldEffect)
+        {
+            if ((u8)(sprite->data[3] >> 8) != localId || (u8)sprite->data[3] != mapNum || (u8)sprite->data[4] != mapGroup)
+                continue;
+            FieldEffectStop(sprite, sprite->callback == UpdateTallGrassFieldEffect ? FLDEFF_TALL_GRASS : FLDEFF_LONG_GRASS);
+        }
+        // Reflection: a copy sprite keyed by the parent's object-event id in data[0]. It owns no field-
+        // effect graphics (it copies the parent's), so just release it, mirroring its own self-destruct.
+        else if (sprite->callback == UpdateObjectReflectionSprite)
+        {
+            if ((u8)sprite->data[0] == objEventId)
+                sprite->inUse = FALSE;
+        }
+    }
+}
+
 u32 FldEff_Bubbles(void)
 {
     u8 spriteId;
