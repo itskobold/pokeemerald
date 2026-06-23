@@ -69,10 +69,6 @@ static EWRAM_DATA u8 sYesNoWindowId = 0;
 static EWRAM_DATA u8 sHofPCTopBarWindowId = 0;
 static EWRAM_DATA u16 sFiller = 0;  // needed to align
 static EWRAM_DATA bool8 sScheduledBgCopiesToVram[4] = {FALSE};
-// Tilemap copies held back until the DMA3 queue has drained. A full window commit (COPYWIN_FULL)
-// queues the window's tile graphics, then defers its tilemap here so the box isn't shown referencing
-// glyph tiles whose transfer slipped to a later frame (the empty-box flash). Flushed below once idle.
-static EWRAM_DATA bool8 sDeferredBgCopiesToVram[4] = {FALSE};
 static EWRAM_DATA u16 sTempTileDataBufferIdx = 0;
 static EWRAM_DATA void *sTempTileDataBuffer[0x20] = {NULL};
 
@@ -1732,40 +1728,11 @@ u8 InitMenuActionGrid(u8 windowId, u8 optionWidth, u8 columns, u8 rows, u8 initi
 void ClearScheduledBgCopiesToVram(void)
 {
     memset(sScheduledBgCopiesToVram, 0, sizeof(sScheduledBgCopiesToVram));
-    memset(sDeferredBgCopiesToVram, 0, sizeof(sDeferredBgCopiesToVram));
 }
 
 void ScheduleBgCopyTilemapToVram(u8 bgId)
 {
     sScheduledBgCopiesToVram[bgId] = TRUE;
-}
-
-// Holds a bg's tilemap copy until the DMA3 queue is empty (see sDeferredBgCopiesToVram). Used to
-// commit a window's tilemap only after its tile graphics have actually landed in VRAM.
-void DeferBgCopyTilemapToVramUntilDma3Idle(u8 bgId)
-{
-    sDeferredBgCopiesToVram[bgId] = TRUE;
-}
-
-// Commits any deferred window tilemaps once the DMA3 queue has fully drained, so a window's tilemap
-// is never shown referencing tile graphics whose transfer slipped to a later frame. Called once per
-// frame from the main loop (AgbMain) rather than DoScheduledBgTilemapCopiesToVram, because most
-// COPYWIN_FULL callers don't pump that per-context flush — only the universal loop reaches them all.
-void FlushDeferredBgCopiesToVram(void)
-{
-    u32 i;
-
-    if (!IsDma3ManagerIdle())
-        return;
-
-    for (i = 0; i < 4; i++)
-    {
-        if (sDeferredBgCopiesToVram[i] == TRUE)
-        {
-            CopyBgTilemapBufferToVram(i);
-            sDeferredBgCopiesToVram[i] = FALSE;
-        }
-    }
 }
 
 void DoScheduledBgTilemapCopiesToVram(void)
@@ -1774,25 +1741,21 @@ void DoScheduledBgTilemapCopiesToVram(void)
     {
         CopyBgTilemapBufferToVram(0);
         sScheduledBgCopiesToVram[0] = FALSE;
-        sDeferredBgCopiesToVram[0] = FALSE; // a full copy of this bg supersedes the deferred one
     }
     if (sScheduledBgCopiesToVram[1] == TRUE)
     {
         CopyBgTilemapBufferToVram(1);
         sScheduledBgCopiesToVram[1] = FALSE;
-        sDeferredBgCopiesToVram[1] = FALSE;
     }
     if (sScheduledBgCopiesToVram[2] == TRUE)
     {
         CopyBgTilemapBufferToVram(2);
         sScheduledBgCopiesToVram[2] = FALSE;
-        sDeferredBgCopiesToVram[2] = FALSE;
     }
     if (sScheduledBgCopiesToVram[3] == TRUE)
     {
         CopyBgTilemapBufferToVram(3);
         sScheduledBgCopiesToVram[3] = FALSE;
-        sDeferredBgCopiesToVram[3] = FALSE;
     }
 }
 

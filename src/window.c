@@ -3,7 +3,6 @@
 #include "malloc.h"
 #include "bg.h"
 #include "blit.h"
-#include "menu.h"
 
 // This global is set to 0 and never changed.
 COMMON_DATA u8 gTransparentTileNumber = 0;
@@ -279,9 +278,9 @@ void CopyWindowToVram(u8 windowId, u8 mode)
         break;
     case COPYWIN_FULL:
         LoadBgTiles(windowLocal.window.bg, windowLocal.tileData, windowSize, windowLocal.window.baseBlock);
-        // Defer the tilemap until the tiles just queued above have transferred, so the window never
-        // appears for a frame referencing graphics still mid-transfer (the empty-box flash).
-        DeferBgCopyTilemapToVramUntilDma3Idle(windowLocal.window.bg);
+        // DMA3 is FIFO, so this tilemap copy lands after the tiles queued above — the window never
+        // appears referencing graphics still mid-transfer (the empty-box flash).
+        CopyBgTilemapBufferToVram(windowLocal.window.bg);
         break;
     }
 }
@@ -313,8 +312,8 @@ void CopyWindowRectToVram(u32 windowId, u32 mode, u32 x, u32 y, u32 w, u32 h)
             break;
         case COPYWIN_FULL:
             LoadBgTiles(windowLocal.window.bg, windowLocal.tileData + (rectPos * 32), rectSize, windowLocal.window.baseBlock + rectPos);
-            // See CopyWindowToVram: hold the tilemap until the tiles above land in VRAM.
-            DeferBgCopyTilemapToVramUntilDma3Idle(windowLocal.window.bg);
+            // FIFO queue: this tilemap copy lands after the tiles above (see CopyWindowToVram).
+            CopyBgTilemapBufferToVram(windowLocal.window.bg);
             break;
         }
     }

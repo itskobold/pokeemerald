@@ -34,13 +34,6 @@ u32 gDma3DeferredAtVBlank;     // bytes still pending after processing returned 
 u32 gDma3PeakQueuedBytes;      // high-water mark of gDma3QueuedAtVBlank since last reset
 u8 gDma3BailReason;
 
-// TRUE when no DMA3 requests are pending (queue fully drained). Used to defer work — e.g. a
-// window's tilemap commit — until a large preceding transfer has actually landed in VRAM.
-bool32 IsDma3ManagerIdle(void)
-{
-    return sDma3QueuedBytes == 0;
-}
-
 void ClearDma3Requests(void)
 {
     int i;
