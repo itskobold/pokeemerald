@@ -86,7 +86,6 @@ SECTIONS {
         src/dodrio_berry_picking.o(.text);
         src/pokemon_jump.o(.text);
         src/minigame_countdown.o(.text);
-        src/rtc.o(.text);
         src/main_menu.o(.text);
         src/battle_controllers.o(.text);
         src/decompress.o(.text);
@@ -114,7 +113,7 @@ SECTIONS {
         src/trade.o(.text);
         src/berry_blender.o(.text);
         src/play_time.o(.text);
-        src/game_time.o(.text);
+        src/clock.o(.text);
         src/new_game.o(.text);
         src/overworld.o(.text);
         src/fieldmap.o(.text);
@@ -132,8 +131,6 @@ SECTIONS {
         src/event_data.o(.text);
         src/coord_event_weather.o(.text);
         src/field_tasks.o(.text);
-        src/clock.o(.text);
-        src/reset_rtc_screen.o(.text);
         src/start_menu.o(.text);
         src/tileset_anims.o(.text);
         src/palette.o(.text);
@@ -362,7 +359,6 @@ SECTIONS {
         src/agb_flash.o(.text);
         src/agb_flash_1m.o(.text);
         src/agb_flash_mx.o(.text);
-        src/siirtc.o(.text);
         src/librfu_stwi.o(.text);
         src/librfu_intr.o(.text);
         src/librfu_rfu.o(.text);
@@ -472,7 +468,6 @@ SECTIONS {
         src/dodrio_berry_picking.o(.rodata);
         src/pokemon_jump.o(.rodata);
         src/minigame_countdown.o(.rodata);
-        src/rtc.o(.rodata);
         src/main_menu.o(.rodata);
         src/battle_controllers.o(.rodata);
         src/digit_obj_util.o(.rodata);
@@ -496,7 +491,7 @@ SECTIONS {
         src/pokeball.o(.rodata);
         src/trade.o(.rodata);
         src/berry_blender.o(.rodata);
-        src/game_time.o(.rodata);
+        src/clock.o(.rodata);
         src/new_game.o(.rodata);
         src/overworld.o(.rodata);
         src/tilesets.o(.rodata);
@@ -511,7 +506,6 @@ SECTIONS {
         src/field_control_avatar.o(.rodata);
         src/coord_event_weather.o(.rodata);
         src/field_tasks.o(.rodata);
-        src/reset_rtc_screen.o(.rodata);
         src/start_menu.o(.rodata);
         src/tileset_anims.o(.rodata);
         src/palette.o(.rodata);
@@ -1244,7 +1238,6 @@ SECTIONS {
         src/agb_flash_1m.o(.rodata);
         src/agb_flash_mx.o(.rodata);
         src/agb_flash_le.o(.rodata);
-        src/siirtc.o(.rodata);
         src/librfu_rfu.o(.rodata);
         src/librfu_sio32id.o(.rodata);
         *libgcc.a:_divdi3.o(.rodata);

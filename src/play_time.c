@@ -1,6 +1,6 @@
 #include "global.h"
 #include "play_time.h"
-#include "game_time.h"
+#include "clock.h"
 
 enum
 {
@@ -37,7 +37,7 @@ void PlayTimeCounter_Stop(void)
 void PlayTimeCounter_Update(void)
 {
     // The game clock ticks regardless of whether play time is being counted.
-    GameClock_Update();
+    Clock_Update();
 
     if (sPlayTimeCounterState != RUNNING)
         return;

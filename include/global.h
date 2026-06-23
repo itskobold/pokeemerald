@@ -195,16 +195,8 @@ struct UCoords32
     u32 y;
 };
 
-struct Time
-{
-    /*0x00*/ s16 days;
-    /*0x02*/ s8 hours;
-    /*0x03*/ s8 minutes;
-    /*0x04*/ s8 seconds;
-};
-
 // Calendar date + time of day, packed into 6 bytes via u16 bitfields.
-struct GameClock
+struct Clock
 {
     /*0x0*/ u16 seconds:6; // 0-59
              u16 minutes:6; // 0-59
@@ -537,9 +529,7 @@ struct SaveBlock2
              //u16 padding1:4;
              //u16 padding2;
     /*0x18*/ struct Pokedex pokedex;
-    /*0x90*/ u8 filler_90[0x8];
-    /*0x98*/ struct Time localTimeOffset;
-    /*0xA0*/ struct Time lastBerryTreeUpdate;
+    /*0x90*/ u8 filler_90[0x18]; // formerly RTC localTimeOffset + lastBerryTreeUpdate
     /*0xA8*/ u32 gcnLinkFlags; // Read by Pokémon Colosseum/XD
     /*0xAC*/ u32 encryptionKey;
     /*0xB0*/ struct PlayersApprentice playerApprentice;
@@ -1089,7 +1079,7 @@ struct SaveBlock1
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
     /*0x3598*/ struct ObjectEventWander objectEventWanderStore[OBJECT_EVENT_WANDER_COUNT]; // 0x150 bytes
-    /*0x36E8*/ struct GameClock gameClock; // 8 bytes
+    /*0x36E8*/ struct Clock gameClock; // 8 bytes
     /*0x36F0*/ u8 unused_3598[0x28]; // Remaining filler from the old camera-focus slot (now gCameraPos).
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;

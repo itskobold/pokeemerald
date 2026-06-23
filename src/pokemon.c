@@ -26,7 +26,7 @@
 #include "pokemon_summary_screen.h"
 #include "pokemon_storage_system.h"
 #include "random.h"
-#include "rtc.h"
+#include "clock.h"
 #include "sound.h"
 #include "string_util.h"
 #include "strings.h"
@@ -5522,13 +5522,12 @@ u16 GetEvolutionTargetSpecies(struct Pokemon *mon, u8 mode, u16 evolutionItem)
                     targetSpecies = gEvolutionTable[species][i].targetSpecies;
                 break;
             case EVO_FRIENDSHIP_DAY:
-                RtcCalcLocalTime();
-                if (gLocalTime.hours >= DAY_EVO_HOUR_BEGIN && gLocalTime.hours < DAY_EVO_HOUR_END && friendship >= FRIENDSHIP_EVO_THRESHOLD)
+                if (gSaveBlock1Ptr->gameClock.hours >= DAY_EVO_HOUR_BEGIN && gSaveBlock1Ptr->gameClock.hours < DAY_EVO_HOUR_END && friendship >= FRIENDSHIP_EVO_THRESHOLD)
                     targetSpecies = gEvolutionTable[species][i].targetSpecies;
                 break;
             case EVO_FRIENDSHIP_NIGHT:
-                RtcCalcLocalTime();
-                if (gLocalTime.hours >= NIGHT_EVO_HOUR_BEGIN && gLocalTime.hours < NIGHT_EVO_HOUR_END && friendship >= FRIENDSHIP_EVO_THRESHOLD)
+                // hours is an unsigned bitfield, so the NIGHT_EVO_HOUR_BEGIN (0) lower bound is implicit.
+                if (gSaveBlock1Ptr->gameClock.hours < NIGHT_EVO_HOUR_END && friendship >= FRIENDSHIP_EVO_THRESHOLD)
                     targetSpecies = gEvolutionTable[species][i].targetSpecies;
                 break;
             case EVO_LEVEL:

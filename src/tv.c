@@ -1,5 +1,5 @@
 #include "global.h"
-#include "rtc.h"
+#include "clock.h"
 #include "overworld.h"
 #include "random.h"
 #include "event_data.h"
@@ -2631,7 +2631,7 @@ void DoPokeNews(void)
         {
             // News event is occurring, make comment depending on how much time is left
             gSaveBlock1Ptr->pokeNews[i].state = POKENEWS_STATE_ACTIVE;
-            if (gLocalTime.hours < 20)
+            if (gSaveBlock1Ptr->gameClock.hours < 20)
                 ShowFieldMessage(sPokeNewsTextGroup_Ongoing[gSaveBlock1Ptr->pokeNews[i].kind]);
             else
                 ShowFieldMessage(sPokeNewsTextGroup_Ending[gSaveBlock1Ptr->pokeNews[i].kind]);

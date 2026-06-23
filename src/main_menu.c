@@ -24,7 +24,6 @@
 #include "pokedex.h"
 #include "pokemon.h"
 #include "random.h"
-#include "rtc.h"
 #include "save.h"
 #include "scanline_effect.h"
 #include "sound.h"
@@ -182,7 +181,6 @@ static void Task_WaitForSaveFileErrorWindow(u8);
 static void CreateMainMenuErrorWindow(const u8 *);
 static void ClearMainMenuWindowTilemap(const struct WindowTemplate *);
 static void Task_DisplayMainMenu(u8);
-static void Task_WaitForBatteryDryErrorWindow(u8);
 static void MainMenu_FormatSavegameText(void);
 static void HighlightSelectedMainMenuItem(u8, u8, s16);
 static void Task_HandleMainMenuInput(u8);
@@ -714,25 +712,6 @@ static void Task_MainMenuCheckBattery(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
 
-        if (!(RtcGetErrorStatus() & RTC_ERR_FLAG_MASK))
-        {
-            gTasks[taskId].func = Task_DisplayMainMenu;
-        }
-        else
-        {
-            CreateMainMenuErrorWindow(gText_BatteryRunDry);
-            gTasks[taskId].func = Task_WaitForBatteryDryErrorWindow;
-        }
-    }
-}
-
-static void Task_WaitForBatteryDryErrorWindow(u8 taskId)
-{
-    RunTextPrinters();
-    if (!IsTextPrinterActive(7) && (JOY_NEW(A_BUTTON)))
-    {
-        ClearWindowTilemap(7);
-        ClearMainMenuWindowTilemap(&sWindowTemplates_MainMenu[7]);
         gTasks[taskId].func = Task_DisplayMainMenu;
     }
 }

@@ -1,14 +1,14 @@
 #include "global.h"
 #include "bg.h"
-#include "clock.h"
 #include "decompress.h"
 #include "event_data.h"
+#include "clock.h"
 #include "gpu_regs.h"
 #include "graphics.h"
 #include "main.h"
 #include "menu.h"
+#include "overworld.h"
 #include "palette.h"
-#include "rtc.h"
 #include "scanline_effect.h"
 #include "sound.h"
 #include "strings.h"
@@ -22,20 +22,11 @@
 #include "constants/songs.h"
 
 static void CB2_WallClock(void);
-static void Task_SetClock_WaitFadeIn(u8 taskId);
-static void Task_SetClock_HandleInput(u8 taskId);
-static void Task_SetClock_AskConfirm(u8 taskId);
-static void Task_SetClock_HandleConfirmInput(u8 taskId);
-static void Task_SetClock_Confirmed(u8 taskId);
-static void Task_SetClock_Exit(u8 taskId);
 static void Task_ViewClock_WaitFadeIn(u8 taskId);
 static void Task_ViewClock_HandleInput(u8 taskId);
 static void Task_ViewClock_FadeOut(u8 taskId);
 static void Task_ViewClock_Exit(u8 taskId);
-static u16 CalcNewMinHandAngle(u16 angle, u8 direction, u8 speed);
-static bool32 AdvanceClock(u8 taskId, u8 direction);
-static void UpdateClockPeriod(u8 taskId, u8 direction);
-static void InitClockWithRtc(u8 taskId);
+static void InitClockDisplay(u8 taskId);
 static void SpriteCB_MinuteHand(struct Sprite *sprite);
 static void SpriteCB_HourHand(struct Sprite *sprite);
 static void SpriteCB_PMIndicator(struct Sprite *sprite);
@@ -58,12 +49,6 @@ static void SpriteCB_AMIndicator(struct Sprite *sprite);
 enum {
     PERIOD_AM,
     PERIOD_PM,
-};
-
-enum {
-    MOVE_NONE,
-    MOVE_BACKWARD,
-    MOVE_FORWARD,
 };
 
 enum {
@@ -95,17 +80,6 @@ static const struct WindowTemplate sWindowTemplates[] =
         .baseBlock = 560
     },
     DUMMY_WIN_TEMPLATE
-};
-
-static const struct WindowTemplate sWindowTemplate_ConfirmYesNo =
-{
-    .bg = 0,
-    .tilemapLeft = 24,
-    .tilemapTop = 9,
-    .width = 5,
-    .height = 4,
-    .paletteNum = 14,
-    .baseBlock = 572
 };
 
 static const struct BgTemplate sBgTemplates[] =
@@ -683,22 +657,35 @@ static void WallClockInit(void)
     ShowBg(3);
 }
 
+// Special: show the wall clock displaying the current game time, then return to the field.
+void StartWallClock(void)
+{
+    SetMainCallback2(CB2_StartWallClock);
+    gMain.savedCallback = CB2_ReturnToFieldContinueScriptPlayMapMusic;
+}
+
 void CB2_StartWallClock(void)
 {
     u8 taskId;
     u8 spriteId;
+    u8 angle1;
+    u8 angle2;
 
     LoadWallClockGraphics();
     LZ77UnCompVram(gWallClockStart_Tilemap, (u16 *)BG_SCREEN_ADDR(7));
 
-    taskId = CreateTask(Task_SetClock_WaitFadeIn, 0);
-    gTasks[taskId].tHours = 10;
-    gTasks[taskId].tMinutes = 0;
-    gTasks[taskId].tMoveDir = 0;
-    gTasks[taskId].tPeriod = 0;
-    gTasks[taskId].tMoveSpeed = 0;
-    gTasks[taskId].tMinuteHandAngle = 0;
-    gTasks[taskId].tHourHandAngle = 300;
+    taskId = CreateTask(Task_ViewClock_WaitFadeIn, 0);
+    InitClockDisplay(taskId);
+    if (gTasks[taskId].tPeriod == PERIOD_AM)
+    {
+        angle1 = 45;
+        angle2 = 90;
+    }
+    else
+    {
+        angle1 = 90;
+        angle2 = 135;
+    }
 
     spriteId = CreateSprite(&sSpriteTemplate_MinuteHand, 120, 80, 1);
     gSprites[spriteId].sTaskId = taskId;
@@ -712,15 +699,15 @@ void CB2_StartWallClock(void)
 
     spriteId = CreateSprite(&sSpriteTemplate_PM, 120, 80, 2);
     gSprites[spriteId].sTaskId = taskId;
-    gSprites[spriteId].data[1] = 45;
+    gSprites[spriteId].data[1] = angle1;
 
     spriteId = CreateSprite(&sSpriteTemplate_AM, 120, 80, 2);
     gSprites[spriteId].sTaskId = taskId;
-    gSprites[spriteId].data[1] = 90;
+    gSprites[spriteId].data[1] = angle2;
 
     WallClockInit();
 
-    AddTextPrinterParameterized(WIN_BUTTON_LABEL, FONT_NORMAL, gText_Confirm3, 0, 1, 0, NULL);
+    AddTextPrinterParameterized(WIN_BUTTON_LABEL, FONT_NORMAL, gText_Cancel4, 0, 1, 0, NULL);
     PutWindowTilemap(WIN_BUTTON_LABEL);
     ScheduleBgCopyTilemapToVram(2);
 }
@@ -736,7 +723,7 @@ void CB2_ViewWallClock(void)
     LZ77UnCompVram(gWallClockView_Tilemap, (u16 *)BG_SCREEN_ADDR(7));
 
     taskId = CreateTask(Task_ViewClock_WaitFadeIn, 0);
-    InitClockWithRtc(taskId);
+    InitClockDisplay(taskId);
     if (gTasks[taskId].tPeriod == PERIOD_AM)
     {
         angle1 = 45;
@@ -782,98 +769,6 @@ static void CB2_WallClock(void)
     UpdatePaletteFade();
 }
 
-static void Task_SetClock_WaitFadeIn(u8 taskId)
-{
-    if (!gPaletteFade.active)
-    {
-        gTasks[taskId].func = Task_SetClock_HandleInput;
-    }
-}
-
-static void Task_SetClock_HandleInput(u8 taskId)
-{
-    if (gTasks[taskId].tMinuteHandAngle % 6)
-    {
-        gTasks[taskId].tMinuteHandAngle = CalcNewMinHandAngle(gTasks[taskId].tMinuteHandAngle, gTasks[taskId].tMoveDir, gTasks[taskId].tMoveSpeed);
-    }
-    else
-    {
-        gTasks[taskId].tMinuteHandAngle = gTasks[taskId].tMinutes * 6;
-        gTasks[taskId].tHourHandAngle = (gTasks[taskId].tHours % 12) * 30 + (gTasks[taskId].tMinutes / 10) * 5;
-        if (JOY_NEW(A_BUTTON))
-        {
-            gTasks[taskId].func = Task_SetClock_AskConfirm;
-        }
-        else
-        {
-            gTasks[taskId].tMoveDir = MOVE_NONE;
-
-            if (JOY_HELD(DPAD_LEFT))
-                gTasks[taskId].tMoveDir = MOVE_BACKWARD;
-
-            if (JOY_HELD(DPAD_RIGHT))
-                gTasks[taskId].tMoveDir = MOVE_FORWARD;
-
-            if (gTasks[taskId].tMoveDir != MOVE_NONE)
-            {
-                if (gTasks[taskId].tMoveSpeed < 0xFF)
-                    gTasks[taskId].tMoveSpeed++;
-
-                gTasks[taskId].tMinuteHandAngle = CalcNewMinHandAngle(gTasks[taskId].tMinuteHandAngle, gTasks[taskId].tMoveDir, gTasks[taskId].tMoveSpeed);
-                AdvanceClock(taskId, gTasks[taskId].tMoveDir);
-            }
-            else
-            {
-                gTasks[taskId].tMoveSpeed = 0;
-            }
-        }
-    }
-}
-
-static void Task_SetClock_AskConfirm(u8 taskId)
-{
-    DrawStdFrameWithCustomTileAndPalette(WIN_MSG, FALSE, 0x250, 0x0d);
-    AddTextPrinterParameterized(WIN_MSG, FONT_NORMAL, gText_IsThisTheCorrectTime, 0, 1, 0, NULL);
-    PutWindowTilemap(WIN_MSG);
-    ScheduleBgCopyTilemapToVram(0);
-    CreateYesNoMenu(&sWindowTemplate_ConfirmYesNo, 0x250, 0x0d, 1);
-    gTasks[taskId].func = Task_SetClock_HandleConfirmInput;
-}
-
-static void Task_SetClock_HandleConfirmInput(u8 taskId)
-{
-    switch (Menu_ProcessInputNoWrapClearOnChoose())
-    {
-    case 0: // YES
-        PlaySE(SE_SELECT);
-        gTasks[taskId].func = Task_SetClock_Confirmed;
-        break;
-    case 1: // NO
-    case MENU_B_PRESSED:
-        PlaySE(SE_SELECT);
-        ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-        ClearWindowTilemap(WIN_MSG);
-        gTasks[taskId].func = Task_SetClock_HandleInput;
-        break;
-    }
-}
-
-static void Task_SetClock_Confirmed(u8 taskId)
-{
-    RtcInitLocalTimeOffset(gTasks[taskId].tHours, gTasks[taskId].tMinutes);
-    BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-    gTasks[taskId].func = Task_SetClock_Exit;
-}
-
-static void Task_SetClock_Exit(u8 taskId)
-{
-    if (!gPaletteFade.active)
-    {
-        FreeAllWindowBuffers();
-        SetMainCallback2(gMain.savedCallback);
-    }
-}
-
 static void Task_ViewClock_WaitFadeIn(u8 taskId)
 {
     if (!gPaletteFade.active)
@@ -882,7 +777,7 @@ static void Task_ViewClock_WaitFadeIn(u8 taskId)
 
 static void Task_ViewClock_HandleInput(u8 taskId)
 {
-    InitClockWithRtc(taskId);
+    InitClockDisplay(taskId);
     if (JOY_NEW(A_BUTTON | B_BUTTON))
         gTasks[taskId].func = Task_ViewClock_FadeOut;
 }
@@ -899,120 +794,16 @@ static void Task_ViewClock_Exit(u8 taskId)
         SetMainCallback2(gMain.savedCallback);
 }
 
-static u8 CalcMinHandDelta(u16 speed)
+static void InitClockDisplay(u8 taskId)
 {
-    if (speed > 60)
-        return 6;
-    if (speed > 30)
-        return 3;
-    if (speed > 10)
-        return 2;
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
 
-    return 1;
-}
-
-static u16 CalcNewMinHandAngle(u16 angle, u8 direction, u8 speed)
-{
-    u8 delta = CalcMinHandDelta(speed);
-    switch (direction)
-    {
-    case MOVE_BACKWARD:
-        if (angle)
-            angle -= delta;
-        else
-            angle = 360 - delta;
-        break;
-    case MOVE_FORWARD:
-        if (angle < 360 - delta)
-            angle += delta;
-        else
-            angle = 0;
-        break;
-    }
-    return angle;
-}
-
-static bool32 AdvanceClock(u8 taskId, u8 direction)
-{
-    switch (direction)
-    {
-    case MOVE_BACKWARD:
-        if (gTasks[taskId].tMinutes > 0)
-        {
-            gTasks[taskId].tMinutes--;
-        }
-        else
-        {
-            gTasks[taskId].tMinutes = 59;
-
-            if (gTasks[taskId].tHours > 0)
-                gTasks[taskId].tHours--;
-            else
-                gTasks[taskId].tHours = 23;
-
-            UpdateClockPeriod(taskId, direction);
-        }
-        break;
-    case MOVE_FORWARD:
-        if (gTasks[taskId].tMinutes < 59)
-        {
-            gTasks[taskId].tMinutes++;
-        }
-        else
-        {
-            gTasks[taskId].tMinutes = 0;
-
-            if (gTasks[taskId].tHours < 23)
-                gTasks[taskId].tHours++;
-            else
-                gTasks[taskId].tHours = 0;
-
-            UpdateClockPeriod(taskId, direction);
-        }
-        break;
-    }
-    return FALSE;
-}
-
-static void UpdateClockPeriod(u8 taskId, u8 direction)
-{
-    u8 hours = gTasks[taskId].tHours;
-    switch (direction)
-    {
-    case MOVE_BACKWARD:
-        switch (hours)
-        {
-        case 11:
-            gTasks[taskId].tPeriod = PERIOD_AM;
-            break;
-        case 23:
-            gTasks[taskId].tPeriod = PERIOD_PM;
-            break;
-        }
-        break;
-    case MOVE_FORWARD:
-        switch (hours)
-        {
-        case 0:
-            gTasks[taskId].tPeriod = PERIOD_AM;
-            break;
-        case 12:
-            gTasks[taskId].tPeriod = PERIOD_PM;
-            break;
-        }
-        break;
-    }
-}
-
-static void InitClockWithRtc(u8 taskId)
-{
-    RtcCalcLocalTime();
-    gTasks[taskId].tHours = gLocalTime.hours;
-    gTasks[taskId].tMinutes = gLocalTime.minutes;
+    gTasks[taskId].tHours = clock->hours;
+    gTasks[taskId].tMinutes = clock->minutes;
     gTasks[taskId].tMinuteHandAngle = gTasks[taskId].tMinutes * 6;
     gTasks[taskId].tHourHandAngle = (gTasks[taskId].tHours % 12) * 30 + (gTasks[taskId].tMinutes / 10) * 5;
 
-    if (gLocalTime.hours < 12)
+    if (clock->hours < 12)
         gTasks[taskId].tPeriod = PERIOD_AM;
     else
         gTasks[taskId].tPeriod = PERIOD_PM;

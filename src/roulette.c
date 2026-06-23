@@ -16,7 +16,7 @@
 #include "palette_util.h"
 #include "random.h"
 #include "roulette.h"
-#include "rtc.h"
+#include "clock.h"
 #include "scanline_effect.h"
 #include "script.h"
 #include "sound.h"
@@ -1154,7 +1154,6 @@ static void InitRouletteTableData(void)
             break;
         }
     }
-    RtcCalcLocalTime();
 }
 
 // Task data for the roulette game tasks, starting with Task_StartPlaying
@@ -1561,7 +1560,7 @@ static u8 GetRandomForBallTravelDistance(u16 ballNum, u16 rand)
     case HAS_SHROOMISH:
     case HAS_TAILLOW:
         // one of the two is in party
-        if (gLocalTime.hours > 3 && gLocalTime.hours < 10)
+        if (gSaveBlock1Ptr->gameClock.hours > 3 && gSaveBlock1Ptr->gameClock.hours < 10)
         {
             if (ballNum < BALLS_PER_ROUND * 2 || (rand & 1))
                 return sRouletteTables[sRoulette->tableId].randDistanceLow / 2;
@@ -1579,7 +1578,7 @@ static u8 GetRandomForBallTravelDistance(u16 ballNum, u16 rand)
         break;
     case HAS_SHROOMISH | HAS_TAILLOW:
         // both are in party
-        if (gLocalTime.hours > 3 && gLocalTime.hours < 11)
+        if (gSaveBlock1Ptr->gameClock.hours > 3 && gSaveBlock1Ptr->gameClock.hours < 11)
         {
             if (ballNum < BALLS_PER_ROUND || (rand & 1))
                 return sRouletteTables[sRoulette->tableId].randDistanceLow / 2;
@@ -1598,7 +1597,7 @@ static u8 GetRandomForBallTravelDistance(u16 ballNum, u16 rand)
     case 0:
     default:
         // neither is in party
-        if (gLocalTime.hours > 3 && gLocalTime.hours < 10)
+        if (gSaveBlock1Ptr->gameClock.hours > 3 && gSaveBlock1Ptr->gameClock.hours < 10)
         {
             if (!(rand & 3))
                 return 1;
@@ -1645,7 +1644,7 @@ static void Task_InitBallRoll(u8 taskId)
     randTravelMod = GetRandomForBallTravelDistance(gTasks[taskId].tTotalBallNum, rand);
     randTravelDist = (rand % randTravelMod) - (randTravelMod / 2);
 
-    if (gLocalTime.hours < 13)
+    if (gSaveBlock1Ptr->gameClock.hours < 13)
         startAngleId = 0;
     else
         startAngleId = 1;

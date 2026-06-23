@@ -7,7 +7,7 @@
 #include "field_screen_effect.h"
 #include "fieldmap.h"
 #include "field_weather.h"
-#include "game_time.h"
+#include "clock.h"
 #include "overworld.h"
 #include "item.h"
 #include "list_menu.h"
@@ -18,7 +18,6 @@
 #include "pokedex.h"
 #include "script.h"
 #include "script_menu.h"
-#include "siirtc.h" // MONTH_* constants for the clock readout
 #include "sound.h"
 #include "string_util.h"
 #include "task.h"
@@ -601,7 +600,7 @@ static void Debug_OpenMainMenu(void)
 
 static void Debug_DrawClockWindow(void)
 {
-    struct GameClock *clock = &gSaveBlock1Ptr->gameClock;
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
     struct WindowTemplate template;
     u8 line1[24];
     u8 line2[24];
@@ -628,7 +627,7 @@ static void Debug_DrawClockWindow(void)
     StringAppend(line1, gStringVar1);
     StringAppend(line1, clock->hours < 12 ? sDebugText_Clock_AM : sDebugText_Clock_PM);
     StringAppend(line1, sDebugText_Clock_Comma);
-    StringAppend(line1, sDebugClockWeekdays[GameClock_GetDayOfWeek()]);
+    StringAppend(line1, sDebugClockWeekdays[Clock_GetDayOfWeek()]);
 
     // Line 2: "SEPT. 15, YR. 0"
     StringCopy(line2, sDebugClockMonths[month - 1]);
@@ -1901,7 +1900,7 @@ static bool32 Debug_ClockFieldHasCoarseStep(u8 field)
 // Opens the shared clock-field box on the given CLOCK_FIELD_*, seeded with the current value.
 static void Debug_OpenClockSetBox(u8 field)
 {
-    struct GameClock *clock = &gSaveBlock1Ptr->gameClock;
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
 
     sClockSetField = field;
     switch (field)
@@ -1975,7 +1974,7 @@ static void Debug_TearDownClockSetBox(u8 taskId)
     sDebugMenuOpen = FALSE;
 }
 
-// Commits the box (A): writes the edited field through its game_time setter (which clamps the date),
+// Commits the box (A): writes the edited field through its clock setter (which clamps the date),
 // then returns to the clock menu so several fields can be set in a row.
 static void Debug_CommitClockSetBox(u8 taskId)
 {
@@ -1985,12 +1984,12 @@ static void Debug_CommitClockSetBox(u8 taskId)
     Debug_TearDownClockSetBox(taskId);
     switch (field)
     {
-    case CLOCK_FIELD_HOURS:   GameClock_SetHours(value);   break;
-    case CLOCK_FIELD_MINUTES: GameClock_SetMinutes(value); break;
-    case CLOCK_FIELD_DAY:     GameClock_SetDay(value);     break;
-    case CLOCK_FIELD_MONTH:   GameClock_SetMonth(value);   break;
-    case CLOCK_FIELD_YEAR:    GameClock_SetYear(value);    break;
-    case CLOCK_FIELD_TIMESCALE: GameClock_SetTimeScale(value); break;
+    case CLOCK_FIELD_HOURS:   Clock_SetHours(value);   break;
+    case CLOCK_FIELD_MINUTES: Clock_SetMinutes(value); break;
+    case CLOCK_FIELD_DAY:     Clock_SetDay(value);     break;
+    case CLOCK_FIELD_MONTH:   Clock_SetMonth(value);   break;
+    case CLOCK_FIELD_YEAR:    Clock_SetYear(value);    break;
+    case CLOCK_FIELD_TIMESCALE: Clock_SetTimeScale(value); break;
     }
     Debug_ShowClockMenu();
 }

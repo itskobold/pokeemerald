@@ -1410,7 +1410,7 @@
 #define FLAG_SYS_TV_START                           (SYSTEM_FLAGS + 0x32)
 #define FLAG_SYS_CHANGED_DEWFORD_TREND              (SYSTEM_FLAGS + 0x33)
 #define FLAG_SYS_MIX_RECORD                         (SYSTEM_FLAGS + 0x34)
-#define FLAG_SYS_CLOCK_SET                          (SYSTEM_FLAGS + 0x35)
+#define FLAG_UNUSED_SYS_CLOCK_SET                   (SYSTEM_FLAGS + 0x35) // formerly FLAG_SYS_CLOCK_SET (RTC removed)
 #define FLAG_SYS_NATIONAL_DEX                       (SYSTEM_FLAGS + 0x36)
 #define FLAG_SYS_CAVE_SHIP                          (SYSTEM_FLAGS + 0x37) // Unused Flag, leftover from R/S debug, presumably used by Emerald's debug too
 #define FLAG_SYS_CAVE_WONDER                        (SYSTEM_FLAGS + 0x38) // Unused Flag, same as above

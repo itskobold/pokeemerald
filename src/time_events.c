@@ -4,8 +4,8 @@
 #include "field_weather.h"
 #include "pokemon.h"
 #include "random.h"
+#include "clock.h"
 #include "overworld.h"
-#include "rtc.h"
 #include "script.h"
 #include "task.h"
 
@@ -83,8 +83,7 @@ void UpdateShoalTideFlag(void)
 
     if (IsMapTypeOutdoors(GetLastUsedWarpMapType()))
     {
-        RtcCalcLocalTime();
-        if (tide[gLocalTime.hours])
+        if (tide[gSaveBlock1Ptr->gameClock.hours])
             FlagSet(FLAG_SYS_SHOAL_TIDE);
         else
             FlagClear(FLAG_SYS_SHOAL_TIDE);

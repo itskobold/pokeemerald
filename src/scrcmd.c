@@ -2,7 +2,6 @@
 #include "frontier_util.h"
 #include "battle_setup.h"
 #include "berry.h"
-#include "clock.h"
 #include "coins.h"
 #include "contest.h"
 #include "contest_util.h"
@@ -35,7 +34,7 @@
 #include "random.h"
 #include "overworld.h"
 #include "rotating_tile_puzzle.h"
-#include "rtc.h"
+#include "clock.h"
 #include "script.h"
 #include "script_menu.h"
 #include "script_movement.h"
@@ -766,22 +765,22 @@ bool8 ScrCmd_initclock(struct ScriptContext *ctx)
     u8 hour = VarGet(ScriptReadHalfword(ctx));
     u8 minute = VarGet(ScriptReadHalfword(ctx));
 
-    RtcInitLocalTimeOffset(hour, minute);
+    Clock_SetHours(hour);
+    Clock_SetMinutes(minute);
     return FALSE;
 }
 
 bool8 ScrCmd_dotimebasedevents(struct ScriptContext *ctx)
 {
-    DoTimeBasedEvents();
+    // Time-based events are now driven by the game clock's interval hooks.
     return FALSE;
 }
 
 bool8 ScrCmd_gettime(struct ScriptContext *ctx)
 {
-    RtcCalcLocalTime();
-    gSpecialVar_0x8000 = gLocalTime.hours;
-    gSpecialVar_0x8001 = gLocalTime.minutes;
-    gSpecialVar_0x8002 = gLocalTime.seconds;
+    gSpecialVar_0x8000 = gSaveBlock1Ptr->gameClock.hours;
+    gSpecialVar_0x8001 = gSaveBlock1Ptr->gameClock.minutes;
+    gSpecialVar_0x8002 = gSaveBlock1Ptr->gameClock.seconds;
     return FALSE;
 }
 

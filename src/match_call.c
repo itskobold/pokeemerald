@@ -17,7 +17,7 @@
 #include "pokemon.h"
 #include "random.h"
 #include "region_map.h"
-#include "rtc.h"
+#include "clock.h"
 #include "script.h"
 #include "script_movement.h"
 #include "sound.h"
@@ -130,7 +130,6 @@ struct BattleFrontierStreakInfo
 static EWRAM_DATA struct MatchCallState sMatchCallState = {0};
 static EWRAM_DATA struct BattleFrontierStreakInfo sBattleFrontierStreakInfo = {0};
 
-static u32 GetCurrentTotalMinutes(struct Time *);
 static u32 GetNumRegisteredTrainers(void);
 static u32 GetActiveMatchCallTrainerId(u32);
 static int GetTrainerMatchCallId(int);
@@ -1028,21 +1027,14 @@ extern const u8 gBirchDexRatingText_OnANationwideBasis[];
 
 void InitMatchCallCounters(void)
 {
-    RtcCalcLocalTime();
-    sMatchCallState.minutes = GetCurrentTotalMinutes(&gLocalTime) + 10;
+    sMatchCallState.minutes = Clock_GetTotalMinutes() + 10;
     sMatchCallState.stepCounter = 0;
-}
-
-static u32 GetCurrentTotalMinutes(struct Time *time)
-{
-    return time->days * 24 * 60 + time->hours * 60 + time->minutes;
 }
 
 static bool32 UpdateMatchCallMinutesCounter(void)
 {
     int curMinutes;
-    RtcCalcLocalTime();
-    curMinutes = GetCurrentTotalMinutes(&gLocalTime);
+    curMinutes = Clock_GetTotalMinutes();
     if (sMatchCallState.minutes > curMinutes || curMinutes - sMatchCallState.minutes > 9)
     {
         sMatchCallState.minutes = curMinutes;
@@ -1884,7 +1876,7 @@ static bool32 ShouldTrainerRequestBattle(int matchCallId)
     if (GetNumOwnedBadges() < 5)
         return FALSE;
 
-    dayCount = RtcGetLocalDayCount();
+    dayCount = Clock_GetDayCount();
     otId = GetTrainerId(gSaveBlock2Ptr->playerTrainerId) & 0xFFFF;
 
     dewfordRand = gSaveBlock1Ptr->dewfordTrends[0].rand;

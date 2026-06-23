@@ -5,7 +5,6 @@
 #include "berry.h"
 #include "bg.h"
 #include "cable_club.h"
-#include "clock.h"
 #include "debug.h"
 #include "event_data.h"
 #include "event_object_movement.h"
@@ -815,7 +814,6 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     ResetCyclingRoadChallengeData();
     RestartWildEncounterImmunitySteps();
     TryUpdateRandomTrainerRematches(mapGroup, mapNum);
-    DoTimeBasedEvents();
     SetSavedWeatherFromCurrMapHeader();
     ChooseAmbientCrySpecies();
     SetDefaultFlashLevel();
@@ -1026,8 +1024,6 @@ static void LoadMapFromWarp(bool32 a1)
     ResetCyclingRoadChallengeData();
     RestartWildEncounterImmunitySteps();
     TryUpdateRandomTrainerRematches(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
-    if (a1 != TRUE)
-        DoTimeBasedEvents();
     SetSavedWeatherFromCurrMapHeader();
     ChooseAmbientCrySpecies();
     if (isOutdoors)
@@ -1922,7 +1918,6 @@ void CB2_ContinueSavedGame(void)
         LoadSaveblockObjEventScripts();
 
     UnfreezeObjectEvents();
-    DoTimeBasedEvents();
     UpdateMiscOverworldStates();
     if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
         InitBattlePyramidMap(TRUE);
