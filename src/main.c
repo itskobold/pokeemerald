@@ -6,6 +6,7 @@
 #include "librfu.h"
 #include "m4a.h"
 #include "bg.h"
+#include "menu.h"
 #include "scanline_effect.h"
 #include "overworld.h"
 #include "play_time.h"
@@ -156,6 +157,10 @@ void AgbMain(void)
 
         PlayTimeCounter_Update();
         MapMusicMain();
+        // Commit any window tilemaps held back until their tile graphics finished transferring
+        // (DeferBgCopyTilemapToVramUntilDma3Idle). Done here, in the universal loop, so it reaches
+        // every context — most COPYWIN_FULL callers don't run DoScheduledBgTilemapCopiesToVram.
+        FlushDeferredBgCopiesToVram();
         WaitForVBlank();
     }
 }

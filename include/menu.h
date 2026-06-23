@@ -64,6 +64,8 @@ void ClearStdWindowAndFrameToTransparent(u8 windowId, bool8 copyToVram);
 void SetWindowTemplateFields(struct WindowTemplate *template, u8 bg, u8 left, u8 top, u8 width, u8 height, u8 paletteNum, u16 baseBlock);
 void DrawStdFrameWithCustomTileAndPalette(u8 windowId, bool8 copyToVram, u16 baseTileNum, u8 paletteNum);
 void ScheduleBgCopyTilemapToVram(u8 bgId);
+void DeferBgCopyTilemapToVramUntilDma3Idle(u8 bgId);
+void FlushDeferredBgCopiesToVram(void);
 void PrintMenuTable(u8 windowId, u8 itemCount, const struct MenuAction *menuActions);
 u8 InitMenuInUpperLeftCornerNormal(u8 windowId, u8 itemCount, u8 initialCursorPos);
 u8 Menu_GetCursorPos(void);

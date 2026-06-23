@@ -51,6 +51,7 @@ void ProcessDma3Requests(void);
 s16 RequestDma3Copy(const void *src, void *dest, u16 size, u8 mode);
 s16 RequestDma3Fill(s32 value, void *dest, u16 size, u8 mode);
 s16 CheckForSpaceForDma3Request(s16 index);
+bool32 IsDma3ManagerIdle(void);
 
 // DMA3 queue instrumentation (debug), snapshotted each VBlank by ProcessDma3Requests.
 extern u32 gDma3QueuedAtVBlank;
