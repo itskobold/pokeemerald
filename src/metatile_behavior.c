@@ -176,6 +176,15 @@ bool8 MetatileBehavior_IsJumpSouth(u8 metatileBehavior)
         return FALSE;
 }
 
+// Any ledge (jump) behavior, cardinal or diagonal.
+bool8 MetatileBehavior_IsLedge(u8 metatileBehavior)
+{
+    if (metatileBehavior >= MB_JUMP_EAST && metatileBehavior <= MB_JUMP_SOUTHWEST)
+        return TRUE;
+    else
+        return FALSE;
+}
+
 bool8 MetatileBehavior_IsPokeGrass(u8 metatileBehavior)
 {
     if (metatileBehavior == MB_TALL_GRASS || metatileBehavior == MB_LONG_GRASS)
@@ -925,7 +934,8 @@ bool8 MetatileBehavior_IsEastBlocked(u8 metatileBehavior)
      || metatileBehavior == MB_IMPASSABLE_SOUTHEAST
      || metatileBehavior == MB_IMPASSABLE_WEST_AND_EAST
      || metatileBehavior == MB_IMPASSABLE_ALL
-     || metatileBehavior == MB_SECRET_BASE_BREAKABLE_DOOR)
+     || metatileBehavior == MB_SECRET_BASE_BREAKABLE_DOOR
+     || MetatileBehavior_IsLedge(metatileBehavior)) // ledges block all but the jump direction
         return TRUE;
     else
         return FALSE;
@@ -938,7 +948,8 @@ bool8 MetatileBehavior_IsWestBlocked(u8 metatileBehavior)
      || metatileBehavior == MB_IMPASSABLE_SOUTHWEST
      || metatileBehavior == MB_IMPASSABLE_WEST_AND_EAST
      || metatileBehavior == MB_IMPASSABLE_ALL
-     || metatileBehavior == MB_SECRET_BASE_BREAKABLE_DOOR)
+     || metatileBehavior == MB_SECRET_BASE_BREAKABLE_DOOR
+     || MetatileBehavior_IsLedge(metatileBehavior)) // ledges block all but the jump direction
         return TRUE;
     else
         return FALSE;
@@ -950,7 +961,8 @@ bool8 MetatileBehavior_IsNorthBlocked(u8 metatileBehavior)
      || metatileBehavior == MB_IMPASSABLE_NORTHEAST
      || metatileBehavior == MB_IMPASSABLE_NORTHWEST
      || metatileBehavior == MB_IMPASSABLE_SOUTH_AND_NORTH
-     || metatileBehavior == MB_IMPASSABLE_ALL)
+     || metatileBehavior == MB_IMPASSABLE_ALL
+     || MetatileBehavior_IsLedge(metatileBehavior)) // ledges block all but the jump direction
         return TRUE;
     else
         return FALSE;
@@ -962,7 +974,8 @@ bool8 MetatileBehavior_IsSouthBlocked(u8 metatileBehavior)
      || metatileBehavior == MB_IMPASSABLE_SOUTHEAST
      || metatileBehavior == MB_IMPASSABLE_SOUTHWEST
      || metatileBehavior == MB_IMPASSABLE_SOUTH_AND_NORTH
-     || metatileBehavior == MB_IMPASSABLE_ALL)
+     || metatileBehavior == MB_IMPASSABLE_ALL
+     || MetatileBehavior_IsLedge(metatileBehavior)) // ledges block all but the jump direction
         return TRUE;
     else
         return FALSE;
