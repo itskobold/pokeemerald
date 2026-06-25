@@ -34,7 +34,7 @@ struct ConnectionFlags
 };
 
 EWRAM_DATA static u16 ALIGNED(4) sBackupMapData[MAX_MAP_DATA_SIZE] = {0};
-EWRAM_DATA static u8 ALIGNED(4) sBackupMapAttrData[MAX_MAP_DATA_SIZE] = {0};
+EWRAM_DATA static u16 ALIGNED(4) sBackupMapAttrData[MAX_MAP_DATA_SIZE] = {0};
 EWRAM_DATA struct MapHeader gMapHeader = {0};
 // Index (0..MAX_MAP_LOCATIONS-1) of the location property set currently active for
 // gMapHeader, selected by the location attribute of the tile the camera is focused on.
@@ -48,7 +48,7 @@ COMMON_DATA struct BackupMapLayout gBackupMapLayout = {0};
 static const struct ConnectionFlags sDummyConnectionFlags = {0};
 
 static void InitMapLayoutData(struct MapHeader *mapHeader);
-static void InitBackupMapLayoutData(const u16 *map, const u8 *attributes, u16 width, u16 height);
+static void InitBackupMapLayoutData(const u16 *map, const u16 *attributes, u16 width, u16 height);
 static void FillSouthConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void FillNorthConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
 static void FillWestConnection(struct MapHeader const *mapHeader, struct MapHeader const *connectedMapHeader, s32 offset);
@@ -78,6 +78,16 @@ static bool8 IsCoordInIncomingConnectingMap(int coord, int srcMax, int destMax, 
     block = ActiveLocationHeader()->mapLayout->border[i];                                          \
 })
 
+// Border (void) tiles carry their own per-tile attributes (currently just bgMaterial). Collision
+// is forced on so the void stays impassable regardless of the stored attribute bits.
+#define GetBorderAttrAt(x, y) ({                                                                   \
+    u16 attr;                                                                                       \
+    int i;                                                                                          \
+    i = (x + 1) & 1;                                                                                \
+    i += ((y + 1) & 1) * 2;                                                                         \
+    attr = ActiveLocationHeader()->mapLayout->borderAttributes[i] | MAPATTR_COLLISION;             \
+})
+
 // The backup buffer slides with the camera's anchor map (the map currently under the camera). A
 // tile's buffer cell is its passed coordinate (home-frame + MAP_OFFSET, the convention every caller
 // already uses) minus the anchor's home-frame offset. Both shifts are 0 while the camera is on the
@@ -92,8 +102,8 @@ static s16 sCameraViewShiftY;
 
 #define GetMapGridBlockAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.map[MapGridBufX(x) + gBackupMapLayout.width * MapGridBufY(y)] : GetBorderBlockAt(x, y))
 
-// Out-of-bounds (border) tiles have no attributes; treat them as impassable.
-#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[MapGridBufX(x) + gBackupMapLayout.width * MapGridBufY(y)] : MAPATTR_COLLISION)
+// Out-of-bounds (border) tiles source their attributes from the border attributes (impassable).
+#define GetMapGridAttrAt(x, y) (AreCoordsWithinMapGridBounds(x, y) ? gBackupMapLayout.attributes[MapGridBufX(x) + gBackupMapLayout.width * MapGridBufY(y)] : GetBorderAttrAt(x, y))
 
 // Whether the buffer currently holds a roamed (non-home) anchor, plus the view it was last stitched
 // from, so a re-stitch only runs when the anchor or in-view set actually changes and the return to
@@ -247,7 +257,7 @@ void InitMapFromSavedGame(void)
 void InitBattlePyramidMap(bool8 setPlayerPosition)
 {
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
-    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    CpuFastFill16(MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
     gBackupMapLayout.attributes = sBackupMapAttrData;
     GenerateBattlePyramidFloorLayout(sBackupMapData, setPlayerPosition);
 }
@@ -255,7 +265,7 @@ void InitBattlePyramidMap(bool8 setPlayerPosition)
 void InitTrainerHillMap(void)
 {
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
-    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    CpuFastFill16(MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
     gBackupMapLayout.attributes = sBackupMapAttrData;
     GenerateTrainerHillFloorLayout(sBackupMapData);
 }
@@ -276,7 +286,7 @@ static void InitMapLayoutData(struct MapHeader *mapHeader)
     sCameraWeatherMapNum = gSaveBlock1Ptr->location.mapNum;
     mapLayout = mapHeader->mapLayout;
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
-    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    CpuFastFill16(MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
     gBackupMapLayout.map = sBackupMapData;
     gBackupMapLayout.attributes = sBackupMapAttrData;
     width = mapLayout->width + MAP_OFFSET_W;
@@ -311,12 +321,12 @@ static void BlitMapIntoBuffer(const struct MapLayout *src, int destX, int destY)
     for (y = 0; y < h; y++)
     {
         const u16 *srcRow = &src->map[(srcY + y) * src->width + srcX];
-        const u8 *attrSrcRow = &src->mapAttributes[(srcY + y) * src->width + srcX];
+        const u16 *attrSrcRow = &src->mapAttributes[(srcY + y) * src->width + srcX];
         u16 *dstRow = &gBackupMapLayout.map[(destY + y) * gBackupMapLayout.width + destX];
-        u8 *attrDstRow = &gBackupMapLayout.attributes[(destY + y) * gBackupMapLayout.width + destX];
+        u16 *attrDstRow = &gBackupMapLayout.attributes[(destY + y) * gBackupMapLayout.width + destX];
 
         CpuCopy16(srcRow, dstRow, w * 2);
-        memcpy(attrDstRow, attrSrcRow, w);
+        CpuCopy16(attrSrcRow, attrDstRow, w * 2);
     }
 }
 
@@ -337,7 +347,7 @@ static bool8 StitchAnchorBuffer(const struct ViewMap *anchor, const struct ViewM
         return FALSE; // anchor map too large to stitch; leave the current buffer in place
 
     CpuFastFill16(MAPGRID_UNDEFINED, sBackupMapData, sizeof(sBackupMapData));
-    CpuFastFill16((MAPATTR_UNDEFINED << 8) | MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
+    CpuFastFill16(MAPATTR_UNDEFINED, sBackupMapAttrData, sizeof(sBackupMapAttrData));
     gBackupMapLayout.map = sBackupMapData;
     gBackupMapLayout.attributes = sBackupMapAttrData;
     gBackupMapLayout.width = width;
@@ -443,10 +453,10 @@ void StitchCameraView(void)
         sLastStitchMaps[i] = maps[i];
 }
 
-static void InitBackupMapLayoutData(const u16 *map, const u8 *attributes, u16 width, u16 height)
+static void InitBackupMapLayoutData(const u16 *map, const u16 *attributes, u16 width, u16 height)
 {
     u16 *dest;
-    u8 *attrDest;
+    u16 *attrDest;
     int y;
     dest = gBackupMapLayout.map;
     dest += gBackupMapLayout.width * 7 + MAP_OFFSET;
@@ -455,7 +465,7 @@ static void InitBackupMapLayoutData(const u16 *map, const u8 *attributes, u16 wi
     for (y = 0; y < height; y++)
     {
         CpuCopy16(map, dest, width * 2);
-        memcpy(attrDest, attributes, width);
+        CpuCopy16(attributes, attrDest, width * 2);
         dest += width + MAP_OFFSET_W;
         attrDest += width + MAP_OFFSET_W;
         map += width;
@@ -522,8 +532,8 @@ static void FillConnection(int x, int y, struct MapHeader const *connectedMapHea
     int i;
     const u16 *src;
     u16 *dest;
-    const u8 *attrSrc;
-    u8 *attrDest;
+    const u16 *attrSrc;
+    u16 *attrDest;
     int mapWidth;
 
     mapWidth = connectedMapHeader->mapLayout->width;
@@ -535,7 +545,7 @@ static void FillConnection(int x, int y, struct MapHeader const *connectedMapHea
     for (i = 0; i < height; i++)
     {
         CpuCopy16(src, dest, width * 2);
-        memcpy(attrDest, attrSrc, width);
+        CpuCopy16(attrSrc, attrDest, width * 2);
         dest += gBackupMapLayout.width;
         src += mapWidth;
         attrDest += gBackupMapLayout.width;
@@ -773,15 +783,20 @@ u8 MapGridGetElevationAt(int x, int y)
     return UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
 }
 
+u8 MapGridGetBgMaterialAt(int x, int y)
+{
+    return UNPACK_BGMATERIAL(GetMapGridAttrAt(x, y));
+}
+
 u8 MapGridGetCollisionAt(int x, int y)
 {
-    // Collision is purely the dedicated bit (bit 7); elevation level never blocks.
+    // Collision is purely the dedicated bit; elevation level never blocks.
     return (GetMapGridAttrAt(x, y) & MAPATTR_COLLISION) != 0;
 }
 
 u8 MapGridGetCliffCollisionAt(int x, int y)
 {
-    // Bit 6: blocks only objects roaming behind a cliff, to wall off the behind region.
+    // Blocks only objects roaming behind a cliff, to wall off the behind region.
     return (GetMapGridAttrAt(x, y) & MAPATTR_CLIFF_COLLISION) != 0;
 }
 
@@ -1349,7 +1364,7 @@ void MapGridSetMetatileElevationAt(int x, int y, u8 elevation)
 {
     if (AreCoordsWithinMapGridBounds(x, y))
     {
-        u8 *attr = &gBackupMapLayout.attributes[x + gBackupMapLayout.width * y];
+        u16 *attr = &gBackupMapLayout.attributes[x + gBackupMapLayout.width * y];
         *attr = (*attr & ~MAPATTR_ELEVATION_MASK) | PACK_ELEVATION(elevation);
     }
 }

@@ -10,7 +10,7 @@
 
 #define TRY_FREE_AND_SET_NULL(ptr) if (ptr != NULL) FREE_AND_SET_NULL(ptr)
 
-#define HEAP_SIZE 0x1C000
+#define HEAP_SIZE 0x18000  // Reduced down from 0x1C000 - if there's strange crashing, increase this
 extern u8 gHeap[HEAP_SIZE];
 
 void *Alloc(u32 size);

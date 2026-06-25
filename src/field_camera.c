@@ -41,7 +41,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
-static void DrawMetatile(s32, const u16 *, u16);
+static void DrawMetatile(s32, const u16 *, const u16 *, u16);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
 static void UpdateCameraPanMovement(struct CameraObject *);
@@ -274,7 +274,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 
     if (offset >= 0)
     {
-        DrawMetatile(0xFF, tiles, offset);
+        DrawMetatile(0xFF, tiles, NULL, offset);
         sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
@@ -282,10 +282,17 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x, int y)
 {
     u16 metatileId = MapGridGetMetatileIdAt(x, y);
+    u8 bgMaterial = MapGridGetBgMaterialAt(x, y);
     const u16 *metatiles;
+    // Set for flagged metatiles: the tile's bottom layer is replaced by primary metatile
+    // #bgMaterial (0-15)'s bottom layer. NULL = normal render.
+    const u16 *materialTiles = NULL;
 
     if (metatileId > NUM_METATILES_TOTAL)
         metatileId = 0;
+    // Only metatiles flagged "use bg material" take the bgMaterial render path.
+    if (UNPACK_USES_BGMATERIAL(GetMetatileAttributesById(metatileId)))
+        materialTiles = mapLayout->primaryTileset->metatiles + bgMaterial * NUM_TILES_PER_METATILE;
     if (metatileId < NUM_METATILES_IN_PRIMARY)
     {
         metatiles = mapLayout->primaryTileset->metatiles;
@@ -295,10 +302,10 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
         metatiles = GetActiveLocationData()->secondaryTileset->metatiles;
         metatileId -= NUM_METATILES_IN_PRIMARY;
     }
-    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y), metatiles + metatileId * NUM_TILES_PER_METATILE, offset);
+    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y), metatiles + metatileId * NUM_TILES_PER_METATILE, materialTiles, offset);
 }
 
-static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, u16 offset)
+static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u16 *materialTiles, u16 offset)
 {
     if (metatileLayerType == 0xFF)
     {
@@ -321,6 +328,25 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, u16 offset)
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
         gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[7];
 
+    }
+    else if (materialTiles != NULL)
+    {
+        // bgMaterial tile: replace this metatile's bottom (ground) layer with the material
+        // metatile's bottom layer; keep this metatile's middle and top layers.
+        gOverworldTilemapBuffer_Bg3[offset] = materialTiles[0];
+        gOverworldTilemapBuffer_Bg3[offset + 1] = materialTiles[1];
+        gOverworldTilemapBuffer_Bg3[offset + 0x20] = materialTiles[2];
+        gOverworldTilemapBuffer_Bg3[offset + 0x21] = materialTiles[3];
+
+        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
+        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
+        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
+        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
+
+        gOverworldTilemapBuffer_Bg1[offset] = tiles[8];
+        gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[9];
+        gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[10];
+        gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[11];
     }
     else
     {

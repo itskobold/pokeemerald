@@ -670,15 +670,23 @@ string generate_layout_headers_text(Json layouts_data) {
         if (layout == Json::object()) continue;
         string layoutName = json_to_string(layout, "name");
         string border_label = layoutName + "_Border";
+        string border_attributes_label = layoutName + "_BorderAttributes";
         string blockdata_label = layoutName + "_Blockdata";
         string attributes_label = layoutName + "_Attributes";
-        // The per-tile attributes file lives alongside the blockdata file (map.bin -> attributes.bin).
+        // The per-tile attributes files live alongside their data files
+        // (map.bin -> attributes.bin, border.bin -> border_attributes.bin).
         string blockdata_path = json_to_string(layout, "blockdata_filepath");
         string attributes_path;
         size_t slash = blockdata_path.find_last_of('/');
         attributes_path = (slash == string::npos ? "" : blockdata_path.substr(0, slash + 1)) + "attributes.bin";
+        string border_path = json_to_string(layout, "border_filepath");
+        string border_attributes_path;
+        size_t border_slash = border_path.find_last_of('/');
+        border_attributes_path = (border_slash == string::npos ? "" : border_path.substr(0, border_slash + 1)) + "border_attributes.bin";
         text << border_label << "::\n"
-             << "\t.incbin \"" << json_to_string(layout, "border_filepath") << "\"\n\n"
+             << "\t.incbin \"" << border_path << "\"\n\n"
+             << border_attributes_label << "::\n"
+             << "\t.incbin \"" << border_attributes_path << "\"\n\n"
              << blockdata_label << "::\n"
              << "\t.incbin \"" << blockdata_path << "\"\n\n"
              << attributes_label << "::\n"
@@ -688,6 +696,7 @@ string generate_layout_headers_text(Json layouts_data) {
              << "\t.4byte " << json_to_string(layout, "width") << "\n"
              << "\t.4byte " << json_to_string(layout, "height") << "\n"
              << "\t.4byte " << border_label << "\n"
+             << "\t.4byte " << border_attributes_label << "\n"
              << "\t.4byte " << blockdata_label << "\n"
              << "\t.4byte " << attributes_label << "\n"
              << "\t.4byte " << json_to_string(layout, "primary_tileset") << "\n";

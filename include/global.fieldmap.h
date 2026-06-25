@@ -14,22 +14,23 @@
 #define MAPGRID_BIOME_MASK        0xF000 // Bits 12-15
 #define MAPGRID_BIOME_SHIFT       12
 
-// Per-tile attributes are stored separately, one u8 per tile, in each
-// data/layouts/*/attributes.bin file (loaded parallel to map.bin). The byte means
-// three things: bits 0-5 are the tile's elevation level (a whole 6-bit value, 0-63,
-// every value an ordinary level with no special cases), bit 6 is the cliff-collision
-// flag (impassable only to objects climbing behind a cliff, used to wall off the
-// behind region without blocking normal movement), and bit 7 is the collision flag
-// (impassable). Movement semantics that used to ride on special elevation values now
-// live on metatile behaviors: stairs (MB_ROCK_STAIRS / MB_SIDEWAYS_STAIRS_*) gate
-// level changes, the surf behaviors gate water, and bridges/multi-level are handled
-// by the behind-cliff system.
-// Scripts may still toggle bit 7 at runtime (e.g. MapGridSetMetatileImpassabilityAt)
+// Per-tile attributes are stored separately, one u16 per tile, in each
+// data/layouts/*/attributes.bin file (loaded parallel to map.bin):
+//   bits 0-7   elevation level (0-255, every value an ordinary level)
+//   bit 8      cliff collision (impassable only to objects climbing behind a cliff)
+//   bit 9      collision (impassable)
+//   bits 10-13 bgMaterial (currently unused)
+// Movement semantics that used to ride on special elevation values live on metatile
+// behaviors: stairs (MB_ROCK_STAIRS / MB_SIDEWAYS_STAIRS_*) gate level changes, the
+// surf behaviors gate water, and multi-level is handled by the behind-cliff system.
+// Scripts may toggle the collision bit at runtime (MapGridSetMetatileImpassabilityAt)
 // without disturbing the elevation level.
-#define MAPATTR_ELEVATION_MASK  0x3F // Bits 0-5
-#define MAPATTR_ELEVATION_SHIFT 0
-#define MAPATTR_CLIFF_COLLISION 0x40 // Bit 6, collision for objects behind a cliff
-#define MAPATTR_COLLISION       0x80 // Bit 7, collision (impassable)
+#define MAPATTR_ELEVATION_MASK   0x00FF // Bits 0-7 (0-255)
+#define MAPATTR_ELEVATION_SHIFT  0
+#define MAPATTR_CLIFF_COLLISION  0x0100 // Bit 8, collision for objects behind a cliff
+#define MAPATTR_COLLISION        0x0200 // Bit 9, collision (impassable)
+#define MAPATTR_BGMATERIAL_MASK  0x3C00 // Bits 10-13 (unused for now)
+#define MAPATTR_BGMATERIAL_SHIFT 10
 
 // The location attribute is 2 bits, so a map can define up to 4 distinct
 // per-location property sets (see struct MapHeaderLocationData / MapHeader).
@@ -58,10 +59,12 @@ enum
 #define PACK_LOCATION(location)   PACK(location, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
 #define PACK_BIOME(biome)         PACK(biome, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
 #define PACK_ELEVATION(elevation) PACK(elevation, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
+#define PACK_BGMATERIAL(material)  PACK(material, MAPATTR_BGMATERIAL_SHIFT, MAPATTR_BGMATERIAL_MASK)
 #define UNPACK_METATILE(data)  UNPACK(data, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
 #define UNPACK_LOCATION(data)  UNPACK(data, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
 #define UNPACK_BIOME(data)     UNPACK(data, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
 #define UNPACK_ELEVATION(attr) UNPACK(attr, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
+#define UNPACK_BGMATERIAL(attr) UNPACK(attr, MAPATTR_BGMATERIAL_SHIFT, MAPATTR_BGMATERIAL_MASK)
 
 // An undefined map grid block has every bit set (no real block, with metatile id
 // <= 0x3FF and biome 0, matches it).
@@ -77,9 +80,11 @@ enum
 #define MAPGRID_IMPASSABLE  0x8000
 
 // Masks/shifts for metatile attributes
-// Metatile attributes consist of an 8 bit behavior value, 4 unused bits, and a 4 bit layer type value
+// Metatile attributes consist of an 8 bit behavior value, a "use bg material" flag,
+// 3 unused bits, and a 4 bit layer type value.
 // This is the data stored in each data/tilesets/*/*/metatile_attributes.bin file
 #define METATILE_ATTR_BEHAVIOR_MASK 0x00FF // Bits 0-7
+#define METATILE_ATTR_BGMATERIAL    0x0100 // Bit 8, gate the bgMaterial render path
 #define METATILE_ATTR_LAYER_MASK    0xF000 // Bits 12-15
 #define METATILE_ATTR_BEHAVIOR_SHIFT 0
 #define METATILE_ATTR_LAYER_SHIFT   12
@@ -88,6 +93,7 @@ enum
 #define PACK_LAYER_TYPE(layerType) PACK(layerType, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
 #define UNPACK_BEHAVIOR(data) UNPACK(data, METATILE_ATTR_BEHAVIOR_SHIFT, METATILE_ATTR_BEHAVIOR_MASK)
 #define UNPACK_LAYER_TYPE(data) UNPACK(data, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
+#define UNPACK_USES_BGMATERIAL(data) (((data) & METATILE_ATTR_BGMATERIAL) != 0)
 
 enum {
     METATILE_LAYER_TYPE_NORMAL,  // Metatile uses middle and top bg layers
@@ -120,9 +126,10 @@ struct MapLayout
     /*0x00*/ s32 width;
     /*0x04*/ s32 height;
     /*0x08*/ const u16 *border;
-    /*0x0C*/ const u16 *map;
-    /*0x10*/ const u8 *mapAttributes;
-    /*0x14*/ const struct Tileset *primaryTileset;
+    /*0x0C*/ const u16 *borderAttributes;
+    /*0x10*/ const u16 *map;
+    /*0x14*/ const u16 *mapAttributes;
+    /*0x18*/ const struct Tileset *primaryTileset;
 };
 
 struct BackupMapLayout
@@ -130,7 +137,7 @@ struct BackupMapLayout
     s32 width;
     s32 height;
     u16 *map;
-    u8 *attributes;
+    u16 *attributes;
 };
 
 struct ObjectEventTemplate

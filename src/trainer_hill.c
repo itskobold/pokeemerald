@@ -674,7 +674,7 @@ static u16 GetMapDataForFloor(u8 floorId, u32 x, u32 y, u32 floorWidth) // floor
     return sHillData->floors[floorId].map.metatileData[floorWidth * y + x] + NUM_METATILES_IN_PRIMARY;
 }
 
-static u8 GetMapAttrForFloor(u8 floorId, u32 x, u32 y)
+static u16 GetMapAttrForFloor(u8 floorId, u32 x, u32 y)
 {
     bool8 impassable = (sHillData->floors[floorId].map.collisionData[y] >> (15 - x) & 1);
     return (impassable ? MAPATTR_COLLISION : 0) | PACK_ELEVATION(ELEVATION_DEFAULT);
@@ -685,8 +685,8 @@ void GenerateTrainerHillFloorLayout(u16 *mapArg)
     s32 y, x;
     const u16 *src;
     u16 *dst;
-    const u8 *attrSrc;
-    u8 *attrDst;
+    const u16 *attrSrc;
+    u16 *attrDst;
     u8 mapId = GetCurrentTrainerHillMapId();
 
     if (mapId == TRAINER_HILL_ENTRANCE)
