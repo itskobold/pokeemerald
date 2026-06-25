@@ -164,4 +164,11 @@
 #define SLOW_MOVEMENT_ON_STAIRS         TRUE
 #define FOLLOW_ME_IMPLEMENTED           FALSE    //for stairs movement. see ObjectMovingOnRockStairs in src/field_player_avatar.c
 
+// Stairs stretch each movement step over this many frames, scaling the base speed (walk/run/bike).
+// A larger value is slower; NONE (1) leaves the step at its normal speed.
+#define STAIRS_SLOW_FACTOR_NONE         1
+#define STAIRS_SLOW_FACTOR_FORWARD      2   // base forward stairs speed
+#define STAIRS_SLOW_FACTOR_SIDEWAYS     4   // 50% of the forward speed
+#define STAIRS_SLOW_FACTOR_BACKWARD     8   // 25% of the forward speed
+
 #endif // GUARD_CONSTANTS_GLOBAL_H

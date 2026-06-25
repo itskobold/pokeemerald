@@ -246,9 +246,8 @@ static void MachBikeTransition_TrySpeedUp(u8 direction)
         }
         else
         {
-            if (ObjectMovingOnRockStairs(playerObjEvent, direction) && gPlayerAvatar.bikeFrameCounter > 1)
-                gPlayerAvatar.bikeFrameCounter--;
-            
+            // Stairs slowdown is applied while stepping (see GetStairsSlowFactor), so the bike keeps
+            // accelerating to full speed and the stairs factor scales it.
             sMachBikeSpeedCallbacks[gPlayerAvatar.bikeFrameCounter](direction);
             gPlayerAvatar.bikeSpeed = gPlayerAvatar.bikeFrameCounter + (gPlayerAvatar.bikeFrameCounter >> 1); // same as dividing by 2, but compiler is insistent on >> 1
             if (gPlayerAvatar.bikeFrameCounter < 2) // do not go faster than the last element in the mach bike array
@@ -581,10 +580,9 @@ static void AcroBikeTransition_Moving(u8 direction)
     }
     else
     {
-        if (ObjectMovingOnRockStairs(playerObjEvent, direction))
-            PlayerWalkFast(direction);
-        else
-            PlayerRideWaterCurrent(direction);
+        // Stairs slowdown is applied while stepping (see GetStairsSlowFactor), so the bike keeps
+        // its speed and the stairs factor scales it.
+        PlayerRideWaterCurrent(direction);
     }
 }
 

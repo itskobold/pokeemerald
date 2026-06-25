@@ -21,7 +21,7 @@
 //   bit 9      collision (impassable)
 //   bits 10-13 bgMaterial (currently unused)
 // Movement semantics that used to ride on special elevation values live on metatile
-// behaviors: stairs (MB_ROCK_STAIRS / MB_SIDEWAYS_STAIRS_*) gate level changes, the
+// behaviors: stairs (MB_FORWARD_STAIRS / MB_BACKWARD_STAIRS / MB_SIDEWAYS_STAIRS_*) gate level changes, the
 // surf behaviors gate water, and multi-level is handled by the behind-cliff system.
 // Scripts may toggle the collision bit at runtime (MapGridSetMetatileImpassabilityAt)
 // without disturbing the elevation level.
@@ -345,7 +345,7 @@ struct ObjectEvent
              u8 directionOverwrite:4;
     /*0x21*/ u8 directionSequenceIndex;
     /*0x22*/ u8 playerCopyableMovement; // COPY_MOVE_*
-    /*0x23*/ //u8 padding2;
+    /*0x23*/ u8 cliffMetatileBehavior; // behavior of the tile left when stepping behind a cliff; held until surfacing
     /*size = 0x24*/
 };
 

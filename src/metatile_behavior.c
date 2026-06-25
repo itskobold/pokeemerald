@@ -71,11 +71,12 @@ static const u8 sTileBitAttributes[NUM_METATILE_BEHAVIORS] =
     [MB_SIDEWAYS_STAIRS_LEFT_SIDE_TOP]      = TILE_FLAG_UNUSED,
     [MB_SIDEWAYS_STAIRS_RIGHT_SIDE_BOTTOM]  = TILE_FLAG_UNUSED,
     [MB_SIDEWAYS_STAIRS_LEFT_SIDE_BOTTOM]   = TILE_FLAG_UNUSED,
-    [MB_ROCK_STAIRS]                        = TILE_FLAG_UNUSED,
+    [MB_FORWARD_STAIRS]                     = TILE_FLAG_UNUSED,
     [MB_EASTWARD_CURRENT]                = TILE_FLAG_UNUSED | TILE_FLAG_SURFABLE,
     [MB_WESTWARD_CURRENT]                = TILE_FLAG_UNUSED | TILE_FLAG_SURFABLE,
     [MB_NORTHWARD_CURRENT]               = TILE_FLAG_UNUSED | TILE_FLAG_SURFABLE,
     [MB_SOUTHWARD_CURRENT]               = TILE_FLAG_UNUSED | TILE_FLAG_SURFABLE,
+    [MB_BACKWARD_STAIRS]                    = TILE_FLAG_UNUSED,
     [MB_NON_ANIMATED_DOOR]               = TILE_FLAG_UNUSED,
     [MB_LADDER]                          = TILE_FLAG_UNUSED,
     [MB_EAST_ARROW_WARP]                 = TILE_FLAG_UNUSED,
@@ -1474,18 +1475,27 @@ bool8 MetatileBehavior_IsSidewaysStairsLeftSideAny(u8 metatileBehavior)
         return FALSE;
 }
 
-bool8 MetatileBehavior_IsRockStairs(u8 metatileBehavior)
+bool8 MetatileBehavior_IsForwardStairs(u8 metatileBehavior)
 {
-    if (metatileBehavior == MB_ROCK_STAIRS)
+    if (metatileBehavior == MB_FORWARD_STAIRS)
         return TRUE;
     else
         return FALSE;
 }
 
-// Stairs tiles are the clean path between elevation levels (rock + sideways stairs).
+bool8 MetatileBehavior_IsBackwardStairs(u8 metatileBehavior)
+{
+    if (metatileBehavior == MB_BACKWARD_STAIRS)
+        return TRUE;
+    else
+        return FALSE;
+}
+
+// Stairs tiles are the clean path between elevation levels (forward/backward + sideways stairs).
 bool8 MetatileBehavior_IsElevationChange(u8 metatileBehavior)
 {
-    return MetatileBehavior_IsRockStairs(metatileBehavior)
+    return MetatileBehavior_IsForwardStairs(metatileBehavior)
+        || MetatileBehavior_IsBackwardStairs(metatileBehavior)
         || MetatileBehavior_IsSidewaysStairsRightSideAny(metatileBehavior)
         || MetatileBehavior_IsSidewaysStairsLeftSideAny(metatileBehavior);
 }

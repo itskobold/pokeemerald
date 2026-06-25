@@ -148,7 +148,8 @@ bool8 MetatileBehavior_IsQuestionnaire(u8 metatileBehavior);
 bool8 MetatileBehavior_IsLongGrass_Duplicate(u8 metatileBehavior);
 bool8 MetatileBehavior_IsLongGrassSouthEdge(u8 metatileBehavior);
 bool8 MetatileBehavior_IsTrainerHillTimer(u8 metatileBehavior);
-bool8 MetatileBehavior_IsRockStairs(u8 metatileBehavior);
+bool8 MetatileBehavior_IsForwardStairs(u8 metatileBehavior);
+bool8 MetatileBehavior_IsBackwardStairs(u8 metatileBehavior);
 bool8 MetatileBehavior_IsElevationChange(u8 metatileBehavior);
 // sideways stairs
 bool8 MetatileBehavior_IsSidewaysStairsRightSide(u8 metatileBehavior);

@@ -99,8 +99,6 @@ static bool8 PlayerAnimIsMultiFrameStationaryAndStateNotTurning(void);
 static bool8 PlayerIsAnimActive(void);
 static bool8 PlayerCheckIfAnimFinishedOrInactive(void);
 
-static void PlayerWalkSlow(u8 direction);
-static void PlayerRunSlow(u8 direction);
 static void PlayerRun(u8);
 static void PlayerNotOnBikeCollide(u8);
 static void PlayerNotOnBikeCollideWithFarawayIslandMew(u8);
@@ -683,20 +681,15 @@ static void PlayerNotOnBikeMoving(u8 direction, u16 heldKeys)
     if (!(gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_UNDERWATER) && (heldKeys & B_BUTTON) && FlagGet(FLAG_SYS_B_DASH)
      && IsRunningDisallowed(gObjectEvents[gPlayerAvatar.objectEventId].currentMetatileBehavior) == 0)
     {
-        if (ObjectMovingOnRockStairs(&gObjectEvents[gPlayerAvatar.objectEventId], direction))
-            PlayerRunSlow(direction);
-        else
-            PlayerRun(direction);
-        
+        // Stairs slowdown is applied while stepping (see GetStairsSlowFactor), so the dash boost
+        // is kept and scaled instead of being replaced by a slow walk.
+        PlayerRun(direction);
         gPlayerAvatar.flags |= PLAYER_AVATAR_FLAG_DASH;
         return;
     }
     else
     {
-        if (ObjectMovingOnRockStairs(&gObjectEvents[gPlayerAvatar.objectEventId], direction))
-            PlayerWalkSlow(direction);
-        else
-            PlayerWalkNormal(direction);
+        PlayerWalkNormal(direction);
     }
 }
 
@@ -1022,16 +1015,6 @@ void PlayerSetAnimId(u8 movementActionId, u8 copyableMovement)
         PlayerSetCopyableMovement(copyableMovement);
         ObjectEventSetHeldMovement(&gObjectEvents[gPlayerAvatar.objectEventId], movementActionId);
     }
-}
-
-// slow
-static void PlayerWalkSlow(u8 direction)
-{
-    PlayerSetAnimId(GetWalkSlowMovementAction(direction), 2);
-}
-static void PlayerRunSlow(u8 direction)
-{
-    PlayerSetAnimId(GetPlayerRunSlowMovementAction(direction), 2);
 }
 
 // normal speed (1 speed)
@@ -2341,6 +2324,12 @@ u8 GetLeftSideStairsDirection(u8 direction)
     }
 }
 
+static bool8 IsForwardOrBackwardStairs(u8 metatileBehavior)
+{
+    return MetatileBehavior_IsForwardStairs(metatileBehavior)
+        || MetatileBehavior_IsBackwardStairs(metatileBehavior);
+}
+
 bool8 ObjectMovingOnRockStairs(struct ObjectEvent *objectEvent, u8 direction)
 {
     #if SLOW_MOVEMENT_ON_STAIRS
@@ -2360,10 +2349,10 @@ bool8 ObjectMovingOnRockStairs(struct ObjectEvent *objectEvent, u8 direction)
         switch (direction)
         {
         case DIR_NORTH:
-            return MetatileBehavior_IsRockStairs(MapGridGetMetatileBehaviorAt(x,y));
+            return IsForwardOrBackwardStairs(MapGridGetMetatileBehaviorAt(x,y));
         case DIR_SOUTH:
             MoveCoords(DIR_SOUTH, &x, &y);
-            return MetatileBehavior_IsRockStairs(MapGridGetMetatileBehaviorAt(x,y));
+            return IsForwardOrBackwardStairs(MapGridGetMetatileBehaviorAt(x,y));
         case DIR_WEST:
         case DIR_EAST:
         case DIR_NORTHEAST:

@@ -181,6 +181,7 @@ static u8 DoJumpSpecialSpriteMovement(struct Sprite *);
 static void CreateLevitateMovementTask(struct ObjectEvent *);
 static void DestroyLevitateMovementTask(u8);
 static bool8 NpcTakeStep(struct Sprite *);
+static u8 GetStairsSlowFactor(struct ObjectEvent *);
 static bool8 AreElevationsCompatible(u8, u8);
 
 static const struct SpriteFrameImage sPicTable_PechaBerryTree[];
@@ -6240,6 +6241,31 @@ static void InitWalkSlow(struct ObjectEvent *objectEvent, struct Sprite *sprite,
     SetStepAnimHandleAlternation(objectEvent, sprite, GetMoveDirectionAnimNum(objectEvent->facingDirection));
 }
 
+// How much a step is slowed while on stairs: 1 = no slow (off stairs), otherwise the step takes
+// this many times as long, scaling whatever the base speed is (walk/run/bike). Forward stairs are
+// the base, sideways are half that speed, backward a quarter.
+static u8 GetStairsSlowFactor(struct ObjectEvent *objectEvent)
+{
+#if SLOW_MOVEMENT_ON_STAIRS
+    u8 curr, prev;
+
+    // Behind a cliff, stairs are walked as plain terrain (matches ObjectMovingOnRockStairs).
+    if (objectEvent->cliffLayer != CLIFF_LAYER_FRONT)
+        return STAIRS_SLOW_FACTOR_NONE;
+
+    if (objectEvent->directionOverwrite) // sideways stairs motion
+        return STAIRS_SLOW_FACTOR_SIDEWAYS;
+
+    curr = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
+    prev = MapGridGetMetatileBehaviorAt(objectEvent->previousCoords.x, objectEvent->previousCoords.y);
+    if (MetatileBehavior_IsBackwardStairs(curr) || MetatileBehavior_IsBackwardStairs(prev))
+        return STAIRS_SLOW_FACTOR_BACKWARD;
+    if (MetatileBehavior_IsForwardStairs(curr) || MetatileBehavior_IsForwardStairs(prev))
+        return STAIRS_SLOW_FACTOR_FORWARD;
+#endif
+    return STAIRS_SLOW_FACTOR_NONE;
+}
+
 static bool8 UpdateWalkSlow(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     if (UpdateWalkSlowAnim(sprite))
@@ -8620,12 +8646,13 @@ static void GetAllGroundEffectFlags_OnFinishStep(struct ObjectEvent *objEvent, u
 
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent *objEvent)
 {
-    // Behind the cliff the object behaves as if on plain ground: record MB_NORMAL so every consumer of
-    // these stored behaviors (ground effects, forced movement, directional blocks) sees normal terrain.
+    // Behind the cliff the object keeps the behavior of the tile it left as it climbed behind, so every
+    // consumer of these stored behaviors (ground effects, forced movement, directional blocks) sees that
+    // terrain held until it surfaces (see cliffMetatileBehavior capture on the climb / spawn).
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
     {
-        objEvent->previousMetatileBehavior = MB_NORMAL;
-        objEvent->currentMetatileBehavior = MB_NORMAL;
+        objEvent->previousMetatileBehavior = objEvent->cliffMetatileBehavior;
+        objEvent->currentMetatileBehavior = objEvent->cliffMetatileBehavior;
         return;
     }
     objEvent->previousMetatileBehavior = MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
@@ -9004,9 +9031,15 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
     }
 
     if (MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y) > objEvent->previousElevation)
+    {
+        // Spawned already behind a cliff: no tile was left to inherit, so fall back to plain ground.
         objEvent->cliffLayer = IsObjectEventFullyBehindCliff(objEvent) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
+        objEvent->cliffMetatileBehavior = MB_NORMAL;
+    }
     else
+    {
         objEvent->cliffLayer = CLIFF_LAYER_FRONT;
+    }
 }
 
 // Run on spawn / map load. NPCs keep their template "initial elevation" instead of snapping to the
@@ -9132,8 +9165,11 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
         // Stepped UP onto non-stairs terrain: climb behind the cliff, freezing the render base
         // (previousElevation) at the level we left. Stepping OFF a stairs tile is excluded — its higher
         // exit is the stairs' legitimate destination (matches the onStairs collision exception).
+        // Remember the tile being left so its behavior is held while behind (see
+        // ObjectEventUpdateMetatileBehaviors).
         objEvent->previousElevation = fromElevation;
         objEvent->cliffLayer = CLIFF_LAYER_BEHIND;
+        objEvent->cliffMetatileBehavior = fromBehavior;
         objEvent->surfacingFromCliff = FALSE;
     }
 }
@@ -9602,14 +9638,16 @@ static void Step8(struct Sprite *sprite, u8 dir)
     sprite->y += 8 * (u16) sDirectionToVectors[dir].y;
 }
 
-#define sSpeed data[4]
-#define sTimer data[5]
+#define sSpeed       data[4]
+#define sTimer       data[5]
+#define sStairsTimer data[7] // frame counter used to stretch a step out on stairs
 
 static void SetSpriteDataForNormalStep(struct Sprite *sprite, u8 direction, u8 speed)
 {
     sprite->sDirection = direction;
     sprite->sSpeed = speed;
     sprite->sTimer = 0;
+    sprite->sStairsTimer = 0;
 }
 
 typedef void (*SpriteStepFunc)(struct Sprite *sprite, u8 direction);
@@ -9683,8 +9721,18 @@ static const s16 sStepTimes[] = {
 
 static bool8 NpcTakeStep(struct Sprite *sprite)
 {
+    u8 stairsFactor;
+
     if (sprite->sTimer >= sStepTimes[sprite->sSpeed])
         return FALSE;
+
+    // On stairs, perform a sub-step only every stairsFactor frames so the move takes that many
+    // times longer. The base speed (walk/run/bike) is untouched, so each mode keeps its boost and
+    // the stairs slowdown scales on top of it.
+    stairsFactor = GetStairsSlowFactor(&gObjectEvents[sprite->sObjEventId]);
+    if (stairsFactor > STAIRS_SLOW_FACTOR_NONE && ++sprite->sStairsTimer < stairsFactor)
+        return FALSE;
+    sprite->sStairsTimer = 0;
 
     sNpcStepFuncTables[sprite->sSpeed][sprite->sTimer](sprite, sprite->sDirection);
 
@@ -9698,6 +9746,7 @@ static bool8 NpcTakeStep(struct Sprite *sprite)
 
 #undef sSpeed
 #undef sTimer
+#undef sStairsTimer
 
 #define sTimer     data[4]
 #define sNumSteps  data[5]
@@ -9707,6 +9756,7 @@ static void SetWalkSlowSpriteData(struct Sprite *sprite, u8 direction)
     sprite->sDirection = direction;
     sprite->sTimer = 0;
     sprite->sNumSteps = 0;
+    sprite->data[7] = 0; // sStairsTimer: the run-slow path also reaches NpcTakeStep
 }
 
 static bool8 UpdateWalkSlowAnim(struct Sprite *sprite)
