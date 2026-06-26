@@ -5585,10 +5585,15 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // UpdateObjectEventBehindCliff.
     bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
      || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
-    // Cliff collision (bit 6) only walls off tiles still up on the cliff plane (above the base climbed
-    // from); stepping back down to the base or below is the legitimate descent.
-    bool32 cliffCollision = objectEvent->cliffLayer != CLIFF_LAYER_FRONT && MapGridGetCliffCollisionAt(x, y)
-     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation;
+    // Cliff collision (bit 6) walls off tiles up on the cliff plane (above the object's committed level).
+    // Applies in front too, so the climb-entry step onto a wall tile is blocked BEFORE it commits rather
+    // than after (no one-tile overstep). The elevation check keeps same-level walking and the descent
+    // back to base/below free; a behind object reads its frozen base as previousElevation. Stairs are the
+    // legitimate path up, so a front object pathing onto one is exempt (a behind/obscured one stays walled
+    // so it can't escape the region via a stairs tile).
+    bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
+     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation
+     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && isStairs);
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         return COLLISION_OUTSIDE_RANGE;
@@ -5717,8 +5722,9 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
     // See GetVanillaCollision for the cliff-plane collision rules mirrored here.
     bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
      || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
-    bool32 cliffCollision = objectEvent->cliffLayer != CLIFF_LAYER_FRONT && MapGridGetCliffCollisionAt(x, y)
-     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation;
+    bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
+     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation
+     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && isStairs);
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         flags |= 1 << (COLLISION_OUTSIDE_RANGE - 1);
