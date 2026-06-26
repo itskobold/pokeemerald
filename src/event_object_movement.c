@@ -1454,12 +1454,14 @@ static u8 InitObjectEventStateFromTemplateAt(const struct ObjectEventTemplate *t
     objectEvent->previousMovementDirection = gInitialMovementTypeFacingDirections[template->movementType];
     SetObjectEventDirection(objectEvent, objectEvent->previousMovementDirection);
     SetObjectEventDynamicGraphicsId(objectEvent);
-    if (sMovementTypeHasRange[objectEvent->movementType])
+    // Give a ranged type a minimal 1-tile box only when neither axis is set. Bumping a designer's
+    // explicit 0 on one axis to 1 boxes the perpendicular axis, which walls off a sideways staircase
+    // crossing the route (its diagonal step moves >1 tile that way). An axis left 0 means unconstrained.
+    if (sMovementTypeHasRange[objectEvent->movementType]
+     && objectEvent->range.rangeX == 0 && objectEvent->range.rangeY == 0)
     {
-        if (objectEvent->range.rangeX == 0)
-            objectEvent->range.rangeX++;
-        if (objectEvent->range.rangeY == 0)
-            objectEvent->range.rangeY++;
+        objectEvent->range.rangeX++;
+        objectEvent->range.rangeY++;
     }
     return objectEventId;
 }
