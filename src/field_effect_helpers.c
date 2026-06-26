@@ -1061,6 +1061,10 @@ void UpdateSurfBlobFieldEffect(struct Sprite *sprite)
     SynchronizeSurfPosition(playerObj, sprite);
     UpdateBobbingEffect(playerObj, playerSprite, sprite);
     sprite->oam.priority = playerSprite->oam.priority;
+    // Cull off-screen like the player sprite and every other object-anchored field effect; without this
+    // the blob keeps drawing while the player is parked off-screen (freecam roaming across map seams),
+    // looking like it respawns on each map the camera visits.
+    UpdateObjectEventSpriteInvisibility(sprite, playerObj->invisible);
 }
 
 static void SynchronizeSurfAnim(struct ObjectEvent *playerObj, struct Sprite *sprite)
