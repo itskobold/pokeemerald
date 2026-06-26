@@ -5434,6 +5434,16 @@ void SetStepAnimHandleAlternation(struct ObjectEvent *objectEvent, struct Sprite
 
     if (!objectEvent->inanimate)
     {
+        // On a slowed stairs step the leg anim free-runs across the slow crossing. Reseeking here
+        // would reset the current frame's dwell to full duration, freezing the legs for a frame at
+        // the tile centre (the boundary between the two slowed half-tiles a backward stair splits a
+        // step into). Just swap the anim and let the running cycle continue uninterrupted.
+        if (GetStairsSlowFactor(objectEvent, TRUE) > STAIRS_SLOW_FACTOR_NONE)
+        {
+            sprite->animNum = animNum;
+            return;
+        }
+
         sprite->animNum = animNum;
         stepTable = GetStepAnimTable(sprite->anims);
         if (stepTable != NULL)
