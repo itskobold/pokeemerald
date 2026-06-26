@@ -9621,6 +9621,14 @@ static void Step8(struct Sprite *sprite, u8 dir)
     sprite->y += 8 * (u16) sDirectionToVectors[dir].y;
 }
 
+// Move n px along dir (diagonal on sideways stairs). Used to glide a substep out over several
+// frames when slowed on stairs; off stairs the fixed StepN funcs above are used instead.
+static void StepN(struct Sprite *sprite, u8 dir, s16 n)
+{
+    sprite->x += n * (u16) sDirectionToVectors[dir].x;
+    sprite->y += n * (u16) sDirectionToVectors[dir].y;
+}
+
 #define sSpeed       data[4]
 #define sTimer       data[5]
 #define sReversing   data[6] // set when a step has been turned back on itself (see ObjectEventReverseHeldMovement)
@@ -9706,33 +9714,47 @@ static const s16 sStepTimes[] = {
 
 static bool8 NpcTakeStep(struct Sprite *sprite)
 {
+    u8 speed = sprite->sSpeed;
+    u8 nSub = sStepTimes[speed];
     u8 stairsFactor;
     u8 subStep;
     bool32 inFirstHalf;
 
-    if (sprite->sTimer >= sStepTimes[sprite->sSpeed])
+    if (sprite->sTimer >= nSub)
         return FALSE;
 
     // sTimer counts sub-steps completed toward the tile being entered (currentCoords) in either
     // travel direction, so this first/second-half split stays tile-anchored through a reversal.
-    inFirstHalf = sprite->sTimer * 2 < sStepTimes[sprite->sSpeed];
+    inFirstHalf = sprite->sTimer * 2 < nSub;
 
-    // On stairs, perform a sub-step only every stairsFactor frames so the move takes that many
-    // times longer. The base speed (walk/run/bike) is untouched, so each mode keeps its boost and
-    // the stairs slowdown scales on top of it.
+    // A reversed step retraces the sub-steps back-to-front, so the sprite undoes the exact pixels it
+    // already covered and lands on its origin tile even for non-uniform tables (FAST_2).
+    subStep = sprite->sReversing ? nSub - 1 - sprite->sTimer : sprite->sTimer;
+
     stairsFactor = GetStairsSlowFactor(&gObjectEvents[sprite->sObjEventId], inFirstHalf);
-    if (stairsFactor > STAIRS_SLOW_FACTOR_NONE && ++sprite->sStairsTimer < stairsFactor)
-        return FALSE;
-    sprite->sStairsTimer = 0;
+    if (stairsFactor > STAIRS_SLOW_FACTOR_NONE)
+    {
+        // Stretch the move out by taking each sub-step over stairsFactor frames. Rather than freeze
+        // then leap a whole sub-step (up to 8px) on the last frame — which the camera, tracking the
+        // sprite 1:1, renders as a jolt that worsens with the factor (sideways x4, backward x8) — the
+        // sub-step's pixels are spread evenly across the frames so the slowed crossing glides. The
+        // cumulative form below reproduces each table's per-sub-step pixels exactly, FAST_2 included.
+        s16 subPx = (16 * (subStep + 1)) / nSub - (16 * subStep) / nSub;
+        u8 t = sprite->sStairsTimer;
+        StepN(sprite, sprite->sDirection, (subPx * (t + 1)) / stairsFactor - (subPx * t) / stairsFactor);
 
-    // A reversed step retraces the sub-step table back-to-front, so the sprite undoes the exact
-    // pixels it already covered and lands on its origin tile even for non-uniform tables (FAST_2).
-    subStep = sprite->sReversing ? sStepTimes[sprite->sSpeed] - 1 - sprite->sTimer : sprite->sTimer;
-    sNpcStepFuncTables[sprite->sSpeed][subStep](sprite, sprite->sDirection);
+        if (++sprite->sStairsTimer < stairsFactor)
+            return FALSE;
+        sprite->sStairsTimer = 0;
+    }
+    else
+    {
+        sNpcStepFuncTables[speed][subStep](sprite, sprite->sDirection);
+    }
 
     sprite->sTimer++;
 
-    if (sprite->sTimer < sStepTimes[sprite->sSpeed])
+    if (sprite->sTimer < nSub)
         return FALSE;
 
     return TRUE;
@@ -9783,7 +9805,8 @@ bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
      || ObjectEventCheckHeldMovementStatus(objectEvent)
      || sprite->sActionFuncId != 1
      || sprite->sReversing
-     || !IsReversibleStepAction(action))
+     || !IsReversibleStepAction(action)
+     || sprite->sStairsTimer != 0)   // mid sub-step on stairs: wait for a boundary (sTimer is exact there)
         return FALSE;
 
     // Nothing travelled yet, or already arrived: nothing to unwind.
@@ -9868,7 +9891,8 @@ bool8 ObjectEventChangeStepGait(struct ObjectEvent *objectEvent, bool8 dash)
      || sprite->sActionFuncId != 1
      || sprite->sReversing
      || (!isWalk && !isRun)
-     || newSpeed == sprite->sSpeed)
+     || newSpeed == sprite->sSpeed
+     || sprite->sStairsTimer != 0)   // mid sub-step on stairs: wait for a boundary (sTimer/off are exact there)
         return FALSE;
 
     // Pixels already covered this step (uniform tables over a 16px tile), and what's left to go.
