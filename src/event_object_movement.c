@@ -5790,12 +5790,15 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
         {
             // An object reserves the tile it stands on (currentCoords) and, while mid-step, the tile it
             // is sliding out of (previousCoords) — so a second object can't pour into the half-vacated
-            // tile and overlap the sprite. The player is the exception: an object that has begun a step
-            // never cancels it, so its old tile is already promised free. Letting the player flow into it
-            // the instant the step starts keeps movement through a shuffling crowd smooth, leaving the
-            // player blocked only by where objects actually stand or are heading (currentCoords).
+            // tile and overlap the sprite. The on-foot player is the exception: an object that has begun
+            // a step never cancels it, so its old tile is already promised free, and at walking pace
+            // flowing in keeps movement through a shuffling crowd smooth. On a bike the player covers a
+            // tile faster than an NPC vacates it, so flowing in would overtake and clip through the still-
+            // sliding sprite — so a biking player respects previousCoords like any NPC.
+            bool32 moverFlowsThrough = objectEvent->isPlayer
+                && !(gPlayerAvatar.flags & (PLAYER_AVATAR_FLAG_MACH_BIKE | PLAYER_AVATAR_FLAG_ACRO_BIKE));
             bool32 occupied = (curObject->currentCoords.x == x && curObject->currentCoords.y == y)
-                           || (!objectEvent->isPlayer
+                           || (!moverFlowsThrough
                             && curObject->previousCoords.x == x && curObject->previousCoords.y == y);
 
             // The player commits its step later than NPCs (during the object-update loop, after field
