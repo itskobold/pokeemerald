@@ -5777,13 +5777,17 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
 {
     u8 i;
     struct ObjectEvent *curObject;
-    // On a stairs tile previousElevation holds the level each object carried on from (differing by the
-    // end it entered), so two objects meeting there would keep mismatched levels and pass through. A
-    // stairs tile has one reliable elevation and both are physically on it, so read the tile's own
-    // elevation instead. Behind a cliff is the exception: stairs are plain terrain, the frozen base governs.
-    bool32 onStairs = MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(x, y));
-    u8 tileElevation = MapGridGetElevationAt(x, y);
-    u8 moverElevation = (onStairs && objectEvent->cliffLayer == CLIFF_LAYER_FRONT) ? tileElevation : objectEvent->previousElevation;
+    bool32 onStairs = MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
+    bool32 toStairs = MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(x, y));
+    // Crossing a stairs boundary in front of a cliff: the mover's previousElevation sits at one side's
+    // level, so it won't elevation-match an object resting on the other side and would pass through it.
+    // Both physically meet on the shared tile, so collide regardless of the resident's level — provided
+    // it too is in front of a cliff (a behind-cliff object belongs to another plane). Two cases:
+    //   - stepping OFF a stairs tile DOWN onto a lower tile, vs an object on that lower tile;
+    //   - stepping UP from a lower non-stairs tile ONTO a higher stairs tile, vs an object on the stairs.
+    bool32 crossingStairs = objectEvent->cliffLayer == CLIFF_LAYER_FRONT
+     && ((onStairs && MapGridGetElevationAt(x, y) < objectEvent->previousElevation)
+      || (!onStairs && toStairs && MapGridGetElevationAt(x, y) > objectEvent->previousElevation));
 
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
@@ -5793,9 +5797,6 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
             // check for collision if curObject is active, not the object in question, and not exempt from collisions
             bool32 occupied = (curObject->currentCoords.x == x && curObject->currentCoords.y == y)
                            || (curObject->previousCoords.x == x && curObject->previousCoords.y == y);
-            // Resident's effective level at (x, y): the stairs tile elevation stands in for previousElevation
-            // (see moverElevation above) for objects not behind a cliff.
-            u8 curElevation = (onStairs && curObject->cliffLayer == CLIFF_LAYER_FRONT) ? tileElevation : curObject->previousElevation;
 
             // The player commits its step later than NPCs (during the object-update loop, after field
             // input), so an NPC could claim the tile the player is mid-step into and overlap it. Reserve
@@ -5812,10 +5813,13 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
             }
 
             // Collide only with objects on the same render plane. previousElevation is each object's
-            // drawn level: it tracks the real tile on flat ground but freezes at the climbed-from base
-            // behind a cliff, so objects on opposite sides of a face pass freely while same-level ones
-            // collide. It also holds steady across the climb transition, avoiding mid-step flicker.
-            if (occupied && AreElevationsCompatible(moverElevation, curElevation))
+            // drawn level: it tracks the real tile on flat ground (stairs included — ObjectEventUpdateElevation
+            // writes the stairs tile's elevation here) but freezes at the climbed-from base behind a cliff, so
+            // objects on opposite sides of a face pass freely while same-level ones collide. It also holds
+            // steady across the climb transition, avoiding mid-step flicker.
+            if (occupied
+             && (AreElevationsCompatible(objectEvent->previousElevation, curObject->previousElevation)
+              || (crossingStairs && curObject->cliffLayer == CLIFF_LAYER_FRONT)))
                 return TRUE;
         }
     }
