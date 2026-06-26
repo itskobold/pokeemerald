@@ -20,6 +20,7 @@ static void LoadObjectReflectionPalette(struct ObjectEvent *objectEvent, struct 
 static void LoadObjectHighBridgeReflectionPalette(struct ObjectEvent *, u8);
 static void LoadObjectRegularReflectionPalette(struct ObjectEvent *, u8);
 static void UpdateGrassFieldEffectSubpriority(struct Sprite *, u8, u8);
+static void RaiseFieldEffectSubpriorityBehindObjects(struct Sprite *, u8);
 static void FadeFootprintsTireTracks_Step0(struct Sprite *);
 static void FadeFootprintsTireTracks_Step1(struct Sprite *);
 static void UpdateFeetInFlowingWaterFieldEffect(struct Sprite *);
@@ -535,6 +536,7 @@ void UpdateShortGrassFieldEffect(struct Sprite *sprite)
         // Offset the grass sprite halfway down the parent sprite.
         sprite->y2 = (graphicsInfo->height >> 1) - 8;
         sprite->subpriority = linkedSprite->subpriority - 1;
+        RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         sprite->oam.priority = linkedSprite->oam.priority;
         UpdateObjectEventSpriteInvisibility(sprite, linkedSprite->invisible);
     }
@@ -760,6 +762,7 @@ static void UpdateFeetInFlowingWaterFieldEffect(struct Sprite *sprite)
         sprite->x = linkedSprite->x;
         sprite->y = linkedSprite->y;
         sprite->subpriority = linkedSprite->subpriority;
+        RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         UpdateObjectEventSpriteInvisibility(sprite, FALSE);
         if (objectEvent->currentCoords.x != sprite->sPrevX || objectEvent->currentCoords.y != sprite->sPrevY)
         {
@@ -831,6 +834,7 @@ void UpdateHotSpringsWaterFieldEffect(struct Sprite *sprite)
         sprite->x = linkedSprite->x;
         sprite->y = (graphicsInfo->height >> 1) + linkedSprite->y - 8;
         sprite->subpriority = linkedSprite->subpriority - 1;
+        RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         UpdateObjectEventSpriteInvisibility(sprite, FALSE);
     }
 }
@@ -1245,6 +1249,7 @@ void UpdateSandPileFieldEffect(struct Sprite *sprite)
         sprite->x = parentX;
         sprite->y = parentY;
         sprite->subpriority = gSprites[gObjectEvents[objectEventId].spriteId].subpriority;
+        RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         UpdateObjectEventSpriteInvisibility(sprite, FALSE);
     }
 }
@@ -1731,16 +1736,27 @@ void WaitFieldEffectSpriteAnim(struct Sprite *sprite)
 
 static void UpdateGrassFieldEffectSubpriority(struct Sprite *sprite, u8 elevation, u8 subpriority)
 {
+    SetObjectSubpriorityByElevation(elevation, sprite, subpriority);
+    // Tile-anchored: no object to skip, so it tucks behind every object standing in the grass.
+    RaiseFieldEffectSubpriorityBehindObjects(sprite, OBJECT_EVENTS_COUNT);
+}
+
+// Push a field-effect sprite behind every object overlapping its tile that is drawn at least as far
+// forward, so the effect never floats on top of a body. Originally this only mattered for the grass
+// rustle (which belongs to the tile, skipObjectId == OBJECT_EVENTS_COUNT). Object-anchored overlays
+// (short grass, hot springs, sand pile, feet in flowing water) sit just in front of their own object
+// and pass their own object event id as skipObjectId so they stay there; the scan only tucks them
+// behind a *different* object that has flowed into the same tile (a neighbour's just-vacated coords).
+static void RaiseFieldEffectSubpriorityBehindObjects(struct Sprite *sprite, u8 skipObjectId)
+{
     u8 i;
     s16 var, xhi, lyhi, yhi, ylo;
 
-    SetObjectSubpriorityByElevation(elevation, sprite, subpriority);
     for (i = 0; i < OBJECT_EVENTS_COUNT; i ++)
     {
         struct ObjectEvent *objectEvent = &gObjectEvents[i];
-        if (objectEvent->active)
+        if (objectEvent->active && i != skipObjectId)
         {
-            const struct ObjectEventGraphicsInfo UNUSED *graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
             struct Sprite *linkedSprite = &gSprites[objectEvent->spriteId];
 
             xhi = sprite->x + sprite->centerToCornerVecX;
@@ -1751,11 +1767,10 @@ static void UpdateGrassFieldEffectSubpriority(struct Sprite *sprite, u8 elevatio
                 var = linkedSprite->y;
                 ylo = sprite->y - sprite->centerToCornerVecY;
                 yhi = ylo + linkedSprite->centerToCornerVecY;
+                // Visit every overlapper, not just the first: the subpriority guard only ever raises
+                // the value, so it settles behind the backmost (forwardmost-drawn) overlapping object.
                 if ((lyhi < yhi || lyhi < ylo) && var > yhi && sprite->subpriority <= linkedSprite->subpriority)
-                {
                     sprite->subpriority = linkedSprite->subpriority + 2;
-                    break;
-                }
             }
         }
     }
