@@ -181,7 +181,7 @@ static u8 DoJumpSpecialSpriteMovement(struct Sprite *);
 static void CreateLevitateMovementTask(struct ObjectEvent *);
 static void DestroyLevitateMovementTask(u8);
 static bool8 NpcTakeStep(struct Sprite *);
-static u8 GetStairsSlowFactor(struct ObjectEvent *);
+static u8 GetStairsSlowFactor(struct ObjectEvent *, bool32);
 static bool8 AreElevationsCompatible(u8, u8);
 
 static const struct SpriteFrameImage sPicTable_PechaBerryTree[];
@@ -5927,40 +5927,10 @@ bool8 ObjectEventIsHeldMovementActive(struct ObjectEvent *objectEvent)
     return FALSE;
 }
 
-static u8 TryUpdateMovementActionOnStairs(struct ObjectEvent *objectEvent, u8 movementActionId)
-{
-    #if FOLLOW_ME_IMPLEMENTED
-        if (objectEvent->isPlayer || objectEvent->localId == GetFollowerLocalId())
-            return movementActionId;    //handled separately
-    #else
-        if (objectEvent->isPlayer)
-            return movementActionId;    //handled separately
-    #endif
-    
-    if (!ObjectMovingOnRockStairs(objectEvent, objectEvent->movementDirection))
-        return movementActionId;
-    
-    switch (movementActionId)
-    {
-        case MOVEMENT_ACTION_WALK_NORMAL_DOWN:
-            return MOVEMENT_ACTION_WALK_SLOW_DOWN;
-        case MOVEMENT_ACTION_WALK_NORMAL_UP:
-            return MOVEMENT_ACTION_WALK_SLOW_UP;
-        case MOVEMENT_ACTION_WALK_NORMAL_LEFT:
-            return MOVEMENT_ACTION_WALK_SLOW_LEFT;
-        case MOVEMENT_ACTION_WALK_NORMAL_RIGHT:
-            return MOVEMENT_ACTION_WALK_SLOW_RIGHT;
-        default:
-            return movementActionId;
-    }
-}
-
 bool8 ObjectEventSetHeldMovement(struct ObjectEvent *objectEvent, u8 movementActionId)
 {
     if (ObjectEventIsMovementOverridden(objectEvent))
         return TRUE;
-    
-    movementActionId = TryUpdateMovementActionOnStairs(objectEvent, movementActionId);
 
     UnfreezeObjectEvent(objectEvent);
     objectEvent->movementActionId = movementActionId;
@@ -5972,7 +5942,6 @@ bool8 ObjectEventSetHeldMovement(struct ObjectEvent *objectEvent, u8 movementAct
 
 void ObjectEventForceSetHeldMovement(struct ObjectEvent *objectEvent, u8 movementActionId)
 {
-    movementActionId = TryUpdateMovementActionOnStairs(objectEvent, movementActionId);
     ObjectEventClearHeldMovementIfActive(objectEvent);
     ObjectEventSetHeldMovement(objectEvent, movementActionId);
 }
@@ -6012,7 +5981,7 @@ u8 ObjectEventClearHeldMovementIfFinished(struct ObjectEvent *objectEvent)
 u8 ObjectEventGetHeldMovementActionId(struct ObjectEvent *objectEvent)
 {
     if (objectEvent->heldMovementActive)
-        return TryUpdateMovementActionOnStairs(objectEvent, objectEvent->movementActionId);
+        return objectEvent->movementActionId;
 
     return MOVEMENT_ACTION_NONE;
 }
@@ -6116,14 +6085,12 @@ static u32 GetCopyDirection(u8 copyInitDir, u32 playerInitDir, u32 playerMoveDir
 
 static void ObjectEventExecHeldMovementAction(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    objectEvent->movementActionId = TryUpdateMovementActionOnStairs(objectEvent, objectEvent->movementActionId);
     if (gMovementActionFuncs[objectEvent->movementActionId][sprite->sActionFuncId](objectEvent, sprite))
         objectEvent->heldMovementFinished = TRUE;
 }
 
 static bool8 ObjectEventExecSingleMovementAction(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    objectEvent->movementActionId = TryUpdateMovementActionOnStairs(objectEvent, objectEvent->movementActionId);
     if (gMovementActionFuncs[objectEvent->movementActionId][sprite->sActionFuncId](objectEvent, sprite))
     {
         objectEvent->movementActionId = MOVEMENT_ACTION_NONE;
@@ -6135,7 +6102,7 @@ static bool8 ObjectEventExecSingleMovementAction(struct ObjectEvent *objectEvent
 
 static void ObjectEventSetSingleMovement(struct ObjectEvent *objectEvent, struct Sprite *sprite, u8 animId)
 {
-    objectEvent->movementActionId = TryUpdateMovementActionOnStairs(objectEvent, animId);
+    objectEvent->movementActionId = animId;
     sprite->sActionFuncId = 0;
 }
 
@@ -6243,22 +6210,38 @@ static void InitWalkSlow(struct ObjectEvent *objectEvent, struct Sprite *sprite,
 
 // How much a step is slowed while on stairs: 1 = no slow (off stairs), otherwise the step takes
 // this many times as long, scaling whatever the base speed is (walk/run/bike). Forward stairs are
-// the base, sideways are half that speed, backward a quarter.
-static u8 GetStairsSlowFactor(struct ObjectEvent *objectEvent)
+// the base, sideways are half that speed, backward a quarter. inFirstHalf is TRUE for the first
+// half of the tile crossing (used to localise the backward-stairs slow).
+static u8 GetStairsSlowFactor(struct ObjectEvent *objectEvent, bool32 inFirstHalf)
 {
 #if SLOW_MOVEMENT_ON_STAIRS
     u8 curr, prev;
 
-    // Behind a cliff, stairs are walked as plain terrain (matches ObjectMovingOnRockStairs).
+    // Behind a cliff, stairs are walked as plain terrain.
     if (objectEvent->cliffLayer != CLIFF_LAYER_FRONT)
         return STAIRS_SLOW_FACTOR_NONE;
 
-    if (objectEvent->directionOverwrite) // sideways stairs motion
+    // Sideways stairs slow only their diagonal motion: directionOverwrite is a diagonal (> DIR_EAST)
+    // for that. A vertical step onto a sideways tile leaves it a plain cardinal (DIR_NORTH/SOUTH),
+    // which must not count as sideways motion.
+    if (objectEvent->directionOverwrite > DIR_EAST)
         return STAIRS_SLOW_FACTOR_SIDEWAYS;
+
+    // Forward/backward stairs only slope vertically, so only N/S travel is slowed; a lateral (E/W)
+    // crossing stays full speed.
+    if (objectEvent->movementDirection != DIR_NORTH && objectEvent->movementDirection != DIR_SOUTH)
+        return STAIRS_SLOW_FACTOR_NONE;
 
     curr = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
     prev = MapGridGetMetatileBehaviorAt(objectEvent->previousCoords.x, objectEvent->previousCoords.y);
-    if (MetatileBehavior_IsBackwardStairs(curr) || MetatileBehavior_IsBackwardStairs(prev))
+    // Backward stairs only slow over half their tile: the final 50% of the step moving onto the
+    // tile (currentCoords) and the first 50% moving off it (previousCoords). The caller's
+    // inFirstHalf tracks progress toward currentCoords, so this holds through a mid-step reversal,
+    // and consecutive backward tiles overlap (one's off-half meets the next's onto-half) into one
+    // continuous slow stretch.
+    if (MetatileBehavior_IsBackwardStairs(curr) && !inFirstHalf)
+        return STAIRS_SLOW_FACTOR_BACKWARD;
+    if (MetatileBehavior_IsBackwardStairs(prev) && inFirstHalf)
         return STAIRS_SLOW_FACTOR_BACKWARD;
     if (MetatileBehavior_IsForwardStairs(curr) || MetatileBehavior_IsForwardStairs(prev))
         return STAIRS_SLOW_FACTOR_FORWARD;
@@ -8026,7 +8009,7 @@ bool8 MovementAction_AcroWheelieHopFaceDown_Step1(struct ObjectEvent *objectEven
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
+        // Shadow kept alive across consecutive hops; cleared in MovePlayerOnAcroBike on hop exit.
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8043,7 +8026,6 @@ bool8 MovementAction_AcroWheelieHopFaceUp_Step1(struct ObjectEvent *objectEvent,
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8060,7 +8042,6 @@ bool8 MovementAction_AcroWheelieHopFaceLeft_Step1(struct ObjectEvent *objectEven
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8077,7 +8058,6 @@ bool8 MovementAction_AcroWheelieHopFaceRight_Step1(struct ObjectEvent *objectEve
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8094,7 +8074,6 @@ bool8 MovementAction_AcroWheelieHopDown_Step1(struct ObjectEvent *objectEvent, s
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8111,7 +8090,6 @@ bool8 MovementAction_AcroWheelieHopUp_Step1(struct ObjectEvent *objectEvent, str
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8131,7 +8109,6 @@ bool8 MovementAction_AcroWheelieHopLeft_Step1(struct ObjectEvent *objectEvent, s
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8151,7 +8128,6 @@ bool8 MovementAction_AcroWheelieHopRight_Step1(struct ObjectEvent *objectEvent, 
 {
     if (DoJumpAnim(objectEvent, sprite))
     {
-        objectEvent->hasShadow = FALSE;
         sprite->sActionFuncId = 2;
         return TRUE;
     }
@@ -8831,6 +8807,13 @@ static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *objEvent, u32 *
         GROUND_EFFECT_FLAG_LAND_IN_SHALLOW_WATER,
         GROUND_EFFECT_FLAG_LAND_ON_NORMAL_GROUND,
     };
+
+    // No landing dust when hopping on stairs.
+    if (MetatileBehavior_IsForwardStairs(objEvent->currentMetatileBehavior)
+     || MetatileBehavior_IsBackwardStairs(objEvent->currentMetatileBehavior)
+     || MetatileBehavior_IsSidewaysStairsRightSideAny(objEvent->currentMetatileBehavior)
+     || MetatileBehavior_IsSidewaysStairsLeftSideAny(objEvent->currentMetatileBehavior))
+        return;
 
     if (objEvent->landingJump && !objEvent->disableJumpLandingGroundEffect)
     {
@@ -9640,6 +9623,7 @@ static void Step8(struct Sprite *sprite, u8 dir)
 
 #define sSpeed       data[4]
 #define sTimer       data[5]
+#define sReversing   data[6] // set when a step has been turned back on itself (see ObjectEventReverseHeldMovement)
 #define sStairsTimer data[7] // frame counter used to stretch a step out on stairs
 
 static void SetSpriteDataForNormalStep(struct Sprite *sprite, u8 direction, u8 speed)
@@ -9647,6 +9631,7 @@ static void SetSpriteDataForNormalStep(struct Sprite *sprite, u8 direction, u8 s
     sprite->sDirection = direction;
     sprite->sSpeed = speed;
     sprite->sTimer = 0;
+    sprite->sReversing = FALSE;
     sprite->sStairsTimer = 0;
 }
 
@@ -9722,19 +9707,28 @@ static const s16 sStepTimes[] = {
 static bool8 NpcTakeStep(struct Sprite *sprite)
 {
     u8 stairsFactor;
+    u8 subStep;
+    bool32 inFirstHalf;
 
     if (sprite->sTimer >= sStepTimes[sprite->sSpeed])
         return FALSE;
 
+    // sTimer counts sub-steps completed toward the tile being entered (currentCoords) in either
+    // travel direction, so this first/second-half split stays tile-anchored through a reversal.
+    inFirstHalf = sprite->sTimer * 2 < sStepTimes[sprite->sSpeed];
+
     // On stairs, perform a sub-step only every stairsFactor frames so the move takes that many
     // times longer. The base speed (walk/run/bike) is untouched, so each mode keeps its boost and
     // the stairs slowdown scales on top of it.
-    stairsFactor = GetStairsSlowFactor(&gObjectEvents[sprite->sObjEventId]);
+    stairsFactor = GetStairsSlowFactor(&gObjectEvents[sprite->sObjEventId], inFirstHalf);
     if (stairsFactor > STAIRS_SLOW_FACTOR_NONE && ++sprite->sStairsTimer < stairsFactor)
         return FALSE;
     sprite->sStairsTimer = 0;
 
-    sNpcStepFuncTables[sprite->sSpeed][sprite->sTimer](sprite, sprite->sDirection);
+    // A reversed step retraces the sub-step table back-to-front, so the sprite undoes the exact
+    // pixels it already covered and lands on its origin tile even for non-uniform tables (FAST_2).
+    subStep = sprite->sReversing ? sStepTimes[sprite->sSpeed] - 1 - sprite->sTimer : sprite->sTimer;
+    sNpcStepFuncTables[sprite->sSpeed][subStep](sprite, sprite->sDirection);
 
     sprite->sTimer++;
 
@@ -9744,8 +9738,175 @@ static bool8 NpcTakeStep(struct Sprite *sprite)
     return TRUE;
 }
 
+// The cardinal walk/run/faster steps whose sprite motion can be unwound mid-step. All share the
+// uniform sub-step tables (so they land back on a tile exactly) and the down/up/left/right action
+// layout used by GetOppositeDirection below (down/up/left/right). Includes the ride-water-current
+// action since the acro bike rides on it; genuine water-current tiles are kept from reversing by
+// the forced-movement tile check in TryReversePlayerMovement. Jumps and walk-slow are not here.
+static bool8 IsReversibleStepAction(u8 action)
+{
+    return (action >= MOVEMENT_ACTION_WALK_NORMAL_DOWN        && action <= MOVEMENT_ACTION_WALK_NORMAL_RIGHT)
+        || (action >= MOVEMENT_ACTION_WALK_FAST_DOWN          && action <= MOVEMENT_ACTION_WALK_FAST_RIGHT)
+        || (action >= MOVEMENT_ACTION_RIDE_WATER_CURRENT_DOWN && action <= MOVEMENT_ACTION_RIDE_WATER_CURRENT_RIGHT)
+        || (action >= MOVEMENT_ACTION_WALK_FASTER_DOWN        && action <= MOVEMENT_ACTION_WALK_FASTER_RIGHT)
+        || (action >= MOVEMENT_ACTION_PLAYER_RUN_DOWN         && action <= MOVEMENT_ACTION_PLAYER_RUN_RIGHT)
+        || (action >= MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_DOWN  && action <= MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_RIGHT);
+}
+
+// First (down) action of the reversible group containing `action`. Only valid for actions that pass
+// IsReversibleStepAction; the group is laid out down/up/left/right so cardinal = action - base + 1.
+static u8 ReversibleStepActionBase(u8 action)
+{
+    if (action <= MOVEMENT_ACTION_WALK_NORMAL_RIGHT)        return MOVEMENT_ACTION_WALK_NORMAL_DOWN;
+    if (action <= MOVEMENT_ACTION_WALK_FAST_RIGHT)          return MOVEMENT_ACTION_WALK_FAST_DOWN;
+    if (action <= MOVEMENT_ACTION_RIDE_WATER_CURRENT_RIGHT) return MOVEMENT_ACTION_RIDE_WATER_CURRENT_DOWN;
+    if (action <= MOVEMENT_ACTION_WALK_FASTER_RIGHT)        return MOVEMENT_ACTION_WALK_FASTER_DOWN;
+    if (action <= MOVEMENT_ACTION_PLAYER_RUN_RIGHT)         return MOVEMENT_ACTION_PLAYER_RUN_DOWN;
+    return MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_DOWN;
+}
+
+// Turns an in-progress step around so the object heads back to the tile it just left, the sprite
+// gliding back from however far it had reached instead of snapping. Handles sideways-stairs steps,
+// whose action is cardinal (left/right) while the actual motion vector is diagonal. Returns FALSE,
+// leaving the step untouched, when there's nothing safe to reverse.
+bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
+{
+    struct Sprite *sprite = &gSprites[objectEvent->spriteId];
+    u8 vec = sprite->sDirection;   // motion vector (diagonal on sideways stairs)
+    u8 action = objectEvent->movementActionId;
+    u8 base, cardDir, newCard, newVec, animNum;
+    s16 x, y;
+
+    // Must be a held movement still partway through its single travel phase, and not already
+    // retracing (one reversal per step; the return trip finishes before it can be flipped again).
+    if (!ObjectEventIsMovementOverridden(objectEvent)
+     || ObjectEventCheckHeldMovementStatus(objectEvent)
+     || sprite->sActionFuncId != 1
+     || sprite->sReversing
+     || !IsReversibleStepAction(action))
+        return FALSE;
+
+    // Nothing travelled yet, or already arrived: nothing to unwind.
+    if (sprite->sTimer <= 0 || sprite->sTimer >= sStepTimes[sprite->sSpeed])
+        return FALSE;
+
+    // The action's cardinal direction (down/up/left/right) names the facing/animation; the motion
+    // vector (vec) is what the sprite actually slides along and can be diagonal on sideways stairs.
+    base = ReversibleStepActionBase(action);
+    cardDir = action - base + 1;
+    newCard = GetOppositeDirection(cardDir);
+    newVec = GetOppositeDirection(vec);
+
+    // Swap the tile we left with the one we were heading for: now we're heading back.
+    x = objectEvent->currentCoords.x;
+    y = objectEvent->currentCoords.y;
+    objectEvent->currentCoords = objectEvent->previousCoords;
+    objectEvent->previousCoords.x = x;
+    objectEvent->previousCoords.y = y;
+
+    SetObjectEventDirection(objectEvent, newVec);
+    if (objectEvent->directionOverwrite)
+        objectEvent->directionOverwrite = newVec;
+    objectEvent->movementActionId = base + (newCard - 1);
+
+    // Run exactly as many sub-steps back as were already taken, retracing the table (see
+    // NpcTakeStep) so the sprite lands back on its origin tile, now moving the opposite way.
+    sprite->sDirection = newVec;
+    sprite->sTimer = sStepTimes[sprite->sSpeed] - sprite->sTimer;
+    sprite->sReversing = TRUE;
+    sprite->sStairsTimer = 0;
+
+    if (objectEvent->movementActionId >= MOVEMENT_ACTION_PLAYER_RUN_DOWN
+     && objectEvent->movementActionId <= MOVEMENT_ACTION_PLAYER_RUN_RIGHT)
+        animNum = GetRunningDirectionAnimNum(objectEvent->facingDirection);
+    else if (objectEvent->movementActionId >= MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_DOWN
+          && objectEvent->movementActionId <= MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_RIGHT)
+        animNum = GetAcroWheeliePedalDirectionAnimNum(objectEvent->facingDirection);
+    else
+        animNum = sDirectionAnimFuncsBySpeed[sprite->sSpeed](objectEvent->facingDirection);
+
+    // Face the opposite-direction frames while keeping the stride cadence flowing (restarting the
+    // step animation would cut the leg cycle short on the now-shorter return trip). For a vertical
+    // flip the frames differ, so reload the current frame in the new direction, preserving the dwell
+    // counter. For a horizontal flip the frames are shared (mirrored via hFlip) and the anim engine
+    // re-applies the flip every frame, so only swap the anim; reloading would duplicate a frame.
+    if (!objectEvent->inanimate)
+    {
+        sprite->animNum = animNum;
+        if (newCard == DIR_NORTH || newCard == DIR_SOUTH)
+        {
+            u8 delay = sprite->animDelayCounter;
+            SeekSpriteAnim(sprite, sprite->animCmdIndex);
+            sprite->animDelayCounter = delay;
+        }
+    }
+
+    // Don't re-fire ground effects: the origin tile's effects already played when we left it, and
+    // re-triggering visibly restarts terrain effects (grass rustle, dash dust) mid-glide.
+    return TRUE;
+}
+
+// Switches an in-progress walk step to a dash (or back) while it's still crossing a tile, so the
+// player can start/stop running mid-transition instead of only at tile boundaries. The sprite keeps
+// its sub-tile position and lands cleanly on the destination at the new speed. Returns FALSE when the
+// step can't switch: not an on-foot walk/run step, already in the requested gait, mid-reverse, or the
+// dash pixel grid (2px) doesn't line up yet (the caller retries a frame later, 1px further along).
+bool8 ObjectEventChangeStepGait(struct ObjectEvent *objectEvent, bool8 dash)
+{
+    struct Sprite *sprite = &gSprites[objectEvent->spriteId];
+    u8 action = objectEvent->movementActionId;
+    u8 newSpeed = dash ? MOVE_SPEED_FAST_1 : MOVE_SPEED_NORMAL;
+    bool8 isWalk = (action >= MOVEMENT_ACTION_WALK_NORMAL_DOWN && action <= MOVEMENT_ACTION_WALK_NORMAL_RIGHT);
+    bool8 isRun  = (action >= MOVEMENT_ACTION_PLAYER_RUN_DOWN  && action <= MOVEMENT_ACTION_PLAYER_RUN_RIGHT);
+    u8 cardDir, off, remaining, mNew, animNum;
+
+    // Note: sideways-stairs steps (directionOverwrite set) are handled here too. Their action is
+    // cardinal (left/right) while sprite->sDirection holds the diagonal vector, which we leave
+    // untouched, so the gait flips speed without disturbing the diagonal motion.
+    if (!ObjectEventIsMovementOverridden(objectEvent)
+     || ObjectEventCheckHeldMovementStatus(objectEvent)
+     || sprite->sActionFuncId != 1
+     || sprite->sReversing
+     || (!isWalk && !isRun)
+     || newSpeed == sprite->sSpeed)
+        return FALSE;
+
+    // Pixels already covered this step (uniform tables over a 16px tile), and what's left to go.
+    off = sprite->sTimer * (16 / sStepTimes[sprite->sSpeed]);
+    remaining = 16 - off;
+    mNew = 16 / sStepTimes[newSpeed];
+    if (remaining % mNew != 0)   // dash sub-steps are 2px; wait a frame for an even boundary
+        return FALSE;
+
+    cardDir = (isWalk ? action - MOVEMENT_ACTION_WALK_NORMAL_DOWN
+                      : action - MOVEMENT_ACTION_PLAYER_RUN_DOWN) + 1;
+    objectEvent->movementActionId =
+        (dash ? MOVEMENT_ACTION_PLAYER_RUN_DOWN : MOVEMENT_ACTION_WALK_NORMAL_DOWN) + (cardDir - 1);
+
+    // Cover the remaining pixels at the new speed so the sprite still lands on the destination tile.
+    sprite->sSpeed = newSpeed;
+    sprite->sTimer = sStepTimes[newSpeed] - remaining / mNew;
+    // Keep the stairs slowdown counter: the new sTimer holds the same pixel position, so the slow
+    // factor is unchanged. Zeroing it here would let mashing B (toggling gait every frame) reset the
+    // counter before it reaches the threshold, freezing the object mid-step on stairs.
+
+    // Swap to the walk/run leg animation, preserving the stride cadence (walk and run share the
+    // 4-frame cycle layout, so the current index maps across).
+    animNum = dash ? GetRunningDirectionAnimNum(objectEvent->facingDirection)
+                   : GetMoveDirectionAnimNum(objectEvent->facingDirection);
+    if (!objectEvent->inanimate)
+    {
+        u8 delay = sprite->animDelayCounter;
+        sprite->animNum = animNum;
+        SeekSpriteAnim(sprite, sprite->animCmdIndex);
+        sprite->animDelayCounter = delay;
+    }
+    return TRUE;
+}
+
 #undef sSpeed
 #undef sTimer
+#undef sReversing
 #undef sStairsTimer
 
 #define sTimer     data[4]
@@ -9891,6 +10052,7 @@ static void SetJumpSpriteData(struct Sprite *sprite, u8 direction, u8 distance, 
     sprite->sDistance = distance;
     sprite->sJumpType = type;
     sprite->sTimer = 0;
+    sprite->data[7] = 0; // stairs slowdown counter (see DoJumpSpriteMovement)
 }
 
 static u8 DoJumpSpriteMovement(struct Sprite *sprite)
@@ -9906,22 +10068,32 @@ static u8 DoJumpSpriteMovement(struct Sprite *sprite)
         [JUMP_DISTANCE_FAR] = 1,
     };
     u8 result = 0;
+    // Hops (e.g. the acro bike bunny-hop) cross tiles through here, not NpcTakeStep, so apply the
+    // stairs slowdown here. data[7] free-runs every frame; the horizontal step + completion only
+    // advance once per stairsFactor frames, slowing the crossing. The hop arc below keys off the
+    // free-running frame instead, so it keeps its normal speed and simply loops as we creep across.
+    bool32 inFirstHalf = sprite->sTimer * 2 < distanceToTime[sprite->sDistance];
+    u8 stairsFactor = GetStairsSlowFactor(&gObjectEvents[sprite->sObjEventId], inFirstHalf);
+    s16 frame = sprite->data[7]++;
 
-    if (sprite->sDistance != JUMP_DISTANCE_IN_PLACE)
-        Step1(sprite, sprite->sDirection);
-
-    sprite->y2 = GetJumpY(sprite->sTimer >> distanceToShift[sprite->sDistance], sprite->sJumpType);
-
-    sprite->sTimer++;
-
-    if (sprite->sTimer == distanceToTime[sprite->sDistance] >> 1)
-        result = JUMP_HALFWAY;
-
-    if (sprite->sTimer >= distanceToTime[sprite->sDistance])
+    if (frame % stairsFactor == 0)
     {
-        sprite->y2 = 0;
-        result = JUMP_FINISHED;
+        if (sprite->sDistance != JUMP_DISTANCE_IN_PLACE)
+            Step1(sprite, sprite->sDirection);
+
+        sprite->sTimer++;
+
+        if (sprite->sTimer == distanceToTime[sprite->sDistance] >> 1)
+            result = JUMP_HALFWAY;
+
+        if (sprite->sTimer >= distanceToTime[sprite->sDistance])
+            result = JUMP_FINISHED;
     }
+
+    if (result == JUMP_FINISHED)
+        sprite->y2 = 0;
+    else
+        sprite->y2 = GetJumpY((frame % distanceToTime[sprite->sDistance]) >> distanceToShift[sprite->sDistance], sprite->sJumpType);
 
     return result;
 }

@@ -162,7 +162,7 @@
 #define CONNECTION_EMERGE     10
 
 #define SLOW_MOVEMENT_ON_STAIRS         TRUE
-#define FOLLOW_ME_IMPLEMENTED           FALSE    //for stairs movement. see ObjectMovingOnRockStairs in src/field_player_avatar.c
+#define FOLLOW_ME_IMPLEMENTED           FALSE    // reserved for follower support
 
 // Stairs stretch each movement step over this many frames, scaling the base speed (walk/run/bike).
 // A larger value is slower; NONE (1) leaves the step at its normal speed.

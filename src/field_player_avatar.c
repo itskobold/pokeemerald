@@ -48,6 +48,9 @@ static u8 ObjectEventCB2_NoMovement2(void);
 static bool8 TryInterruptObjectEventSpecialAnim(struct ObjectEvent *, u8);
 static void npc_clear_strange_bits(struct ObjectEvent *);
 static void MovePlayerAvatarUsingKeypadInput(u8, u16, u16);
+static bool8 MetatileBehaviorForcesMovement(u8);
+static bool8 TryReversePlayerMovement(struct ObjectEvent *, u8);
+static void TryUpdatePlayerDashState(struct ObjectEvent *, u16);
 static void PlayerAllowForcedMovementIfMovingSameDirection(void);
 static bool8 TryDoMetatileBehaviorForcedMovement(void);
 static u8 GetForcedMovementByMetatileBehavior(void);
@@ -345,6 +348,9 @@ void PlayerStep(u8 direction, u16 newKeys, u16 heldKeys)
     if (gPlayerAvatar.preventStep == FALSE)
     {
         Bike_TryAcroBikeHistoryUpdate(newKeys, heldKeys);
+        TryUpdatePlayerDashState(playerObjEvent, heldKeys);
+        if (TryReversePlayerMovement(playerObjEvent, direction))
+            return;
         if (TryInterruptObjectEventSpecialAnim(playerObjEvent, direction) == 0)
         {
             npc_clear_strange_bits(playerObjEvent);
@@ -388,6 +394,68 @@ static bool8 TryInterruptObjectEventSpecialAnim(struct ObjectEvent *playerObjEve
     }
 
     return FALSE;
+}
+
+// True if standing on this tile hands control to the terrain (ice, currents, slides, warp/spin
+// mats, muddy slope). On such tiles a step can't be cancelled by steering back.
+static bool8 MetatileBehaviorForcesMovement(u8 metatileBehavior)
+{
+    u8 i;
+
+    for (i = 0; i < NUM_FORCED_MOVEMENTS; i++)
+    {
+        if (sForcedMovementTestFuncs[i](metatileBehavior))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// Lets the player abort an in-progress step by holding the opposite direction, gliding back to the
+// tile they left. Suppressed while the terrain is steering (forced movement) or already forcing a
+// move. Returns TRUE when a reversal was started, so PlayerStep should issue no further movement.
+static bool8 TryReversePlayerMovement(struct ObjectEvent *playerObjEvent, u8 direction)
+{
+    u8 travelDir = playerObjEvent->movementDirection;
+
+    // On sideways stairs the player slides diagonally (directionOverwrite) but still steers with the
+    // horizontal D-pad, so reverse against that horizontal component rather than the diagonal.
+    if (playerObjEvent->directionOverwrite)
+    {
+        if (travelDir == DIR_SOUTHEAST || travelDir == DIR_NORTHEAST)
+            travelDir = DIR_EAST;
+        else if (travelDir == DIR_SOUTHWEST || travelDir == DIR_NORTHWEST)
+            travelDir = DIR_WEST;
+    }
+
+    if (direction == DIR_NONE || direction != GetOppositeDirection(travelDir))
+        return FALSE;
+    if (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_FORCED_MOVE)
+        return FALSE;
+    if (MetatileBehaviorForcesMovement(playerObjEvent->currentMetatileBehavior))
+        return FALSE;
+    return ObjectEventReverseHeldMovement(playerObjEvent);
+}
+
+// Lets the player start or stop dashing partway through a step instead of only at tile boundaries.
+// Only plain on-foot walking/running can switch; surf/bike/forced moves keep their fixed speed.
+static void TryUpdatePlayerDashState(struct ObjectEvent *playerObjEvent, u16 heldKeys)
+{
+    bool8 dash;
+
+    if (gPlayerAvatar.flags & (PLAYER_AVATAR_FLAG_SURFING | PLAYER_AVATAR_FLAG_MACH_BIKE
+                             | PLAYER_AVATAR_FLAG_ACRO_BIKE | PLAYER_AVATAR_FLAG_UNDERWATER
+                             | PLAYER_AVATAR_FLAG_FORCED_MOVE))
+        return;
+
+    dash = (heldKeys & B_BUTTON) && FlagGet(FLAG_SYS_B_DASH)
+        && IsRunningDisallowed(playerObjEvent->currentMetatileBehavior) == 0;
+    if (ObjectEventChangeStepGait(playerObjEvent, dash))
+    {
+        if (dash)
+            gPlayerAvatar.flags |= PLAYER_AVATAR_FLAG_DASH;
+        else
+            gPlayerAvatar.flags &= ~PLAYER_AVATAR_FLAG_DASH;
+    }
 }
 
 static void npc_clear_strange_bits(struct ObjectEvent *objEvent)
@@ -2324,49 +2392,4 @@ u8 GetLeftSideStairsDirection(u8 direction)
     }
 }
 
-static bool8 IsForwardOrBackwardStairs(u8 metatileBehavior)
-{
-    return MetatileBehavior_IsForwardStairs(metatileBehavior)
-        || MetatileBehavior_IsBackwardStairs(metatileBehavior);
-}
-
-bool8 ObjectMovingOnRockStairs(struct ObjectEvent *objectEvent, u8 direction)
-{
-    #if SLOW_MOVEMENT_ON_STAIRS
-        s16 x = objectEvent->currentCoords.x;
-        s16 y = objectEvent->currentCoords.y;
-
-        // Behind the cliff every tile is treated as MB_NORMAL: no slow-stairs movement (and no
-        // stairs-driven state changes that would break the behind-cliff state machine).
-        if (objectEvent->cliffLayer != CLIFF_LAYER_FRONT)
-            return FALSE;
-
-        #if FOLLOW_ME_IMPLEMENTED
-            if (PlayerHasFollower() && (objectEvent->isPlayer || objectEvent->localId == GetFollowerLocalId()))
-                return FALSE;
-        #endif
-        
-        switch (direction)
-        {
-        case DIR_NORTH:
-            return IsForwardOrBackwardStairs(MapGridGetMetatileBehaviorAt(x,y));
-        case DIR_SOUTH:
-            MoveCoords(DIR_SOUTH, &x, &y);
-            return IsForwardOrBackwardStairs(MapGridGetMetatileBehaviorAt(x,y));
-        case DIR_WEST:
-        case DIR_EAST:
-        case DIR_NORTHEAST:
-        case DIR_NORTHWEST:
-        case DIR_SOUTHWEST:
-        case DIR_SOUTHEAST:
-            // directionOverwrite is only used for sideways stairs motion
-            if (objectEvent->directionOverwrite)
-                return TRUE;
-        default:
-            return FALSE;
-        }
-    #else
-        return FALSE;
-    #endif
-}
 

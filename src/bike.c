@@ -289,7 +289,18 @@ static void MachBikeTransition_TrySlowDown(u8 direction)
 // the acro bike requires the input handler to be executed before the transition can.
 static void MovePlayerOnAcroBike(u8 newDirection, u16 newKeys, u16 heldKeys)
 {
-    sAcroBikeTransitions[CheckMovementInputAcroBike(&newDirection, newKeys, heldKeys)](newDirection);
+    u8 transition = CheckMovementInputAcroBike(&newDirection, newKeys, heldKeys);
+
+    sAcroBikeTransitions[transition](newDirection);
+
+    // Bunny-hops keep their shadow alive across consecutive hops (the hop actions no longer clear
+    // it) so it doesn't blink between tiles. Drop it once we leave the hop for a grounded
+    // transition; the side/turn jumps manage their own shadow.
+    if (transition != ACRO_TRANS_WHEELIE_HOPPING_STANDING
+     && transition != ACRO_TRANS_WHEELIE_HOPPING_MOVING
+     && transition != ACRO_TRANS_SIDE_JUMP
+     && transition != ACRO_TRANS_TURN_JUMP)
+        gObjectEvents[gPlayerAvatar.objectEventId].hasShadow = FALSE;
 }
 
 static u8 CheckMovementInputAcroBike(u8 *newDirection, u16 newKeys, u16 heldKeys)

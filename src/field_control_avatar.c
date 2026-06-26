@@ -127,14 +127,41 @@ void FieldGetPlayerInput(struct FieldInput *input, u16 newKeys, u16 heldKeys)
             input->checkStandardWildEncounter = TRUE;
     }
 
-    if (heldKeys & DPAD_UP)
-        input->dpadDirection = DIR_NORTH;
-    else if (heldKeys & DPAD_DOWN)
-        input->dpadDirection = DIR_SOUTH;
-    else if (heldKeys & DPAD_LEFT)
-        input->dpadDirection = DIR_WEST;
-    else if (heldKeys & DPAD_RIGHT)
-        input->dpadDirection = DIR_EAST;
+    // Prioritise the most recently pressed direction. A newly pressed key wins;
+    // otherwise keep the last direction while it's still held, then fall back.
+    {
+        static u8 sLastHeldDir; // zero-init = DIR_NONE; an initializer would land in discarded .data
+        u8 dir = DIR_NONE;
+
+        if (newKeys & DPAD_UP)
+            dir = DIR_NORTH;
+        else if (newKeys & DPAD_DOWN)
+            dir = DIR_SOUTH;
+        else if (newKeys & DPAD_LEFT)
+            dir = DIR_WEST;
+        else if (newKeys & DPAD_RIGHT)
+            dir = DIR_EAST;
+
+        if (dir == DIR_NONE)
+        {
+            if ((sLastHeldDir == DIR_NORTH && (heldKeys & DPAD_UP))
+             || (sLastHeldDir == DIR_SOUTH && (heldKeys & DPAD_DOWN))
+             || (sLastHeldDir == DIR_WEST && (heldKeys & DPAD_LEFT))
+             || (sLastHeldDir == DIR_EAST && (heldKeys & DPAD_RIGHT)))
+                dir = sLastHeldDir;
+            else if (heldKeys & DPAD_UP)
+                dir = DIR_NORTH;
+            else if (heldKeys & DPAD_DOWN)
+                dir = DIR_SOUTH;
+            else if (heldKeys & DPAD_LEFT)
+                dir = DIR_WEST;
+            else if (heldKeys & DPAD_RIGHT)
+                dir = DIR_EAST;
+        }
+
+        sLastHeldDir = dir;
+        input->dpadDirection = dir;
+    }
 }
 
 int ProcessPlayerFieldInput(struct FieldInput *input)
