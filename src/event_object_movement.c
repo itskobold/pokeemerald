@@ -101,6 +101,17 @@ static u32 GetCopyDirection(u8, u32, u32);
 static void TryEnableObjectEventAnim(struct ObjectEvent *, struct Sprite *);
 static void ObjectEventExecHeldMovementAction(struct ObjectEvent *, struct Sprite *);
 static void UpdateObjectEventBehindCliff(struct ObjectEvent *);
+
+// Pre-step snapshot of the player's cliff state, taken when its step commits and restored if that
+// step is reversed (see UpdateObjectEventBehindCliff / ObjectEventReverseHeldMovement). File-scope
+// rather than in struct ObjectEvent, which is embedded in SaveBlock1: only the player reverses and
+// it has one in-flight step, so a single snapshot suffices and the save layout is untouched.
+static struct {
+    u8 cliffMetatileBehavior;
+    u8 previousElevation:4;
+    u8 cliffLayer:2;
+    u8 surfacingFromCliff:1;
+} sPlayerCliffBackup;
 static void UpdateObjectEventSpriteAnimPause(struct ObjectEvent *, struct Sprite *);
 static bool8 IsCoordOutsideObjectEventMovementRange(struct ObjectEvent *, s16, s16);
 static bool8 IsMetatileDirectionallyImpassable(struct ObjectEvent *, s16, s16, u8);
@@ -9130,6 +9141,18 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
 {
     u8 fromElevation, toElevation, fromBehavior, toBehavior;
 
+    // Snapshot the player's pre-step cliff state so a reversal can undo whatever this commit resolves
+    // below (see ObjectEventReverseHeldMovement). Kept out of struct ObjectEvent because it is embedded
+    // in SaveBlock1 — growing it would shift the save layout. Only the player reverses, and it has a
+    // single in-flight step, so one file-scope snapshot per player commit is always the right one.
+    if (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId])
+    {
+        sPlayerCliffBackup.cliffLayer = objEvent->cliffLayer;
+        sPlayerCliffBackup.surfacingFromCliff = objEvent->surfacingFromCliff;
+        sPlayerCliffBackup.previousElevation = objEvent->previousElevation;
+        sPlayerCliffBackup.cliffMetatileBehavior = objEvent->cliffMetatileBehavior;
+    }
+
     if (objEvent->drawAtHighestElevation) // "any elevation" objects never go behind a cliff
         return;
 
@@ -9836,6 +9859,15 @@ bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
     objectEvent->currentCoords = objectEvent->previousCoords;
     objectEvent->previousCoords.x = x;
     objectEvent->previousCoords.y = y;
+
+    // We never actually reach the destination tile, so undo the cliff state the forward step committed
+    // (climb behind / deferred surface) by restoring the snapshot from when it started. Returning to
+    // the origin tile then settles with the same cliff state it had before the step (see
+    // UpdateObjectEventBehindCliff / DoGroundEffects_OnFinishStep).
+    objectEvent->cliffLayer = sPlayerCliffBackup.cliffLayer;
+    objectEvent->surfacingFromCliff = sPlayerCliffBackup.surfacingFromCliff;
+    objectEvent->previousElevation = sPlayerCliffBackup.previousElevation;
+    objectEvent->cliffMetatileBehavior = sPlayerCliffBackup.cliffMetatileBehavior;
 
     SetObjectEventDirection(objectEvent, newVec);
     if (objectEvent->directionOverwrite)
