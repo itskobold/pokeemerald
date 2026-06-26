@@ -136,7 +136,6 @@ static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *, u32 *);
 static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *);
 static u8 GetReflectionTypeByMetatileBehavior(u32);
 static void InitObjectPriorityByElevation(struct Sprite *, u8);
-static u8 GetObjectEventRenderElevation(struct ObjectEvent *);
 static void ObjectEventUpdateSubpriority(struct ObjectEvent *, struct Sprite *);
 static void SetObjectEventSubpriority(struct ObjectEvent *, struct Sprite *);
 static void DoTracksGroundEffect_None(struct ObjectEvent *, struct Sprite *, u8);
@@ -5576,9 +5575,9 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
     u8 curBehavior = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
     bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
-    // Stairs-bottom tiles are the base step of a staircase: like stairs, stepping off them down to the
-    // lower neighbour is a legitimate descent, not an elevation mismatch.
-    bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior) || MetatileBehavior_IsStairsBottom(curBehavior);
+    // On a stairs tile, stepping off it down to the lower neighbour is a legitimate descent, not an
+    // elevation mismatch.
+    bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
     // Ignore front-terrain metatile collisions when already behind the cliff, or on the upward
     // non-stairs step that climbs behind it (lets the cliff's first tile be entered). See
     // UpdateObjectEventBehindCliff.
@@ -5712,8 +5711,7 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
     u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
     u8 curBehavior = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
     bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
-    // Stairs-bottom tiles allow stepping off down to the lower neighbour; see GetVanillaCollision.
-    bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior) || MetatileBehavior_IsStairsBottom(curBehavior);
+    bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
     // See GetVanillaCollision for the cliff-plane collision rules mirrored here.
     bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
      || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
@@ -5821,11 +5819,10 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
             // cliff is the real "same plane" test here.
             // Behind a cliff an object is on a separate render plane: previousElevation freezes at the
             // climbed-from base, so the render-level match keeps opposite sides of a face apart while
-            // colliding objects frozen at the same base. (GetObjectEventRenderElevation also fakes a
-            // stairs-bottom object up to its neighbour's drawn level for that comparison.)
+            // colliding objects frozen at the same base.
             if (occupied
              && ((moverInFront && curObject->cliffLayer == CLIFF_LAYER_FRONT)
-              || AreElevationsCompatible(GetObjectEventRenderElevation(objectEvent), GetObjectEventRenderElevation(curObject))))
+              || AreElevationsCompatible(objectEvent->previousElevation, curObject->previousElevation)))
                 return TRUE;
         }
     }
@@ -6270,11 +6267,9 @@ static u8 GetStairsSlowFactor(struct ObjectEvent *objectEvent, bool32 inFirstHal
     // inFirstHalf tracks progress toward currentCoords, so this holds through a mid-step reversal,
     // and consecutive backward tiles overlap (one's off-half meets the next's onto-half) into one
     // continuous slow stretch.
-    // A backward-stairs-bottom is the base step: slow it like a real backward stair (same half-tile
-    // localisation) so leaving it toward the upper stairs keeps the continuous slow.
-    if ((MetatileBehavior_IsBackwardStairs(curr) || MetatileBehavior_IsBackwardStairsBottom(curr)) && !inFirstHalf)
+    if (MetatileBehavior_IsBackwardStairs(curr) && !inFirstHalf)
         return STAIRS_SLOW_FACTOR_BACKWARD;
-    if ((MetatileBehavior_IsBackwardStairs(prev) || MetatileBehavior_IsBackwardStairsBottom(prev)) && inFirstHalf)
+    if (MetatileBehavior_IsBackwardStairs(prev) && inFirstHalf)
         return STAIRS_SLOW_FACTOR_BACKWARD;
     if (MetatileBehavior_IsForwardStairs(curr) || MetatileBehavior_IsForwardStairs(prev))
         return STAIRS_SLOW_FACTOR_FORWARD;
@@ -8994,37 +8989,16 @@ static bool32 IsObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
     return TRUE;
 }
 
-// Render elevation used to pick the sprite's draw priority/subsprite table. Normally the object's
-// frozen render base, but an object standing fully unobscured (in front of any cliff) on a
-// stairs-bottom tile is drawn at the level of the neighbouring tile the stairs descend toward:
-// FORWARD_STAIRS_BOTTOM uses the tile one row south (y+1), BACKWARD_STAIRS_BOTTOM the tile one row
-// north (y-1). Off-map neighbours (no connection there) render as level 0.
-static u8 GetObjectEventRenderElevation(struct ObjectEvent *objEvent)
-{
-    s16 x, y;
-    u8 behavior;
-
-    if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
-        return objEvent->previousElevation;
-
-    x = objEvent->currentCoords.x;
-    y = objEvent->currentCoords.y;
-    behavior = MapGridGetMetatileBehaviorAt(x, y);
-
-    if (MetatileBehavior_IsForwardStairsBottom(behavior))
-        return MapGridGetElevationOrZeroAt(x, y + 1);
-    if (MetatileBehavior_IsBackwardStairsBottom(behavior))
-        return MapGridGetElevationOrZeroAt(x, y - 1);
-
-    return objEvent->previousElevation;
-}
+// Height-based elevations no longer layer front-object sprites: the behind-cliff system owns all
+// cross-level occlusion, so every front sprite shares one draw band (OAM priority 2, full-sprite
+// subsprite table, one subpriority base) and sorts against other front sprites only by screen Y.
+// Feeding this flat elevation to the elevation tables selects that band without magic numbers.
+#define FLAT_RENDER_ELEVATION 3
 
 // Set the sprite's draw priority/subsprite table from the object's current elevation and cliff
 // state. Does not touch the elevation value itself.
 static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
-    u8 renderElevation;
-
     // "Any elevation" object: always draw in front of terrain at the top render level,
     // ignoring behind-cliff/elevation occlusion entirely.
     if (objEvent->drawAtHighestElevation)
@@ -9035,8 +9009,9 @@ static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Spri
         return;
     }
 
-    renderElevation = GetObjectEventRenderElevation(objEvent);
-    sprite->subspriteTableNum = sElevationToSubspriteTableNum[renderElevation];
+    // Front sprites no longer layer by elevation band: all sit on one flat band and sort only by
+    // screen Y (subpriority), with cross-level occlusion left to the behind-cliff system.
+    sprite->subspriteTableNum = sElevationToSubspriteTableNum[FLAT_RENDER_ELEVATION];
 
     // Behind a cliff, draw the whole sprite behind the top 2 metatile layers (priority 3, in front of
     // only the bottom BG layer). SUBSPRITES_ON would let the subsprite tables override oam.priority per
@@ -9049,7 +9024,7 @@ static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Spri
     else
     {
         sprite->subspriteMode = SUBSPRITES_ON;
-        sprite->oam.priority = sElevationToPriority[renderElevation];
+        sprite->oam.priority = sElevationToPriority[FLAT_RENDER_ELEVATION];
     }
 }
 
@@ -9074,8 +9049,8 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
         return;
     }
 
-    // Stairs-bottom tiles are a flat render-only transition, never a cliff to hide behind.
-    if (MetatileBehavior_IsStairsBottom(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y)))
+    // Stairs are the walkable path between levels, never a cliff to hide behind.
+    if (MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y)))
     {
         objEvent->cliffLayer = CLIFF_LAYER_FRONT;
         return;
@@ -9208,15 +9183,6 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
     fromBehavior = MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y);
     toBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
 
-    // Stairs-bottom tiles are a flat render-only transition: stepping onto one is never a climb,
-    // so the object stays in front (its level is faked at draw time, see GetObjectEventRenderElevation).
-    if (MetatileBehavior_IsStairsBottom(toBehavior))
-    {
-        objEvent->cliffLayer = CLIFF_LAYER_FRONT;
-        objEvent->surfacingFromCliff = FALSE;
-        return;
-    }
-
     // Stairs carry no elevation of their own: no climb/crest, hold the current state. Cliff-face-side
     // is NOT included: an upward step onto it climbs behind like any other higher tile.
     if (MetatileBehavior_IsElevationChange(toBehavior))
@@ -9254,14 +9220,15 @@ void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 sub
     sprite->subpriority = sElevationToSubpriority[elevation] + y + subpriority;
 }
 
-// Subpriority for an "any elevation" object: 0 is the frontmost value, so it draws on
-// top of every other object instead of sorting among them by screen Y.
+// Subpriority orders front sprites against each other. "Any elevation" objects take 0 (the frontmost
+// value) so they draw on top of everything; every other front sprite uses the one flat band so the
+// only thing separating them is the screen-Y term (see SetObjectSubpriorityByElevation).
 static void SetObjectEventSubpriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
     if (objEvent->drawAtHighestElevation)
         sprite->subpriority = 0;
     else
-        SetObjectSubpriorityByElevation(GetObjectEventRenderElevation(objEvent), sprite, 1);
+        SetObjectSubpriorityByElevation(FLAT_RENDER_ELEVATION, sprite, 1);
 }
 
 static void ObjectEventUpdateSubpriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
