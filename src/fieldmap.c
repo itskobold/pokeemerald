@@ -795,6 +795,11 @@ u8 MapGridGetElevationOrZeroAt(int x, int y)
 
 u8 MapGridGetBgMaterialAt(int x, int y)
 {
+    // Void tiles inside the backup buffer (block == MAPGRID_UNDEFINED) render the border
+    // metatile, so their bgMaterial must source from the border attributes too — the in-bounds
+    // MAPATTR_UNDEFINED placeholder carries no material. Mirrors MapGridGetMetatileIdAt.
+    if (GetMapGridBlockAt(x, y) == MAPGRID_UNDEFINED)
+        return UNPACK_BGMATERIAL(GetBorderAttrAt(x, y));
     return UNPACK_BGMATERIAL(GetMapGridAttrAt(x, y));
 }
 
