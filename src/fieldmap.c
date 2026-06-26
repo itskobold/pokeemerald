@@ -783,6 +783,16 @@ u8 MapGridGetElevationAt(int x, int y)
     return UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
 }
 
+// Elevation for stairs-bottom render overrides. Connection tiles within the border carry the
+// connected map's real attributes, so they resolve normally; a tile with no real entry (off-map
+// void / unconnected edge) renders as level 0.
+u8 MapGridGetElevationOrZeroAt(int x, int y)
+{
+    if (!AreCoordsWithinMapGridBounds(x, y) || GetMapGridBlockAt(x, y) == MAPGRID_UNDEFINED)
+        return 0;
+    return UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
+}
+
 u8 MapGridGetBgMaterialAt(int x, int y)
 {
     return UNPACK_BGMATERIAL(GetMapGridAttrAt(x, y));

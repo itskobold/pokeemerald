@@ -1491,6 +1491,30 @@ bool8 MetatileBehavior_IsBackwardStairs(u8 metatileBehavior)
         return FALSE;
 }
 
+bool8 MetatileBehavior_IsForwardStairsBottom(u8 metatileBehavior)
+{
+    if (metatileBehavior == MB_FORWARD_STAIRS_BOTTOM)
+        return TRUE;
+    else
+        return FALSE;
+}
+
+bool8 MetatileBehavior_IsBackwardStairsBottom(u8 metatileBehavior)
+{
+    if (metatileBehavior == MB_BACKWARD_STAIRS_BOTTOM)
+        return TRUE;
+    else
+        return FALSE;
+}
+
+// Render-only transition tiles: objects on them render at a neighbour's level but are never
+// treated as a cliff (see GetObjectEventRenderElevation / the behind-cliff resolvers).
+bool8 MetatileBehavior_IsStairsBottom(u8 metatileBehavior)
+{
+    return MetatileBehavior_IsForwardStairsBottom(metatileBehavior)
+        || MetatileBehavior_IsBackwardStairsBottom(metatileBehavior);
+}
+
 // Stairs tiles are the clean path between elevation levels (forward/backward + sideways stairs).
 bool8 MetatileBehavior_IsElevationChange(u8 metatileBehavior)
 {
