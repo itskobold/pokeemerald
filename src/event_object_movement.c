@@ -101,6 +101,8 @@ static u32 GetCopyDirection(u8, u32, u32);
 static void TryEnableObjectEventAnim(struct ObjectEvent *, struct Sprite *);
 static void ObjectEventExecHeldMovementAction(struct ObjectEvent *, struct Sprite *);
 static void UpdateObjectEventBehindCliff(struct ObjectEvent *);
+static bool8 IsPlayerMovementReversing(void);
+static bool8 ShouldCopyPlayerMovement(void);
 
 // Pre-step snapshot of the player's cliff state, taken when its step commits and restored if that
 // step is reversed (see UpdateObjectEventBehindCliff / ObjectEventReverseHeldMovement). File-scope
@@ -5027,9 +5029,22 @@ bool8 MovementType_CopyPlayer_Step0(struct ObjectEvent *objectEvent, struct Spri
     return TRUE;
 }
 
+// Copy-player NPCs mirror only the player's own field steps as they play out. A step the player never
+// really takes is excluded: walking in place into a collision advertises COPY_MOVE_NONE (see
+// PlayerNotOnBikeCollide), forced movement (ice, currents, mats, slopes) is skipped via its flag, and
+// a step being cancelled is turned back mid-glide in _Step2 rather than freshly copied here. Turning
+// in place still copies, as a turn (COPY_MOVE_FACE).
+static bool8 ShouldCopyPlayerMovement(void)
+{
+    return gObjectEvents[gPlayerAvatar.objectEventId].movementActionId != MOVEMENT_ACTION_NONE
+        && gPlayerAvatar.tileTransitionState != T_TILE_CENTER
+        && !(gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_FORCED_MOVE)
+        && !IsPlayerMovementReversing();
+}
+
 bool8 MovementType_CopyPlayer_Step1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    if (gObjectEvents[gPlayerAvatar.objectEventId].movementActionId == MOVEMENT_ACTION_NONE || gPlayerAvatar.tileTransitionState == T_TILE_CENTER)
+    if (!ShouldCopyPlayerMovement())
         return FALSE;
 
     return gCopyPlayerMovementFuncs[PlayerGetCopyableMovement()](objectEvent, sprite, GetPlayerMovementDirection(), NULL);
@@ -5037,6 +5052,11 @@ bool8 MovementType_CopyPlayer_Step1(struct ObjectEvent *objectEvent, struct Spri
 
 bool8 MovementType_CopyPlayer_Step2(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
+    // The player cancelled the step we're mirroring: turn ours back too so we glide home to our origin
+    // tile in sync. No-op once we're already retracing or if the copied step wasn't reversible.
+    if (IsPlayerMovementReversing())
+        ObjectEventReverseHeldMovement(objectEvent);
+
     if (ObjectEventExecSingleMovementAction(objectEvent, sprite))
     {
         objectEvent->singleMovementActive = FALSE;
@@ -5207,7 +5227,7 @@ movement_type_def(MovementType_CopyPlayerInGrass, gMovementTypeFuncs_CopyPlayerI
 
 bool8 MovementType_CopyPlayerInGrass_Step1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    if (gObjectEvents[gPlayerAvatar.objectEventId].movementActionId == MOVEMENT_ACTION_NONE || gPlayerAvatar.tileTransitionState == T_TILE_CENTER)
+    if (!ShouldCopyPlayerMovement())
         return FALSE;
 
     return gCopyPlayerMovementFuncs[PlayerGetCopyableMovement()](objectEvent, sprite, GetPlayerMovementDirection(), MetatileBehavior_IsPokeGrass);
@@ -9866,10 +9886,13 @@ bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
     u8 base, cardDir, newCard, newVec, animNum;
     s16 x, y;
 
-    // Must be a held movement still partway through its single travel phase, and not already
-    // retracing (one reversal per step; the return trip finishes before it can be flipped again).
+    // Must be an in-progress step (held for the player, single for copy-player NPCs) still partway
+    // through its travel phase, and not already retracing (one reversal per step; the return trip
+    // finishes before it can be flipped again). The finished check only applies to held movement —
+    // ObjectEventCheckHeldMovementStatus reports "not held" as a truthy 16, which would wrongly reject
+    // every single-movement NPC, so gate it on heldMovementActive.
     if (!ObjectEventIsMovementOverridden(objectEvent)
-     || ObjectEventCheckHeldMovementStatus(objectEvent)
+     || (objectEvent->heldMovementActive && ObjectEventCheckHeldMovementStatus(objectEvent))
      || sprite->sActionFuncId != 1
      || sprite->sReversing
      || !IsReversibleStepAction(action)
@@ -9895,13 +9918,17 @@ bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
     objectEvent->previousCoords.y = y;
 
     // We never actually reach the destination tile, so undo the cliff state the forward step committed
-    // (climb behind / deferred surface) by restoring the snapshot from when it started. Returning to
-    // the origin tile then settles with the same cliff state it had before the step (see
-    // UpdateObjectEventBehindCliff / DoGroundEffects_OnFinishStep).
-    objectEvent->cliffLayer = sPlayerCliffBackup.cliffLayer;
-    objectEvent->surfacingFromCliff = sPlayerCliffBackup.surfacingFromCliff;
-    objectEvent->previousElevation = sPlayerCliffBackup.previousElevation;
-    objectEvent->cliffMetatileBehavior = sPlayerCliffBackup.cliffMetatileBehavior;
+    // (climb behind / deferred surface) by restoring the snapshot from when it started. Only the player
+    // snapshots its cliff state (single in-flight step — see UpdateObjectEventBehindCliff), so restore
+    // is player-only; copy-player NPCs that reverse through here (see MovementType_CopyPlayer_Step2)
+    // have no snapshot and would otherwise be clobbered with the player's.
+    if (objectEvent == &gObjectEvents[gPlayerAvatar.objectEventId])
+    {
+        objectEvent->cliffLayer = sPlayerCliffBackup.cliffLayer;
+        objectEvent->surfacingFromCliff = sPlayerCliffBackup.surfacingFromCliff;
+        objectEvent->previousElevation = sPlayerCliffBackup.previousElevation;
+        objectEvent->cliffMetatileBehavior = sPlayerCliffBackup.cliffMetatileBehavior;
+    }
 
     SetObjectEventDirection(objectEvent, newVec);
     if (objectEvent->directionOverwrite)
@@ -9943,6 +9970,15 @@ bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
     // Don't re-fire ground effects: the origin tile's effects already played when we left it, and
     // re-triggering visibly restarts terrain effects (grass rustle, dash dust) mid-glide.
     return TRUE;
+}
+
+// True while the player is gliding back through a step it cancelled mid-transition (its sprite stays
+// flagged reversing until the next step begins). Copy-player objects poll this to cancel the step they
+// were mirroring (see MovementType_CopyPlayer_Step1 / _Step2).
+static bool8 IsPlayerMovementReversing(void)
+{
+    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+    return gSprites[player->spriteId].sReversing;
 }
 
 // Switches an in-progress walk step to a dash (or back) while it's still crossing a tile, so the
