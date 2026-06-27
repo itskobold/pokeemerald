@@ -5597,6 +5597,9 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
     u8 curBehavior = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
     bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
+    // Escalator warp tiles are painted as elevated cliff tiles so they render correctly, but a front
+    // object walks onto one like a stairs tile (the warp fires on arrival).
+    bool32 isEscalator = MetatileBehavior_IsEscalator(nextBehavior);
     // On a stairs tile, stepping off it down to the lower neighbour is a legitimate descent, not an
     // elevation mismatch.
     bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
@@ -5613,7 +5616,7 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // so it can't escape the region via a stairs tile).
     bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
      && MapGridGetElevationAt(x, y) > objectEvent->previousElevation
-     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && isStairs);
+     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator));
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         return COLLISION_OUTSIDE_RANGE;
@@ -5738,13 +5741,14 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
     u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
     u8 curBehavior = MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
     bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
+    bool32 isEscalator = MetatileBehavior_IsEscalator(nextBehavior);
     bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
     // See GetVanillaCollision for the cliff-plane collision rules mirrored here.
     bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
      || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
     bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
      && MapGridGetElevationAt(x, y) > objectEvent->previousElevation
-     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && isStairs);
+     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator));
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         flags |= 1 << (COLLISION_OUTSIDE_RANGE - 1);
@@ -9071,8 +9075,10 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
         return;
     }
 
-    // Stairs are the walkable path between levels, never a cliff to hide behind.
-    if (MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y)))
+    // Stairs are the walkable path between levels, never a cliff to hide behind. Escalator warp tiles
+    // are elevated cliff tiles, but the player warps in onto one in front so the ride is visible.
+    if (MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y))
+     || MetatileBehavior_IsEscalator(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y)))
     {
         objEvent->cliffLayer = CLIFF_LAYER_FRONT;
         return;
@@ -9206,8 +9212,9 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
     toBehavior = MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y);
 
     // Stairs carry no elevation of their own: no climb/crest, hold the current state. Cliff-face-side
-    // is NOT included: an upward step onto it climbs behind like any other higher tile.
-    if (MetatileBehavior_IsElevationChange(toBehavior))
+    // is NOT included: an upward step onto it climbs behind like any other higher tile. Escalator warp
+    // tiles are elevated cliff tiles too, but the player rides them in front, so don't climb behind.
+    if (MetatileBehavior_IsElevationChange(toBehavior) || MetatileBehavior_IsEscalator(toBehavior))
         return;
 
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)

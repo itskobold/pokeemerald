@@ -1030,9 +1030,9 @@ static void PCTurnOnEffect(struct Task *task)
             break;
         }
 
-        // Update map
+        // Update map. Redraw only the PC tile, not the whole view (compositor cost) - runs every flicker.
         PCTurnOnEffect_SetMetatile(task->tIsScreenOn, dx, dy);
-        DrawWholeMapView();
+        CurrentMapDrawMetatileAt(gSaveBlock1Ptr->playerPos.x + dx + MAP_OFFSET, gSaveBlock1Ptr->playerPos.y + dy + MAP_OFFSET);
 
         // Screen flickers 5 times. Odd number and starting with the
         // screen off means the animation ends with the screen on.
@@ -1147,7 +1147,9 @@ static void LotteryCornerComputerEffect(struct Task *task)
             MapGridSetMetatileIdAt(11 + MAP_OFFSET, 1 + MAP_OFFSET, METATILE_Shop_Laptop1_Flash | MAPGRID_IMPASSABLE);
             MapGridSetMetatileIdAt(11 + MAP_OFFSET, 2 + MAP_OFFSET, METATILE_Shop_Laptop2_Flash | MAPGRID_IMPASSABLE);
         }
-        DrawWholeMapView();
+        // Redraw only the laptop tiles, not the whole view (compositor cost) - runs every flicker.
+        CurrentMapDrawMetatileAt(11 + MAP_OFFSET, 1 + MAP_OFFSET);
+        CurrentMapDrawMetatileAt(11 + MAP_OFFSET, 2 + MAP_OFFSET);
 
         // Screen flickers 5 times. Odd number and starting with the
         // screen off means the animation ends with the screen on.
@@ -1953,7 +1955,10 @@ static void Task_MoveElevatorWindowLights(u8 taskId)
                     MapGridSetMetatileIdAt(x + MAP_OFFSET + 1, y + MAP_OFFSET, sElevatorWindowTiles_Descending[y][tMoveCounter % ELEVATOR_LIGHT_STAGES] | MAPGRID_IMPASSABLE);
             }
         }
-        DrawWholeMapView();
+        // Redraw only the elevator window tiles, not the whole view (compositor cost) - runs every move.
+        for (y = 0; y < ELEVATOR_WINDOW_HEIGHT; y++)
+            for (x = 0; x < ELEVATOR_WINDOW_WIDTH; x++)
+                CurrentMapDrawMetatileAt(x + MAP_OFFSET + 1, y + MAP_OFFSET);
         tTimer = 0;
         if (tMoveCounter == tTotalMoves)
             DestroyTask(taskId);
@@ -3855,7 +3860,11 @@ static void Task_CloseBattlePikeCurtain(u8 taskId)
                                        (x + METATILE_BattlePike_CurtainFrames_Start) + (y * METATILE_ROW_WIDTH) + (tCurrentFrame * CURTAIN_HEIGHT * METATILE_ROW_WIDTH));
             }
         }
-        DrawWholeMapView();
+        // Redraw only the curtain tiles, not the whole view (compositor cost) - runs each frame.
+        for (y = 0; y < CURTAIN_HEIGHT; y++)
+            for (x = 0; x < CURTAIN_WIDTH; x++)
+                CurrentMapDrawMetatileAt(gSaveBlock1Ptr->playerPos.x + x + MAP_OFFSET - 1,
+                                         gSaveBlock1Ptr->playerPos.y + y + MAP_OFFSET - 3);
         tCurrentFrame++;
         if (tCurrentFrame == 3)
         {

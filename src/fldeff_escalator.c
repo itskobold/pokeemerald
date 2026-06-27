@@ -147,7 +147,14 @@ static void Task_DrawEscalator(u8 taskId)
     // If all metatiles of the escalator have been set, draw map and progress to next stage
     if (tState == 0)
     {
-        DrawWholeMapView();
+        // Redraw only the escalator's 3x3 metatile region (centred on the player) instead of the whole
+        // map view: a full DrawWholeMapView through the compositor every cycle is far too costly.
+        s16 x = tPlayerX - 1;
+        s16 y = tPlayerY - 1;
+        s16 i, j;
+        for (i = 0; i < 3; i++)
+            for (j = 0; j < 3; j++)
+                CurrentMapDrawMetatileAt(x + j, y + i);
         tTransitionStage = (tTransitionStage + 1) % ESCALATOR_STAGES;
         tDrawingEscalator = FALSE;
     }
