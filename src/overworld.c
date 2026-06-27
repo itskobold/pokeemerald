@@ -2028,6 +2028,15 @@ static void VBlankCB_Field(void)
     TransferTilesetAnimsBuffer();
 }
 
+// True while VBlankCB_Field is the active VBlank handler, i.e. FieldUpdateBgTilemapScroll's
+// synchronous pre-scroll flush is landing the overworld BG1/BG2 tilemaps in VRAM every frame. When
+// so, the DMA3-queued copy of the same buffers (ScheduleBgCopyTilemapToVram) is redundant; the field
+// renderer skips it. During map load the field VBlank isn't installed yet, so the queue still runs.
+bool8 IsFieldBgTilemapFlushedInVBlank(void)
+{
+    return gMain.vblankCallback == VBlankCB_Field;
+}
+
 static void InitCurrentFlashLevelScanlineEffect(void)
 {
     u8 flashLevel;

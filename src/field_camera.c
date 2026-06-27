@@ -33,7 +33,6 @@ struct FieldCameraOffset
     u8 yPixelOffset;
     u8 xTileOffset;
     u8 yTileOffset;
-    bool8 copyBGToVRAM;
 };
 
 static void RedrawMapSliceNorth(struct FieldCameraOffset *, const struct MapLayout *);
@@ -108,7 +107,6 @@ static void ResetCameraOffset(struct FieldCameraOffset *cameraOffset)
     cameraOffset->yTileOffset = 0;
     cameraOffset->xPixelOffset = 0;
     cameraOffset->yPixelOffset = 0;
-    cameraOffset->copyBGToVRAM = TRUE;
 }
 
 static void AddCameraTileOffset(struct FieldCameraOffset *cameraOffset, u32 xOffset, u32 yOffset)
@@ -176,7 +174,6 @@ void GetCameraOffsetWithPan(s16 *x, s16 *y)
 void DrawWholeMapView(void)
 {
     DrawWholeMapViewInternal(gCameraPos.x, gCameraPos.y, gMapHeader.mapLayout);
-    sFieldCameraOffset.copyBGToVRAM = TRUE;
 }
 
 static void DrawWholeMapViewInternal(int x, int y, const struct MapLayout *mapLayout)
@@ -214,7 +211,6 @@ static void RedrawMapSlicesForCameraUpdate(struct FieldCameraOffset *cameraOffse
         RedrawMapSliceNorth(cameraOffset, mapLayout);
     if (y < 0)
         RedrawMapSliceSouth(cameraOffset, mapLayout);
-    cameraOffset->copyBGToVRAM = TRUE;
 }
 
 static void RedrawMapSliceNorth(struct FieldCameraOffset *cameraOffset, const struct MapLayout *mapLayout)
@@ -288,10 +284,7 @@ void CurrentMapDrawMetatileAt(int x, int y)
     int offset = MapPosToBgTilemapOffset(&sFieldCameraOffset, x, y);
 
     if (offset >= 0)
-    {
         DrawMetatileAt(gMapHeader.mapLayout, offset, x, y);
-        sFieldCameraOffset.copyBGToVRAM = TRUE;
-    }
 }
 
 // BG tilemap offsets of a metatile's four 8x8 sub-tiles, in metatile sub-tile order
@@ -313,7 +306,6 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
             u16 fg = tiles[4 + p];
             DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1);
         }
-        sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
 
@@ -394,10 +386,16 @@ static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, con
         gOverworldTilemapBuffer_Bg1[offset] = newFg;
     }
 
-    ScheduleBgCopyTilemapToVram(1);
-    ScheduleBgCopyTilemapToVram(2);
-    // Also flag the field for the synchronous, pre-scroll VRAM flush (see FieldUpdateBgTilemapScroll).
+    // Flag the synchronous, pre-scroll VRAM flush (see FieldUpdateBgTilemapScroll). While the field
+    // VBlank is installed that flush copies both plane tilemaps every frame, so the DMA3-queued copy
+    // below would just write the same buffers to the same VRAM a second time - skip it. During map
+    // load (field VBlank not yet active) the sync flush doesn't run, so fall back to the queue.
     sFieldTilemapDirty = TRUE;
+    if (!IsFieldBgTilemapFlushedInVBlank())
+    {
+        ScheduleBgCopyTilemapToVram(1);
+        ScheduleBgCopyTilemapToVram(2);
+    }
 }
 
 // Tiles (map-grid coords, the space DrawMetatileAt and object currentCoords share) whose middle

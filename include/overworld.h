@@ -130,6 +130,7 @@ u8 GetCurrentMapBattleScene(void);
 void CleanupOverworldWindowsAndTilemaps(void);
 bool32 IsOverworldLinkActive(void);
 void CB1_Overworld(void);
+bool8 IsFieldBgTilemapFlushedInVBlank(void);
 void CB2_OverworldBasic(void);
 void CB2_Overworld(void);
 void SetMainCallback1(void (*cb)(void));
