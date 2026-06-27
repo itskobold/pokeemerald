@@ -230,10 +230,6 @@ static u8 DaysInMonth(u8 month, u16 year)
     return sDaysPerMonth[month - 1];
 }
 
-static void Clock_RecalcSunTimes(struct Clock *clock);
-static void Clock_UpdateTwilight(struct Clock *clock);
-static void Clock_UpdateTimeOfDay(struct Clock *clock);
-
 void Clock_Init(void)
 {
     struct Clock *clock = &gSaveBlock1Ptr->gameClock;
@@ -246,9 +242,9 @@ void Clock_Init(void)
     clock->year = 0;
     clock->timeScale = 20;
 
-    Clock_RecalcSunTimes(clock);
-    Clock_UpdateTwilight(clock);
-    Clock_UpdateTimeOfDay(clock);
+    Clock_RecalcSunTimes();
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 
     sClockVBlanks = 0;
 }
@@ -318,54 +314,6 @@ static u16 CalcSunriseTime(s16 waveIndex)
 static u16 CalcSunsetTime(s16 waveIndex)
 {
     return SUNSET_MID - Cos(waveIndex, SUNSET_AMP);
-}
-
-static void Clock_RecalcSunTimes(struct Clock *clock)
-{
-    s16 waveIndex = SunWaveIndex(clock);
-
-    clock->sunriseTime = CalcSunriseTime(waveIndex);
-    clock->sunsetTime = CalcSunsetTime(waveIndex);
-}
-
-// Recomputes the twilight counter for the current time of day. Morning twilight
-// runs [sunrise, sunrise + 128); evening twilight runs [sunset - 128, sunset).
-// The counter reads 1 on the first minute, climbs to 128 on the last, else 0.
-static void Clock_UpdateTwilight(struct Clock *clock)
-{
-    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
-
-    if (tod >= clock->sunriseTime && tod < clock->sunriseTime + TWILIGHT_MINUTES)
-        sTwilightCounter = tod - clock->sunriseTime + 1;
-    else if (tod >= clock->sunsetTime - TWILIGHT_MINUTES && tod < clock->sunsetTime)
-        sTwilightCounter = tod - (clock->sunsetTime - TWILIGHT_MINUTES) + 1;
-    else
-        sTwilightCounter = 0;
-}
-
-// Recomputes the time-of-day band for the current time of day. Dawn/dusk are the
-// sunrise/sunset twilight windows; midnight and midday are the first 30 minutes
-// of 12am/12pm; everything else is night (around midnight) or day.
-static void Clock_UpdateTimeOfDay(struct Clock *clock)
-{
-    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
-
-    if (tod < SOLAR_BAND_LENGTH)
-        sTimeOfDay = TIME_OF_DAY_MIDNIGHT;
-    else if (tod < clock->sunriseTime)
-        sTimeOfDay = TIME_OF_DAY_NIGHT;
-    else if (tod < clock->sunriseTime + TWILIGHT_MINUTES)
-        sTimeOfDay = TIME_OF_DAY_DAWN;
-    else if (tod < NOON_MINUTES)
-        sTimeOfDay = TIME_OF_DAY_DAY;
-    else if (tod < NOON_MINUTES + SOLAR_BAND_LENGTH)
-        sTimeOfDay = TIME_OF_DAY_MIDDAY;
-    else if (tod < clock->sunsetTime - TWILIGHT_MINUTES)
-        sTimeOfDay = TIME_OF_DAY_DAY;
-    else if (tod < clock->sunsetTime)
-        sTimeOfDay = TIME_OF_DAY_DUSK;
-    else
-        sTimeOfDay = TIME_OF_DAY_NIGHT;
 }
 
 // Returns the current day of the week (WEEKDAY_SUN..WEEKDAY_SAT), counted
@@ -569,8 +517,8 @@ u8 *Clock_GetMonthString(u8 *dest, bool32 abbreviate)
 static void Clock_OnMinute(void)
 {
     BerryTreeTimeUpdate(1);
-    Clock_UpdateTwilight(&gSaveBlock1Ptr->gameClock);
-    Clock_UpdateTimeOfDay(&gSaveBlock1Ptr->gameClock);
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 }
 static void Clock_On5Minutes(void)  {}
 static void Clock_On10Minutes(void) {}
@@ -727,7 +675,7 @@ void Clock_AdvanceSeconds(u32 seconds)
 
     // Keep the cached sun times aligned to the current date, as the setters do.
     if (afterMin / MINUTES_PER_DAY != beforeMin / MINUTES_PER_DAY)
-        Clock_RecalcSunTimes(clock);
+        Clock_RecalcSunTimes();
 
     Clock_FireIntervals(beforeMin, afterMin, beforeMonth, AbsMonths(clock));
     Clock_FireSunEvents(beforeMin, afterMin);
@@ -756,15 +704,6 @@ void Clock_Update(void)
     Clock_AdvanceSeconds(gSaveBlock1Ptr->gameClock.timeScale);
 }
 
-// Recomputes the RAM-only derived state (twilight window and time-of-day band)
-// from the current clock, so it stays correct after a setter jumps the time.
-// Season and season-phase are derived on demand, so they need no refresh.
-static void Clock_RefreshDerived(struct Clock *clock)
-{
-    Clock_UpdateTwilight(clock);
-    Clock_UpdateTimeOfDay(clock);
-}
-
 // Clamps the day into the current month's valid range; call after changing month/year, since a
 // shorter month (or a non-leap February) can leave the stored day past the end of the month.
 static void ClampDay(struct Clock *clock)
@@ -782,7 +721,8 @@ void Clock_SetMinutes(u32 minutes)
     struct Clock *clock = &gSaveBlock1Ptr->gameClock;
 
     clock->minutes = minutes % MINUTES_PER_HOUR;
-    Clock_RefreshDerived(clock);
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 }
 
 void Clock_SetHours(u32 hours)
@@ -790,7 +730,8 @@ void Clock_SetHours(u32 hours)
     struct Clock *clock = &gSaveBlock1Ptr->gameClock;
 
     clock->hours = hours % HOURS_PER_DAY;
-    Clock_RefreshDerived(clock);
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 }
 
 void Clock_SetDay(u32 day)
@@ -803,8 +744,9 @@ void Clock_SetDay(u32 day)
     else if (day > max)
         day = max;
     clock->day = day;
-    Clock_RecalcSunTimes(clock);
-    Clock_RefreshDerived(clock);
+    Clock_RecalcSunTimes();
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 }
 
 void Clock_SetMonth(u32 month)
@@ -817,8 +759,9 @@ void Clock_SetMonth(u32 month)
         month = MONTH_DEC;
     clock->month = month;
     ClampDay(clock);
-    Clock_RecalcSunTimes(clock);
-    Clock_RefreshDerived(clock);
+    Clock_RecalcSunTimes();
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 }
 
 void Clock_SetYear(u32 year)
@@ -827,11 +770,63 @@ void Clock_SetYear(u32 year)
 
     clock->year = year;
     ClampDay(clock); // a leap/non-leap change can shorten February
-    Clock_RecalcSunTimes(clock);
-    Clock_RefreshDerived(clock);
+    Clock_RecalcSunTimes();
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
 }
 
 void Clock_SetTimeScale(u32 scale)
 {
     gSaveBlock1Ptr->gameClock.timeScale = scale; // in-game seconds per real second (0 pauses)
+}
+
+void Clock_RecalcSunTimes(void)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+    s16 waveIndex = SunWaveIndex(clock);
+
+    clock->sunriseTime = CalcSunriseTime(waveIndex);
+    clock->sunsetTime = CalcSunsetTime(waveIndex);
+}
+
+// Recomputes the twilight counter for the current time of day. Morning twilight
+// runs [sunrise, sunrise + 128); evening twilight runs [sunset - 128, sunset).
+// The counter reads 1 on the first minute, climbs to 128 on the last, else 0.
+void Clock_UpdateTwilight(void)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
+
+    if (tod >= clock->sunriseTime && tod < clock->sunriseTime + TWILIGHT_MINUTES)
+        sTwilightCounter = tod - clock->sunriseTime + 1;
+    else if (tod >= clock->sunsetTime - TWILIGHT_MINUTES && tod < clock->sunsetTime)
+        sTwilightCounter = tod - (clock->sunsetTime - TWILIGHT_MINUTES) + 1;
+    else
+        sTwilightCounter = 0;
+}
+
+// Recomputes the time-of-day band for the current time of day. Dawn/dusk are the
+// sunrise/sunset twilight windows; midnight and midday are the first 30 minutes
+// of 12am/12pm; everything else is night (around midnight) or day.
+void Clock_UpdateTimeOfDay(void)
+{
+    struct Clock *clock = &gSaveBlock1Ptr->gameClock;
+    u32 tod = clock->hours * MINUTES_PER_HOUR + clock->minutes;
+
+    if (tod < SOLAR_BAND_LENGTH)
+        sTimeOfDay = TIME_OF_DAY_MIDNIGHT;
+    else if (tod < clock->sunriseTime)
+        sTimeOfDay = TIME_OF_DAY_NIGHT;
+    else if (tod < clock->sunriseTime + TWILIGHT_MINUTES)
+        sTimeOfDay = TIME_OF_DAY_DAWN;
+    else if (tod < NOON_MINUTES)
+        sTimeOfDay = TIME_OF_DAY_DAY;
+    else if (tod < NOON_MINUTES + SOLAR_BAND_LENGTH)
+        sTimeOfDay = TIME_OF_DAY_MIDDAY;
+    else if (tod < clock->sunsetTime - TWILIGHT_MINUTES)
+        sTimeOfDay = TIME_OF_DAY_DAY;
+    else if (tod < clock->sunsetTime)
+        sTimeOfDay = TIME_OF_DAY_DUSK;
+    else
+        sTimeOfDay = TIME_OF_DAY_NIGHT;
 }

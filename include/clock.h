@@ -99,5 +99,8 @@ void Clock_SetDay(u32 day);
 void Clock_SetMonth(u32 month);
 void Clock_SetYear(u32 year);
 void Clock_SetTimeScale(u32 scale);
+void Clock_RecalcSunTimes(void);
+void Clock_UpdateTwilight(void);
+void Clock_UpdateTimeOfDay(void);
 
 #endif // GUARD_CLOCK_H
