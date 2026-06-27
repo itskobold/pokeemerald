@@ -9526,6 +9526,12 @@ static void DoFlaggedGroundEffects(struct ObjectEvent *objEvent, struct Sprite *
     if (ObjectEventIsFarawayIslandMew(objEvent) == TRUE && !ShouldMewShakeGrass(objEvent))
         return;
 
+    // Behind a cliff the object's feet are occluded by the cliff face, so don't stamp ground-effect
+    // sprites (grass, footprints, tracks, dust, ...) at its hidden position. Reflections are mirrored
+    // off nearby water, not drawn at the object, so they're left alone.
+    if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
+        flags &= GROUND_EFFECT_FLAG_WATER_REFLECTION | GROUND_EFFECT_FLAG_ICE_REFLECTION;
+
     for (i = 0; i < ARRAY_COUNT(sGroundEffectFuncs); i++, flags >>= 1)
         if (flags & 1)
             sGroundEffectFuncs[i](objEvent, sprite);

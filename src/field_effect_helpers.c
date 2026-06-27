@@ -538,7 +538,10 @@ void UpdateShortGrassFieldEffect(struct Sprite *sprite)
         sprite->subpriority = linkedSprite->subpriority - 1;
         RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         sprite->oam.priority = linkedSprite->oam.priority;
-        UpdateObjectEventSpriteInvisibility(sprite, linkedSprite->invisible);
+        // Hide while the object is behind a cliff: this sprite follows it, so it'd otherwise poke
+        // out in front of the cliff face.
+        UpdateObjectEventSpriteInvisibility(sprite, linkedSprite->invisible
+            || gObjectEvents[objectEventId].cliffLayer != CLIFF_LAYER_FRONT);
     }
 }
 
@@ -1254,7 +1257,8 @@ void UpdateSandPileFieldEffect(struct Sprite *sprite)
         sprite->y = parentY;
         sprite->subpriority = gSprites[gObjectEvents[objectEventId].spriteId].subpriority;
         RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
-        UpdateObjectEventSpriteInvisibility(sprite, FALSE);
+        // Hide while the object is behind a cliff (this sprite follows it).
+        UpdateObjectEventSpriteInvisibility(sprite, gObjectEvents[objectEventId].cliffLayer != CLIFF_LAYER_FRONT);
     }
 }
 
