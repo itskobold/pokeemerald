@@ -432,10 +432,10 @@ static bool32 WasInTileList(const struct Coords16 *list, u8 count, s16 x, s16 y)
 // Promote every tile of the sprite's footprint when the object stands (feet) at tile (cx, cy): the
 // sprite is bottom-anchored and horizontally centred on that tile, so it spans ceil(width/16) tile
 // columns either side of centre and ceil(height/16) rows up from the feet. Each covered tile higher
-// than the object's render base is a cliff face in front of that band, so its middle layer is promoted
-// over the sprite; rows/cols at or below the base are normal ground the sprite stands in front of.
-// previousElevation is the frozen base while behind a cliff and the object's own ground level when in
-// front, covering both the climbed-behind and stood-in-front-of-a-taller-cliff cases.
+// than the frozen base (previousElevation) is a cliff face in front of that band, so its middle layer
+// is promoted over the sprite; rows/cols at or below the base are normal ground it stands in front of.
+// Only called for objects whose feet are behind a cliff (see UpdateCliffFacePromotion) — a FRONT object
+// at the base of a taller cliff is in front of the wall, so its head must NOT be promoted behind it.
 static void PromoteSpriteFootprint(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *graphicsInfo, s16 cx, s16 cy)
 {
     s16 half = graphicsInfo->width / 2;
@@ -467,7 +467,10 @@ void UpdateCliffFacePromotion(void)
         struct ObjectEvent *objEvent = &gObjectEvents[i];
         const struct ObjectEventGraphicsInfo *graphicsInfo;
 
-        if (!objEvent->active || objEvent->drawAtHighestElevation)
+        // Occlusion is gated on the foot-based cliff state, not per-tile elevation: only an object whose
+        // feet are behind the cliff (BEHIND/OBSCURED) is promoted. This stops a FRONT object's head from
+        // flipping "behind" just because the tile north of it is higher terrain it stands in front of.
+        if (!objEvent->active || objEvent->drawAtHighestElevation || objEvent->cliffLayer == CLIFF_LAYER_FRONT)
             continue;
 
         // Cover the sprite's whole footprint at the tile it is leaving and the tile it is entering, so a
