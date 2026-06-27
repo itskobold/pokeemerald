@@ -6,6 +6,7 @@
 #include "task.h"
 #include "battle_transition.h"
 #include "fieldmap.h"
+#include "field_compositor.h"
 
 static EWRAM_DATA struct {
     const u16 *src;
@@ -596,6 +597,27 @@ void UpdateTilesetAnimations(void)
         sPrimaryTilesetAnimCallback(sPrimaryTilesetAnimCounter);
     if (sSecondaryTilesetAnimCallback)
         sSecondaryTilesetAnimCallback(sSecondaryTilesetAnimCounter);
+
+    // The overworld map is drawn by the software compositor, which keeps tileset graphics in its
+    // own EWRAM cache instead of VRAM. Feed each queued animation frame into that cache and
+    // recomposite the affected on-screen tiles here in the main loop, then drop the queue so the
+    // VBlank DMA path (TransferTilesetAnimsBuffer) stays idle. The `dest` VRAM address each
+    // QueueAnimTiles_* produced encodes the animated tiles' absolute tile id.
+    if (IsFieldCompositorActive())
+    {
+        u32 i;
+
+        for (i = 0; i < sTilesetDMA3TransferBufferSize; i++)
+        {
+            u32 firstTileId = ((u32)sTilesetDMA3TransferBuffer[i].dest - BG_VRAM) / TILE_SIZE_4BPP;
+            FieldCompositorUpdateSourceTiles(firstTileId, sTilesetDMA3TransferBuffer[i].src,
+                                             sTilesetDMA3TransferBuffer[i].size / TILE_SIZE_4BPP);
+        }
+        sTilesetDMA3TransferBufferSize = 0;
+        // Recomposite a few of the slots the updates above marked dirty; the rest follow over the
+        // next frames so a multi-animation frame doesn't recomposite everything at once.
+        FieldCompositorTickAnim();
+    }
 }
 
 static void _InitPrimaryTilesetAnimation(void)

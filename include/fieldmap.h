@@ -35,6 +35,7 @@ u8 MapGridGetCliffCollisionAt(int x, int y);
 int GetMapBorderIdAt(int x, int y);
 bool32 CanCameraMoveInDirection(int direction);
 u16 GetMetatileAttributesById(u16 metatile);
+u8 GetMetatileCompositingById(u16 metatile);
 void GetCameraFocusCoords(u16 *x, u16 *y);
 u8 MapGridGetMetatileLayerTypeAt(int x, int y);
 u8 MapGridGetElevationAt(int x, int y);

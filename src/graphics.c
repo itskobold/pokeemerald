@@ -1464,8 +1464,8 @@ const u16 gTilesetPalettes_Terrain[][16] =
     INCGFX_U16("data/tilesets/primary/terrain/palettes/15.pal", ".gbapal"),
 };
 
-const u32 gTilesetTiles_General[] = INCGFX_U32("data/tilesets/primary/general/tiles.png", ".4bpp.lz");
-const u32 gTilesetTiles_Terrain[] = INCGFX_U32("data/tilesets/primary/terrain/tiles.png", ".4bpp.lz");
+const u32 gTilesetTiles_General[] = INCGFX_U32("data/tilesets/primary/general/tiles.png", ".4bpp");
+const u32 gTilesetTiles_Terrain[] = INCGFX_U32("data/tilesets/primary/terrain/tiles.png", ".4bpp");
 
 // trade/egg hatch
 

@@ -28,6 +28,7 @@ void ResetFieldCamera(void);
 void ResetCameraUpdateInfo(void);
 u32 InitCameraUpdateCallback(u8 trackedSpriteId);
 void CameraUpdate(void);
+void UpdateCliffFacePromotion(void);
 void UpdateCameraElevation(void);
 void UpdateCameraBiome(void);
 bool8 IsFreecamActive(void);

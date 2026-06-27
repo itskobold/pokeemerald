@@ -5,6 +5,7 @@
 #include "field_camera.h"
 #include "field_weather.h"
 #include "fieldmap.h"
+#include "field_compositor.h"
 #include "fldeff.h"
 #include "fldeff_misc.h"
 #include "frontier_util.h"
@@ -931,6 +932,16 @@ u16 GetMetatileAttributesById(u16 metatile)
     }
 }
 
+// Per-metatile compositing flags (METATILE_COMPOSITE_*), 0 for out-of-range ids.
+u8 GetMetatileCompositingById(u16 metatile)
+{
+    if (metatile < NUM_METATILES_IN_PRIMARY)
+        return gMapHeader.mapLayout->primaryTileset->metatileCompositing[metatile];
+    else if (metatile < NUM_METATILES_TOTAL)
+        return GetActiveLocationData()->secondaryTileset->metatileCompositing[metatile - NUM_METATILES_IN_PRIMARY];
+    return 0;
+}
+
 // Captures the on-screen metatile view (the MAP_OFFSET_W x MAP_OFFSET_H window whose
 // top-left map tile is x,y) into gSaveBlock1Ptr->mapView.
 static void SaveMapViewAt(int x, int y)
@@ -1408,26 +1419,21 @@ static bool8 SkipCopyingMetatileFromSavedMap(u16 *mapBlock, u16 mapWidth, u8 yMo
     return FALSE;
 }
 
+// The map is now drawn by the software compositor (see field_compositor.c), so tileset
+// graphics are decompressed into its EWRAM source cache rather than loaded to BG VRAM (the
+// char blocks the raw tileset used to occupy now hold 8BPP composite output). `offset` is the
+// old VRAM tile offset, still used to tell primary (0) from secondary apart.
 static void CopyTilesetToVram(struct Tileset const *tileset, u16 numTiles, u16 offset)
 {
-    if (tileset)
-    {
-        if (!tileset->isCompressed)
-            LoadBgTiles(2, tileset->tiles, numTiles * 32, offset);
-        else
-            DecompressAndCopyTileDataToVram(2, tileset->tiles, numTiles * 32, offset, 0);
-    }
+    if (offset == 0)
+        FieldCompositorLoadPrimaryTiles(tileset);
+    else
+        FieldCompositorLoadSecondaryTiles(tileset);
 }
 
 static void CopyTilesetToVramUsingHeap(struct Tileset const *tileset, u16 numTiles, u16 offset)
 {
-    if (tileset)
-    {
-        if (!tileset->isCompressed)
-            LoadBgTiles(2, tileset->tiles, numTiles * 32, offset);
-        else
-            DecompressAndLoadBgGfxUsingHeap(2, tileset->tiles, numTiles * 32, offset, 0);
-    }
+    CopyTilesetToVram(tileset, numTiles, offset);
 }
 
 // Below two are dummied functions from FRLG, used to tint the overworld palettes for the Quest Log

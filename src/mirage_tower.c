@@ -33,18 +33,6 @@ struct MetatileCoords
     u16 metatileId;
 };
 
-struct BgRegOffsets
-{
-    u16 bgHOFS;
-    u16 bgVOFS;
-};
-
-struct FallAnim_Tower
-{
-    u8 *disintegrateRand;
-    u8 disintegrateIdx;
-};
-
 struct FallAnim_Fossil
 {
     u8 *frameImageTiles;
@@ -56,7 +44,6 @@ struct FallAnim_Fossil
 
 #define TAG_CEILING_CRUMBLE 4000
 
-#define MIRAGE_TOWER_GFX_LENGTH (sizeof(sMirageTower_Gfx))
 #define FOSSIL_DISINTEGRATE_LENGTH 0x100
 
 static void PlayerDescendMirageTower(u8);
@@ -66,14 +53,10 @@ static void WaitCeilingCrumble(u8);
 static void FinishCeilingCrumbleTask(u8);
 static void CreateCeilingCrumbleSprites(void);
 static void SpriteCB_CeilingCrumble(struct Sprite *);
-static void DoMirageTowerDisintegration(u8);
-static void InitMirageTowerShake(u8);
 static void Task_FossilFallAndSink(u8);
 static void SpriteCB_FallingFossil(struct Sprite *);
 static void UpdateDisintegrationEffect(u8 *, u16, u8, u8, u8);
 
-static const ALIGNED(2) u8 sMirageTower_Gfx[] = INCGFX_U8("graphics/misc/mirage_tower.png", ".4bpp", "-num_tiles 73 -Wnum_tiles");
-static const u16 sMirageTowerTilemap[] = INCBIN_U16("graphics/misc/mirage_tower.bin");
 static const u16 sFossil_Pal[] = INCGFX_U16("graphics/object_events/pics/misc/fossil.png", ".gbapal"); // Unused
 static const u8 sFossil_Gfx[] = INCGFX_U8("graphics/object_events/pics/misc/fossil.png", ".4bpp"); // Duplicate of gObjectEventPic_Fossil
 static const u8 sMirageTowerCrumbles_Gfx[] = INCGFX_U8("graphics/misc/mirage_tower_crumbles.png", ".4bpp");
@@ -248,11 +231,7 @@ static const struct SpriteTemplate sSpriteTemplate_CeilingCrumbleLarge =
     .callback = SpriteCB_CeilingCrumble
 };
 
-EWRAM_DATA static u8 *sMirageTowerGfxBuffer = NULL;
-EWRAM_DATA static u8 *sMirageTowerTilemapBuffer = NULL;
 EWRAM_DATA static struct FallAnim_Fossil *sFallingFossil = NULL;
-EWRAM_DATA static struct FallAnim_Tower *sFallingTower = NULL;
-EWRAM_DATA static struct BgRegOffsets *sBgShakeOffsets = NULL;
 EWRAM_DATA static struct MirageTowerPulseBlend *sMirageTowerPulseBlend = NULL;
 
 // Holds data about the disintegration effect for Mirage Tower / the unchosen fossil.
@@ -494,12 +473,19 @@ static void SetInvisibleMirageTowerMetatiles(void)
 
 void StartMirageTowerDisintegration(void)
 {
-    CreateTask(DoMirageTowerDisintegration, 9);
+    // The original tile-by-tile crumble was drawn by repurposing BG0, which the field compositor now
+    // uses as the text layer - so it's dropped. Remove the tower through the compositor-safe metatile
+    // path instead (swaps the tower metatiles to sand and redraws via the compositor).
+    SetInvisibleMirageTowerMetatiles();
+    ScriptContext_Enable();
 }
 
 void StartMirageTowerShake(void)
 {
-    CreateTask(InitMirageTowerShake, 9);
+    // The tower's vanish is deferred to StartMirageTowerDisintegration (above) so it stays put while the
+    // player descends. Rumble with a camera pan (compositor-safe) in place of the old BG0 scroll shake.
+    StartScreenShake(1, 2, 48, 3);
+    ScriptContext_Enable();
 }
 
 void StartMirageTowerFossilFallAndSink(void)
@@ -507,166 +493,7 @@ void StartMirageTowerFossilFallAndSink(void)
     CreateTask(Task_FossilFallAndSink, 9);
 }
 
-static void SetBgShakeOffsets(void)
-{
-    SetGpuReg(REG_OFFSET_BG0HOFS, sBgShakeOffsets->bgHOFS);
-    SetGpuReg(REG_OFFSET_BG0VOFS, sBgShakeOffsets->bgVOFS);
-}
-
-static void UpdateBgShake(u8 taskId)
-{
-    if (!gTasks[taskId].data[0])
-    {
-        sBgShakeOffsets->bgHOFS = -sBgShakeOffsets->bgHOFS;
-        gTasks[taskId].data[0] = 2;
-        SetBgShakeOffsets();
-    }
-    else
-    {
-        gTasks[taskId].data[0]--;
-    }
-}
-
 #define tState data[0]
-
-static void InitMirageTowerShake(u8 taskId)
-{
-    u8 zero;
-
-    switch (gTasks[taskId].tState)
-    {
-    case 0:
-        FreeAllWindowBuffers();
-        SetBgAttribute(0, BG_ATTR_PRIORITY, 2);
-        gTasks[taskId].tState++;
-        break;
-    case 1:
-        sMirageTowerGfxBuffer = (u8 *)AllocZeroed(MIRAGE_TOWER_GFX_LENGTH);
-        sMirageTowerTilemapBuffer = (u8 *)AllocZeroed(BG_SCREEN_SIZE);
-        ChangeBgX(0, 0, BG_COORD_SET);
-        ChangeBgY(0, 0, BG_COORD_SET);
-        gTasks[taskId].tState++;
-        break;
-    case 2:
-        CpuSet(sMirageTower_Gfx, sMirageTowerGfxBuffer, MIRAGE_TOWER_GFX_LENGTH / 2);
-        LoadBgTiles(0, sMirageTowerGfxBuffer, MIRAGE_TOWER_GFX_LENGTH, 0);
-        gTasks[taskId].tState++;
-        break;
-    case 3:
-        SetBgTilemapBuffer(0, sMirageTowerTilemapBuffer);
-        CopyToBgTilemapBufferRect_ChangePalette(0, &sMirageTowerTilemap, 12, 29, 6, 12, 17);
-        CopyBgTilemapBufferToVram(0);
-        gTasks[taskId].tState++;
-        break;
-    case 4:
-        ShowBg(0);
-        gTasks[taskId].tState++;
-        break;
-    case 5:
-        SetInvisibleMirageTowerMetatiles();
-        gTasks[taskId].tState++;
-        break;
-    case 6:
-        sBgShakeOffsets = Alloc(sizeof(*sBgShakeOffsets));
-        zero = 0;
-        sBgShakeOffsets->bgHOFS = 2;
-        sBgShakeOffsets->bgVOFS = zero;
-        CreateTask(UpdateBgShake, 10);
-        DestroyTask(taskId);
-        ScriptContext_Enable();
-        break;
-    }
-}
-
-#define OUTER_BUFFER_LENGTH 0x60
-#define INNER_BUFFER_LENGTH 0x30
-static void DoMirageTowerDisintegration(u8 taskId)
-{
-    u8 bgShakeTaskId, j;
-    u16 i;
-    u8 index;
-
-    switch (gTasks[taskId].tState)
-    {
-    case 1:
-        sFallingTower = AllocZeroed(OUTER_BUFFER_LENGTH * sizeof(struct FallAnim_Tower));
-        break;
-    case 3:
-        if (gTasks[taskId].data[3] <= (OUTER_BUFFER_LENGTH - 1))
-        {
-            if (gTasks[taskId].data[1] > 1)
-            {
-                // Initialize disintegration pattern
-                index = gTasks[taskId].data[3];
-                sFallingTower[index].disintegrateRand = Alloc(INNER_BUFFER_LENGTH);
-                for (i = 0; i <= (INNER_BUFFER_LENGTH - 1); i++)
-                    sFallingTower[index].disintegrateRand[i] = i;
-
-                // Randomize disintegration pattern
-                for (i = 0; i <= (INNER_BUFFER_LENGTH - 1); i++)
-                {
-                    u16 rand1, rand2, temp;
-                    rand1 = Random() % INNER_BUFFER_LENGTH;
-                    rand2 = Random() % INNER_BUFFER_LENGTH;
-                    SWAP(sFallingTower[index].disintegrateRand[rand2], sFallingTower[index].disintegrateRand[rand1], temp);
-                }
-                if (gTasks[taskId].data[3] <= (OUTER_BUFFER_LENGTH - 1))
-                    gTasks[taskId].data[3]++;
-                gTasks[taskId].data[1] = 0;
-            }
-            gTasks[taskId].data[1]++;
-        }
-        index = gTasks[taskId].data[3];
-        for (i = (u8)(gTasks[taskId].data[2]); i < index; i++)
-        {
-            for (j = 0; j < 1; j++)
-            {
-                UpdateDisintegrationEffect(sMirageTowerGfxBuffer,
-                            (OUTER_BUFFER_LENGTH - 1 - i) * INNER_BUFFER_LENGTH + sFallingTower[i].disintegrateRand[sFallingTower[i].disintegrateIdx++],
-                            0, INNER_BUFFER_LENGTH, 1);
-            }
-            if (sFallingTower[i].disintegrateIdx > (INNER_BUFFER_LENGTH - 1))
-            {
-                FREE_AND_SET_NULL(sFallingTower[i].disintegrateRand);
-                gTasks[taskId].data[2]++;
-                if ((i % 2) == 1)
-                    sBgShakeOffsets->bgVOFS--;
-            }
-        }
-        LoadBgTiles(0, sMirageTowerGfxBuffer, MIRAGE_TOWER_GFX_LENGTH, 0);
-        if (sFallingTower[OUTER_BUFFER_LENGTH - 1].disintegrateIdx > INNER_BUFFER_LENGTH - 1)
-            break;
-        return;
-    case 4:
-        UnsetBgTilemapBuffer(0);
-        bgShakeTaskId = FindTaskIdByFunc(UpdateBgShake);
-        if (bgShakeTaskId != TASK_NONE)
-            DestroyTask(bgShakeTaskId);
-        sBgShakeOffsets->bgVOFS = sBgShakeOffsets->bgHOFS = 0;
-        SetBgShakeOffsets();
-        break;
-    case 5:
-        FREE_AND_SET_NULL(sBgShakeOffsets);
-        FREE_AND_SET_NULL(sFallingTower);
-        FREE_AND_SET_NULL(sMirageTowerGfxBuffer);
-        FREE_AND_SET_NULL(sMirageTowerTilemapBuffer);
-        break;
-    case 6:
-        SetGpuRegBits(REG_OFFSET_BG2CNT, BGCNT_PRIORITY(2));
-        SetGpuRegBits(REG_OFFSET_BG0CNT, BGCNT_PRIORITY(0));
-        SetBgAttribute(0, BG_ATTR_PRIORITY, 0);
-        InitStandardTextBoxWindows();
-        break;
-    case 7:
-        ShowBg(0);
-        break;
-    case 8:
-        DestroyTask(taskId);
-        ScriptContext_Enable();
-        break;
-    }
-    gTasks[taskId].tState++;
-}
 
 static void Task_FossilFallAndSink(u8 taskId)
 {

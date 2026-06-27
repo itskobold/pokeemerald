@@ -8628,11 +8628,11 @@ static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, s
     }
     else if (objectEvent->cliffLayer == CLIFF_LAYER_OBSCURED)
     {
-        // Fully buried in a cliff: priority can't sink the sprite below the bottom BG layer
-        // (see UpdateObjectEventElevationAndPriority), so it can't be drawn normally. While the player
-        // is buried too and the clouds have fully faded, draw the buried object (the player included) as
-        // a flat dark silhouette by switching its sprite to object-window mode so it carves the cloud
-        // overlay's window (the darkening is applied in ApplyCliffSilhouetteBlend); otherwise just hide it.
+        // Fully buried in a cliff: the promoted terrain (UpdateCliffFacePromotion) already hides the
+        // sprite, so drawing it normally adds nothing. While the player is buried too and the clouds have
+        // fully faded, draw the buried object (the player included) as a flat dark silhouette by switching
+        // its sprite to object-window mode so it carves the cloud overlay's window (the darkening is
+        // applied in ApplyCliffSilhouetteBlend); otherwise just hide it.
         if (ShouldDrawCliffSilhouettes())
             sprite->oam.objMode = ST_OAM_OBJ_WINDOW;
         else
@@ -9040,23 +9040,14 @@ static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Spri
         return;
     }
 
-    // Front sprites no longer layer by elevation band: all sit on one flat band and sort only by
-    // screen Y (subpriority), with cross-level occlusion left to the behind-cliff system.
+    // All field object sprites share one draw band between the two composite planes: OAM priority
+    // 2, so the foreground plane (priority 1) draws over them and the background plane (priority 3)
+    // behind them. They sort against each other only by screen Y (subpriority). Cross-level / cliff
+    // occlusion is now handled by promoting a tile's middle layer into the foreground plane for the
+    // object hiding behind it (see DrawMetatileAt / IsCliffPromotedCell), not by sprite priority.
     sprite->subspriteTableNum = sElevationToSubspriteTableNum[FLAT_RENDER_ELEVATION];
-
-    // Behind a cliff, draw the whole sprite behind the top 2 metatile layers (priority 3, in front of
-    // only the bottom BG layer). SUBSPRITES_ON would let the subsprite tables override oam.priority per
-    // piece, so ignore those priorities to keep every piece on the one behind-cliff plane.
-    if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
-    {
-        sprite->subspriteMode = SUBSPRITES_IGNORE_PRIORITY;
-        sprite->oam.priority = 3;
-    }
-    else
-    {
-        sprite->subspriteMode = SUBSPRITES_ON;
-        sprite->oam.priority = sElevationToPriority[FLAT_RENDER_ELEVATION];
-    }
+    sprite->subspriteMode = SUBSPRITES_ON;
+    sprite->oam.priority = sElevationToPriority[FLAT_RENDER_ELEVATION];
 }
 
 static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
@@ -9860,6 +9851,28 @@ static bool8 IsReversibleStepAction(u8 action)
         || (action >= MOVEMENT_ACTION_WALK_FASTER_DOWN        && action <= MOVEMENT_ACTION_WALK_FASTER_RIGHT)
         || (action >= MOVEMENT_ACTION_PLAYER_RUN_DOWN         && action <= MOVEMENT_ACTION_PLAYER_RUN_RIGHT)
         || (action >= MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_DOWN  && action <= MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_RIGHT);
+}
+
+// The map tile the object's sprite is actually drawn over this frame. A walk step slides the sprite
+// across the tile over several frames (see NpcTakeStep): for the first half of the crossing it is still
+// on the tile being left (previousCoords), only reaching the tile being entered (currentCoords) in the
+// second half. Cliff-face promotion (UpdateCliffFacePromotion) uses this so an object climbing behind a
+// cliff stays drawn in front until its feet really cross onto the higher tile, instead of snapping
+// behind on the step's first frame. Outside a slide previous/current coincide.
+void GetObjectEventRenderCoords(struct ObjectEvent *objEvent, s16 *x, s16 *y)
+{
+    struct Sprite *sprite = &gSprites[objEvent->spriteId];
+
+    if (IsReversibleStepAction(objEvent->movementActionId) && sprite->sTimer * 2 < sStepTimes[sprite->sSpeed])
+    {
+        *x = objEvent->previousCoords.x;
+        *y = objEvent->previousCoords.y;
+    }
+    else
+    {
+        *x = objEvent->currentCoords.x;
+        *y = objEvent->currentCoords.y;
+    }
 }
 
 // First (down) action of the reversible group containing `action`. Only valid for actions that pass

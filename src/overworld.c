@@ -5,12 +5,14 @@
 #include "berry.h"
 #include "bg.h"
 #include "cable_club.h"
+#include "clock.h"
 #include "debug.h"
 #include "dma3.h"
 #include "event_data.h"
 #include "event_object_movement.h"
 #include "event_scripts.h"
 #include "field_camera.h"
+#include "field_compositor.h"
 #include "field_control_avatar.h"
 #include "field_effect.h"
 #include "field_message_box.h"
@@ -278,32 +280,28 @@ static const struct BgTemplate sOverworldBgTemplates[] =
         .baseTile = 0
     },
     {
+        // Foreground composite plane (8BPP). Priority 1 draws it in front of field object
+        // sprites (OAM priority 2) but behind text (BG0, priority 0).
         .bg = 1,
         .charBaseIndex = 0,
         .mapBaseIndex = 29,
         .screenSize = 0,
-        .paletteMode = 0,
+        .paletteMode = 1,
         .priority = 1,
         .baseTile = 0
     },
     {
+        // Background composite plane (8BPP). Priority 3 draws it behind field object sprites.
         .bg = 2,
         .charBaseIndex = 0,
         .mapBaseIndex = 28,
         .screenSize = 0,
-        .paletteMode = 0,
-        .priority = 2,
-        .baseTile = 0
-    },
-    {
-        .bg = 3,
-        .charBaseIndex = 0,
-        .mapBaseIndex = 30,
-        .screenSize = 0,
-        .paletteMode = 0,
+        .paletteMode = 1,
         .priority = 3,
         .baseTile = 0
     }
+    // BG3 (the old bottom map layer) is retired: the compositor folds the map into the two
+    // 8BPP planes above, so only BG0-2 are used in the overworld now.
 };
 
 static const struct ScanlineEffectParams sFlashEffectParams =
@@ -1581,13 +1579,12 @@ static void InitOverworldBgs(void)
     InitBgsFromTemplates(0, sOverworldBgTemplates, ARRAY_COUNT(sOverworldBgTemplates));
     SetBgAttribute(1, BG_ATTR_MOSAIC, 1);
     SetBgAttribute(2, BG_ATTR_MOSAIC, 1);
-    SetBgAttribute(3, BG_ATTR_MOSAIC, 1);
+    // BG1 = foreground composite, BG2 = background composite (both 8BPP); BG3 retired.
     gOverworldTilemapBuffer_Bg1 = AllocZeroed(BG_SCREEN_SIZE);
     gOverworldTilemapBuffer_Bg2 = AllocZeroed(BG_SCREEN_SIZE);
-    gOverworldTilemapBuffer_Bg3 = AllocZeroed(BG_SCREEN_SIZE);
     SetBgTilemapBuffer(1, gOverworldTilemapBuffer_Bg1);
     SetBgTilemapBuffer(2, gOverworldTilemapBuffer_Bg2);
-    SetBgTilemapBuffer(3, gOverworldTilemapBuffer_Bg3);
+    FieldCompositorInit();
     InitStandardTextBoxWindows();
 }
 
@@ -1595,7 +1592,7 @@ void CleanupOverworldWindowsAndTilemaps(void)
 {
     ClearMirageTowerPulseBlendEffect();
     FreeAllOverworldWindowBuffers();
-    TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg3);
+    FieldCompositorFree();
     TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg2);
     TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg1);
 }
@@ -1660,10 +1657,14 @@ void CB1_Overworld(void)
 
 static void OverworldBasic(void)
 {
+    // Return last frame's freed composite slots to the pool before any redraws this frame (their
+    // tilemap cells have reached VRAM by now). Reusing a slot the same frame it was freed would tear.
+    FieldCompositorReclaimFreedSlots();
     ScriptContext_RunScript();
     RunTasks();
     AnimateSprites();
     CameraUpdate();
+    UpdateCliffFacePromotion();
     UpdateCameraPanning();
     BuildOamBuffer();
     UpdatePaletteFade();
@@ -1945,8 +1946,11 @@ void CB2_ContinueSavedGame(void)
     ResetSafariZoneFlag_();
     if (gSaveFileStatus == SAVE_STATUS_ERROR)
         ResetWinStreaks();
-
+    Clock_RecalcSunTimes();
+    Clock_UpdateTwilight();
+    Clock_UpdateTimeOfDay();
     LoadSaveblockMapHeader();
+
     ClearDiveAndHoleWarps();
     trainerHillMapId = GetCurrentTrainerHillMapId();
     if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
@@ -2363,7 +2367,7 @@ static void InitOverworldGraphicsRegisters(void)
     ShowBg(0);
     ShowBg(1);
     ShowBg(2);
-    ShowBg(3);
+    HideBg(3);
     InitFieldMessageBox();
 }
 

@@ -2,6 +2,7 @@
 #include "berry.h"
 #include "bike.h"
 #include "field_camera.h"
+#include "field_compositor.h"
 #include "field_player_avatar.h"
 #include "fieldmap.h"
 #include "event_object_movement.h"
@@ -41,7 +42,8 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
-static void DrawMetatile(s32, const u16 *, const u16 *, u16);
+static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32);
+static bool32 IsCliffPromotedCell(int, int);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
 static void UpdateCameraPanMovement(struct CameraObject *);
@@ -268,13 +270,25 @@ void CurrentMapDrawMetatileAt(int x, int y)
     }
 }
 
+// BG tilemap offsets of a metatile's four 8x8 sub-tiles, in metatile sub-tile order
+// (TL, TR, BL, BR). Each metatile spans a 2x2 cell block (rows are 0x20 apart).
+static const u16 sSubTileCellOffsets[4] = {0, 1, 0x20, 0x21};
+
 void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 {
     int offset = MapPosToBgTilemapOffset(&sFieldCameraOffset, x, y);
+    u32 p;
 
     if (offset >= 0)
     {
-        DrawMetatile(0xFF, tiles, NULL, offset);
+        // Door "covered" semantics: the door's lower half (tiles[0..3]) sits in the background
+        // plane behind the player, its upper half (tiles[4..7]) in the foreground plane in front.
+        for (p = 0; p < 4; p++)
+        {
+            u16 bg = tiles[p];
+            u16 fg = tiles[4 + p];
+            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1);
+        }
         sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
@@ -283,97 +297,195 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
 {
     u16 metatileId = MapGridGetMetatileIdAt(x, y);
     u8 bgMaterial = MapGridGetBgMaterialAt(x, y);
-    const u16 *metatiles;
+    const u16 *tiles;
     // Set for flagged metatiles: the tile's bottom layer is replaced by primary metatile
     // #bgMaterial (0-15)'s bottom layer. NULL = normal render.
     const u16 *materialTiles = NULL;
+    // True when an object stands behind a cliff at this tile: the cell composites using the
+    // metatile's "behind cliff" layer flags instead of its "in front of cliff" flags.
+    bool32 promote = IsCliffPromotedCell(x, y);
+    // 3-bit mask (one bit per layer 0/1/2) selecting which layers go to the foreground plane for
+    // this cell's current cliff state; the rest go to the background plane. See METATILE_COMPOSITE_*.
+    u32 fgMask;
+    u32 p;
 
     if (metatileId > NUM_METATILES_TOTAL)
         metatileId = 0;
+    fgMask = promote ? METATILE_COMPOSITE_BEHIND(GetMetatileCompositingById(metatileId))
+                     : METATILE_COMPOSITE_FRONT(GetMetatileCompositingById(metatileId));
     // Only metatiles flagged "use bg material" take the bgMaterial render path.
     if (UNPACK_USES_BGMATERIAL(GetMetatileAttributesById(metatileId)))
         materialTiles = mapLayout->primaryTileset->metatiles + bgMaterial * NUM_TILES_PER_METATILE;
     if (metatileId < NUM_METATILES_IN_PRIMARY)
-    {
-        metatiles = mapLayout->primaryTileset->metatiles;
-    }
+        tiles = mapLayout->primaryTileset->metatiles + metatileId * NUM_TILES_PER_METATILE;
     else
+        tiles = GetActiveLocationData()->secondaryTileset->metatiles + (metatileId - NUM_METATILES_IN_PRIMARY) * NUM_TILES_PER_METATILE;
+
+    // For each of the metatile's four sub-tiles, route its three layers (ground/middle/top) into the
+    // foreground or background plane per fgMask, preserving bottom->top order within each plane.
+    // bgMaterial swaps the ground layer for the material metatile's ground.
+    for (p = 0; p < 4; p++)
     {
-        metatiles = GetActiveLocationData()->secondaryTileset->metatiles;
-        metatileId -= NUM_METATILES_IN_PRIMARY;
+        u16 layers[3];
+        u16 bg[3], fg[3];
+        u32 bgCount = 0, fgCount = 0;
+        u32 l;
+
+        layers[0] = materialTiles ? materialTiles[p] : tiles[p];
+        layers[1] = tiles[4 + p];
+        layers[2] = tiles[8 + p];
+
+        for (l = 0; l < 3; l++)
+        {
+            if (fgMask & (1 << l))
+                fg[fgCount++] = layers[l];
+            else
+                bg[bgCount++] = layers[l];
+        }
+        DrawCompositeCell(offset + sSubTileCellOffsets[p], bg, bgCount, fg, fgCount);
     }
-    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y), metatiles + metatileId * NUM_TILES_PER_METATILE, materialTiles, offset);
 }
 
-static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u16 *materialTiles, u16 offset)
+// Resolve composite slots for one 8x8 cell and write them to the two plane tilemaps. The cell's
+// current slots (stored as the tilemap tile indices) are released after acquiring the new ones,
+// so an unchanged recipe keeps its slot alive across the swap.
+static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount)
 {
-    if (metatileLayerType == 0xFF)
+    u16 oldBg = gOverworldTilemapBuffer_Bg2[offset] & 0x3FF;
+    u16 oldFg = gOverworldTilemapBuffer_Bg1[offset] & 0x3FF;
+    u16 newBg = FieldCompositorAcquire(bgEntries, bgCount);
+    u16 newFg = FieldCompositorAcquire(fgEntries, fgCount);
+
+    // On pool exhaustion Acquire returns COMPOSITE_SLOT_KEEP: leave the cell's current tile in place
+    // (keep its slot, don't write the sentinel) so it shows stale content for a frame instead of
+    // flashing blank. The redraw is retried so it resolves once a slot frees.
+    if (newBg != COMPOSITE_SLOT_KEEP)
     {
-        // A door metatile shall be drawn, we use covered behavior
-        // Draw metatile's bottom layer to the bottom background layer.
-        gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
-        gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
-        gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
-        gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
-
-        // Draw transparent tiles to the top background layer.
-        gOverworldTilemapBuffer_Bg2[offset] = 0;
-        gOverworldTilemapBuffer_Bg2[offset + 1] = 0;
-        gOverworldTilemapBuffer_Bg2[offset + 0x20] = 0;
-        gOverworldTilemapBuffer_Bg2[offset + 0x21] = 0;
-
-        // Draw metatile's top layer to the middle background layer.
-        gOverworldTilemapBuffer_Bg1[offset] = tiles[4];
-        gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[5];
-        gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
-        gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[7];
-
+        FieldCompositorRelease(oldBg);
+        gOverworldTilemapBuffer_Bg2[offset] = newBg;
     }
-    else if (materialTiles != NULL)
+    if (newFg != COMPOSITE_SLOT_KEEP)
     {
-        // bgMaterial tile: replace this metatile's bottom (ground) layer with the material
-        // metatile's bottom layer; keep this metatile's middle and top layers.
-        gOverworldTilemapBuffer_Bg3[offset] = materialTiles[0];
-        gOverworldTilemapBuffer_Bg3[offset + 1] = materialTiles[1];
-        gOverworldTilemapBuffer_Bg3[offset + 0x20] = materialTiles[2];
-        gOverworldTilemapBuffer_Bg3[offset + 0x21] = materialTiles[3];
-
-        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
-        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
-        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
-        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
-
-        gOverworldTilemapBuffer_Bg1[offset] = tiles[8];
-        gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[9];
-        gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[10];
-        gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[11];
-    }
-    else
-    {
-        // Draw metatile's bottom layer to the bottom background layer.
-        gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
-        gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
-        gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
-        gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
-
-        // Draw metatile's middle layer to the middle background layer.
-        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
-        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
-        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
-        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
-
-        // Draw metatile's top layer to the top background layer, which covers object event sprites.
-        gOverworldTilemapBuffer_Bg1[offset] = tiles[8];
-        gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[9];
-        gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[10];
-        gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[11];
-
-
+        FieldCompositorRelease(oldFg);
+        gOverworldTilemapBuffer_Bg1[offset] = newFg;
     }
 
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
-    ScheduleBgCopyTilemapToVram(3);
+}
+
+// Tiles (map-grid coords, the space DrawMetatileAt and object currentCoords share) whose middle
+// layer is currently promoted into the foreground plane to occlude an object hiding behind a cliff.
+// Rebuilt each frame from object positions. Sized for each object's full sprite footprint (width x
+// height in tiles) at both its current and destination tile while stepping; a handful of tiles each.
+#define MAX_CLIFF_PROMOTED_TILES (OBJECT_EVENTS_COUNT * 6)
+// In EWRAM: IWRAM is nearly full, and these are referenced while UpdateCliffFacePromotion descends into
+// the compositor's deep redraw chain, so keeping them (and the per-frame prev snapshot) off the IWRAM
+// stack/bss avoids overflowing into other globals.
+EWRAM_DATA static struct Coords16 sCliffPromotedTiles[MAX_CLIFF_PROMOTED_TILES] = {0};
+EWRAM_DATA static struct Coords16 sCliffPromotedTilesPrev[MAX_CLIFF_PROMOTED_TILES] = {0};
+EWRAM_DATA static u8 sCliffPromotedTileCount = 0;
+
+// Whether a foreground cell should promote its middle layer (see DrawMetatileAt): true when a
+// behind-cliff object's sprite covers this tile, so the cliff's middle layer draws over it.
+static bool32 IsCliffPromotedCell(int x, int y)
+{
+    u32 i;
+
+    for (i = 0; i < sCliffPromotedTileCount; i++)
+    {
+        if (sCliffPromotedTiles[i].x == x && sCliffPromotedTiles[i].y == y)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static void AddCliffPromotedTile(s16 x, s16 y)
+{
+    u32 i;
+
+    for (i = 0; i < sCliffPromotedTileCount; i++)
+    {
+        if (sCliffPromotedTiles[i].x == x && sCliffPromotedTiles[i].y == y)
+            return;
+    }
+    if (sCliffPromotedTileCount < MAX_CLIFF_PROMOTED_TILES)
+    {
+        sCliffPromotedTiles[sCliffPromotedTileCount].x = x;
+        sCliffPromotedTiles[sCliffPromotedTileCount].y = y;
+        sCliffPromotedTileCount++;
+    }
+}
+
+static bool32 WasInTileList(const struct Coords16 *list, u8 count, s16 x, s16 y)
+{
+    u32 i;
+
+    for (i = 0; i < count; i++)
+    {
+        if (list[i].x == x && list[i].y == y)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// Promote every tile of the sprite's footprint when the object stands (feet) at tile (cx, cy): the
+// sprite is bottom-anchored and horizontally centred on that tile, so it spans ceil(width/16) tile
+// columns either side of centre and ceil(height/16) rows up from the feet. Each covered tile higher
+// than the object's render base is a cliff face in front of that band, so its middle layer is promoted
+// over the sprite; rows/cols at or below the base are normal ground the sprite stands in front of.
+// previousElevation is the frozen base while behind a cliff and the object's own ground level when in
+// front, covering both the climbed-behind and stood-in-front-of-a-taller-cliff cases.
+static void PromoteSpriteFootprint(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *graphicsInfo, s16 cx, s16 cy)
+{
+    s16 half = graphicsInfo->width / 2;
+    s16 colStart = (8 - half) >> 4;       // left edge px (centre at +8) -> column, floored
+    s16 colEnd = (8 + half - 1) >> 4;     // right edge px (inclusive) -> column, floored
+    s16 rows = (graphicsInfo->height + 15) / 16;
+    s16 c, r;
+
+    for (r = 0; r < rows; r++)
+        for (c = colStart; c <= colEnd; c++)
+            if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->previousElevation)
+                AddCliffPromotedTile(cx + c, cy - r);
+}
+
+// Rebuild the cliff-promoted tile set from current object positions and redraw any tile that
+// entered or left it (its foreground recipe changed). Called once per frame from the overworld.
+void UpdateCliffFacePromotion(void)
+{
+    struct Coords16 *prev = sCliffPromotedTilesPrev;
+    u8 prevCount = sCliffPromotedTileCount;
+    u32 i;
+
+    for (i = 0; i < prevCount; i++)
+        prev[i] = sCliffPromotedTiles[i];
+    sCliffPromotedTileCount = 0;
+
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+    {
+        struct ObjectEvent *objEvent = &gObjectEvents[i];
+        const struct ObjectEventGraphicsInfo *graphicsInfo;
+
+        if (!objEvent->active || objEvent->drawAtHighestElevation)
+            continue;
+
+        // Cover the sprite's whole footprint at the tile it is leaving and the tile it is entering, so a
+        // mid-step sprite straddling both is occluded across its full span (and its destination is set up
+        // before it arrives). The two footprints coincide when not stepping; AddCliffPromotedTile dedups.
+        graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+        PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
+        PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
+    }
+
+    // Redraw tiles whose promotion state flipped. Off-screen tiles are skipped by
+    // CurrentMapDrawMetatileAt and pick up the live state when they scroll back into view.
+    for (i = 0; i < prevCount; i++)
+        if (!IsCliffPromotedCell(prev[i].x, prev[i].y))
+            CurrentMapDrawMetatileAt(prev[i].x, prev[i].y);
+    for (i = 0; i < sCliffPromotedTileCount; i++)
+        if (!WasInTileList(prev, prevCount, sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y))
+            CurrentMapDrawMetatileAt(sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y);
 }
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)

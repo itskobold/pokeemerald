@@ -2,6 +2,7 @@
 #include "event_data.h"
 #include "field_door.h"
 #include "field_camera.h"
+#include "field_compositor.h"
 #include "fieldmap.h"
 #include "metatile_behavior.h"
 #include "task.h"
@@ -280,18 +281,18 @@ static const struct DoorGraphics sDoorAnimGraphicsTable[] =
     {},
 };
 
-// NOTE: The tiles of a door's animation must be copied to VRAM because they are not already part of any given tileset.
-//       This means that if there are any pre-existing tiles in this copied region that are visible when the door
-//       animation is played they will be overwritten.
+// Door animation tiles aren't part of any tileset, so they're fed into the compositor's source
+// cache (under reserved tile ids at the top of the secondary range) for the door metatiles below to
+// composite from. The tile ids must not collide with tiles a visible secondary metatile actually uses.
 #define DOOR_TILE_START_SIZE1 (NUM_TILES_TOTAL - 8)
 #define DOOR_TILE_START_SIZE2 (NUM_TILES_TOTAL - 16)
 
 static void CopyDoorTilesToVram(const struct DoorGraphics *gfx, const struct DoorAnimFrame *frame)
 {
     if (gfx->size == 2)
-        CpuFastCopy(gfx->tiles + frame->offset, (void *)(VRAM + TILE_OFFSET_4BPP(DOOR_TILE_START_SIZE2)), 16 * TILE_SIZE_4BPP);
+        FieldCompositorUpdateSourceTilesImmediate(DOOR_TILE_START_SIZE2, gfx->tiles + frame->offset, 16);
     else
-        CpuFastCopy(gfx->tiles + frame->offset, (void *)(VRAM + TILE_OFFSET_4BPP(DOOR_TILE_START_SIZE1)), 8 * TILE_SIZE_4BPP);
+        FieldCompositorUpdateSourceTilesImmediate(DOOR_TILE_START_SIZE1, gfx->tiles + frame->offset, 8);
 }
 
 static void BuildDoorTiles(u16 *tiles, u16 tileNum, const u8 *paletteNums)

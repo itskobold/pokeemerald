@@ -95,6 +95,18 @@ enum
 #define UNPACK_LAYER_TYPE(data) UNPACK(data, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
 #define UNPACK_USES_BGMATERIAL(data) (((data) & METATILE_ATTR_BGMATERIAL) != 0)
 
+// Per-metatile foreground/background compositing flags. One u8 per metatile, stored in each
+// data/tilesets/*/*/metatile_compositing.bin (loaded parallel to metatile_attributes). The two
+// cliff states each get 3 bits, one per metatile layer (0=ground, 1=middle, 2=top): a set bit
+// composites that layer into the foreground plane for that state, a clear bit into the background.
+//   bits 0-2  in front of cliff: layer 0/1/2 -> foreground
+//   bits 3-5  behind cliff:      layer 0/1/2 -> foreground
+#define METATILE_COMPOSITE_FRONT_SHIFT  0
+#define METATILE_COMPOSITE_BEHIND_SHIFT 3
+#define METATILE_COMPOSITE_LAYER_MASK   0x7
+#define METATILE_COMPOSITE_FRONT(flags)  (((flags) >> METATILE_COMPOSITE_FRONT_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
+#define METATILE_COMPOSITE_BEHIND(flags) (((flags) >> METATILE_COMPOSITE_BEHIND_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
+
 enum {
     METATILE_LAYER_TYPE_NORMAL,  // Metatile uses middle and top bg layers
     METATILE_LAYER_TYPE_COVERED, // Metatile uses bottom and middle bg layers
@@ -118,7 +130,8 @@ struct Tileset
     /*0x08*/ const u16 (*palettes)[16];
     /*0x0C*/ const u16 *metatiles;
     /*0x10*/ const u16 *metatileAttributes;
-    /*0x14*/ TilesetCB callback;
+    /*0x14*/ const u8 *metatileCompositing; // per-metatile fg/bg layer flags, see METATILE_COMPOSITE_*
+    /*0x18*/ TilesetCB callback;
 };
 
 struct MapLayout
@@ -274,13 +287,15 @@ struct MapHeader
                // the remaining 6 bits are unused
 };
 
-// Render plane of a sprite relative to a cliff face it has climbed behind. The states are ordered:
-// each higher one sinks the sprite further back, so >= FRONT comparisons gate "behind the cliff".
+// State of a sprite relative to a cliff face it has climbed behind. Drives cliff collision and which
+// tiles promote their middle layer into the foreground to occlude the sprite (UpdateCliffFacePromotion);
+// the sprite itself always draws at the one flat object priority. FRONT is 0, so any non-FRONT state
+// means behind the cliff.
 enum CliffLayer
 {
-    CLIFF_LAYER_FRONT,    // in front of the cliff: normal elevation-based rendering
-    CLIFF_LAYER_BEHIND,   // behind the cliff face: drawn behind the top 2 tile layers
-    CLIFF_LAYER_OBSCURED, // fully buried: every tile the sprite spans is higher, so it is hidden
+    CLIFF_LAYER_FRONT,    // in front of the cliff: rendered normally, no terrain promotion
+    CLIFF_LAYER_BEHIND,   // behind the cliff face: covered tiles promote their middle layer over it
+    CLIFF_LAYER_OBSCURED, // fully buried: every tile the sprite spans is higher, so it is hidden/silhouetted
 };
 
 struct ObjectEvent
