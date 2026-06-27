@@ -1,5 +1,6 @@
 #include "global.h"
 #include "berry.h"
+#include "bg.h"
 #include "bike.h"
 #include "field_camera.h"
 #include "field_compositor.h"
@@ -129,9 +130,32 @@ void ResetFieldCamera(void)
     ResetCameraOffset(&sFieldCameraOffset);
 }
 
+// Set whenever the compositor rewrites a field tilemap cell (DrawCompositeCell); consumed by the
+// synchronous flush in FieldUpdateBgTilemapScroll.
+static bool8 sFieldTilemapDirty;
+
+// Copy a finished overworld BG tilemap buffer straight to its VRAM map base, synchronously.
+static void FlushFieldBgTilemap(u8 bg, const u16 *buffer)
+{
+    DmaCopy32(3, buffer, (void *)(BG_VRAM + GetBgAttribute(bg, BG_ATTR_MAPBASEINDEX) * BG_SCREEN_SIZE), BG_SCREEN_SIZE);
+}
+
 void FieldUpdateBgTilemapScroll(void)
 {
     u32 r4, r5;
+
+    // Land this frame's slice redraw in VRAM BEFORE the scroll below reveals it. The compositor also
+    // schedules these tilemaps through the DMA3 queue (which covers non-field contexts like map load),
+    // but that queue drains after the scroll commits this VBlank and under fast movement can slip the
+    // copy past scanout - so the viewport scrolls onto not-yet-resident edge tiles and tears. Flushing
+    // synchronously here, ahead of the scroll, guarantees the new edge column is present with no lag.
+    if (sFieldTilemapDirty)
+    {
+        FlushFieldBgTilemap(1, gOverworldTilemapBuffer_Bg1);
+        FlushFieldBgTilemap(2, gOverworldTilemapBuffer_Bg2);
+        sFieldTilemapDirty = FALSE;
+    }
+
     r5 = sFieldCameraOffset.xPixelOffset + sHorizontalCameraPan;
     r4 = sVerticalCameraPan + sFieldCameraOffset.yPixelOffset + 8;
 
@@ -372,6 +396,8 @@ static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, con
 
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
+    // Also flag the field for the synchronous, pre-scroll VRAM flush (see FieldUpdateBgTilemapScroll).
+    sFieldTilemapDirty = TRUE;
 }
 
 // Tiles (map-grid coords, the space DrawMetatileAt and object currentCoords share) whose middle
