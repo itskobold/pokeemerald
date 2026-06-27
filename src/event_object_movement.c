@@ -9075,10 +9075,11 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
         return;
     }
 
-    // Stairs are the walkable path between levels, never a cliff to hide behind. Escalator warp tiles
-    // are elevated cliff tiles, but the player warps in onto one in front so the ride is visible.
-    if (MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y))
-     || MetatileBehavior_IsEscalator(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y)))
+    // Escalator warp tiles are elevated cliff: player warps in onto one in front, so keep it visible.
+    // Stairs aren't special-cased on spawn: nothing was climbed, so an object below the stair tile's
+    // elevation (e.g. elevation 5 on a 6 stair) stays behind via the comparison below; one at the
+    // stair's own level falls through to front.
+    if (MetatileBehavior_IsEscalator(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y)))
     {
         objEvent->cliffLayer = CLIFF_LAYER_FRONT;
         return;
