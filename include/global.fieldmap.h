@@ -127,11 +127,16 @@ struct Tileset
     /*0x00*/ bool8 isCompressed;
     /*0x01*/ bool8 isSecondary;
     /*0x04*/ const u32 *tiles;
-    /*0x08*/ const u16 (*palettes)[16];
+    /*0x08*/ const u16 *palettes; // flat: primary banks 0-5, secondary banks 6-12 (16 colours each)
     /*0x0C*/ const u16 *metatiles;
     /*0x10*/ const u16 *metatileAttributes;
     /*0x14*/ const u8 *metatileCompositing; // per-metatile fg/bg layer flags, see METATILE_COMPOSITE_*
     /*0x18*/ TilesetCB callback;
+    // Optional 16-byte bank->base-offset table for the 8bpp compositor. The compositor adds
+    // base[palField] to each non-zero source pixel (see field_compositor.c). NULL = default
+    // base[i] = i*16 (vanilla 16-colour banks). Lets a tile relocate its colours anywhere in
+    // the 256-colour overworld palette.
+    /*0x1C*/ const u8 *paletteOffsets;
 };
 
 struct MapLayout

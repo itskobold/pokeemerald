@@ -29,6 +29,7 @@ struct PngToGbaOptions {
     bool isAffineMap;
     bool isTiled;
     int dataWidth;
+    int paletteMod; // if >0, reduce each pixel index modulo this (absolute -> per-bank relative)
 };
 
 #endif // OPTIONS_H

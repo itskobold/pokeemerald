@@ -1931,12 +1931,14 @@ static void ClearPlaceDecorationGraphicsDataBuffer(struct PlaceDecorationGraphic
 
 static void CopyPalette(u16 *dest, u16 pal)
 {
-    CpuFastCopy(&gTilesetPointer_SecretBase->palettes[pal], dest, PLTT_SIZE_4BPP);
+    // palettes is now a flat array; index by bank (16 colours each)
+    CpuFastCopy(gTilesetPointer_SecretBase->palettes + pal * 16, dest, PLTT_SIZE_4BPP);
 }
 
 static void CopyTile(u8 *dest, u16 tile)
 {
     u8 ALIGNED(4) buffer[TILE_SIZE_4BPP];
+    const u8 *src;
     u16 mode;
     u16 i;
 
@@ -1944,7 +1946,12 @@ static void CopyTile(u8 *dest, u16 tile)
     if (tile != 0)
         tile &= 0x03FF;
 
-    CpuFastCopy(&gTilesetPointer_SecretBase->tiles[tile * TILE_SIZE_4BPP / sizeof(u32)], buffer, TILE_SIZE_4BPP);
+    // SecretBase tiles are now 8BPP (one byte/pixel, values 0-15 for this legacy art). Pack two
+    // pixels per byte into the 4BPP buffer the decoration selection sprite expects (low nibble =
+    // left pixel). The matching 16-colour palette is loaded separately via CopyPalette.
+    src = (const u8 *)gTilesetPointer_SecretBase->tiles + tile * TILE_SIZE_8BPP;
+    for (i = 0; i < TILE_SIZE_4BPP; i++)
+        buffer[i] = (src[i * 2] & 0x0F) | ((src[i * 2 + 1] & 0x0F) << 4);
     switch (mode)
     {
     case 0:

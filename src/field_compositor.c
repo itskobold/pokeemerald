@@ -62,9 +62,13 @@ static inline u32 SlotCount(const struct CompositeSlot *s)
     return s->entries[2] ? 3 : (s->entries[1] ? 2 : (s->entries[0] ? 1 : 0));
 }
 
-static const u8 *sPrimaryTiles;   // ROM, uncompressed 4BPP; tile ids 0..NUM_TILES_IN_PRIMARY-1
-static const u8 *sSecondaryTiles; // ROM, uncompressed 4BPP; tile ids NUM_TILES_IN_PRIMARY..
-static u8 *sAnimTiles;             // [ANIM_TILE_CAPACITY * TILE_SIZE_4BPP], heap
+static const u8 *sPrimaryTiles;   // ROM, uncompressed 8BPP; tile ids 0..NUM_TILES_IN_PRIMARY-1
+static const u8 *sSecondaryTiles; // ROM, uncompressed 8BPP; tile ids NUM_TILES_IN_PRIMARY..
+static u8 *sAnimTiles;             // [ANIM_TILE_CAPACITY * TILE_SIZE_8BPP], heap
+// Per-bank base offset added to each non-zero source pixel (see ComposeSlot). Indexed by the
+// metatile subtile entry's palette field. Banks 0..NUM_PALS_IN_PRIMARY-1 come from the primary
+// tileset, NUM_PALS_IN_PRIMARY..NUM_PALS_TOTAL-1 from the secondary; default = bank*16.
+static u8 sBankOffset[16];
 static u8 *sAnimOverrideIndex;     // [NUM_TILES_TOTAL]; ANIM_NOT_OVERRIDDEN or index into sAnimTiles
 static u16 sAnimPrimaryCount;      // next free override slot in the primary region
 static u16 sAnimSecondaryCount;    // next free override slot in the secondary region (from BASE)
@@ -119,14 +123,14 @@ static const u8 *GetSourceTilePtr(u16 tileId)
     u16 ov = sAnimOverrideIndex[tileId];
 
     if (ov != ANIM_NOT_OVERRIDDEN)
-        return sAnimTiles + ov * TILE_SIZE_4BPP;
+        return sAnimTiles + ov * TILE_SIZE_8BPP;
     // Reserved door tile ids have no ROM backing (they only exist via the door override); reading them
     // from the tileset would run past its graphics. Treat un-overridden ones as transparent.
     if (tileId >= ANIM_DOOR_FIRST_TILE)
         return NULL;
     if (tileId < NUM_TILES_IN_PRIMARY)
-        return sPrimaryTiles ? sPrimaryTiles + tileId * TILE_SIZE_4BPP : NULL;
-    return sSecondaryTiles ? sSecondaryTiles + (tileId - NUM_TILES_IN_PRIMARY) * TILE_SIZE_4BPP : NULL;
+        return sPrimaryTiles ? sPrimaryTiles + tileId * TILE_SIZE_8BPP : NULL;
+    return sSecondaryTiles ? sSecondaryTiles + (tileId - NUM_TILES_IN_PRIMARY) * TILE_SIZE_8BPP : NULL;
 }
 
 // Drop the animation overrides for a tile-id range (a tileset is being swapped in there). The new
@@ -186,10 +190,12 @@ void FieldCompositorInit(void)
     sHashHead = AllocZeroed(COMPOSITE_HASH_SIZE * sizeof(u16));
     sFreeList = AllocZeroed(COMPOSITE_SLOT_COUNT * sizeof(u16));
     sPendingFree = AllocZeroed(COMPOSITE_SLOT_COUNT * sizeof(u16));
-    sAnimTiles = AllocZeroed(ANIM_TILE_CAPACITY * TILE_SIZE_4BPP);
+    sAnimTiles = AllocZeroed(ANIM_TILE_CAPACITY * TILE_SIZE_8BPP);
     sAnimOverrideIndex = AllocZeroed(NUM_TILES_TOTAL * sizeof(u8));
     for (i = 0; i < NUM_TILES_TOTAL; i++)
         sAnimOverrideIndex[i] = ANIM_NOT_OVERRIDDEN;
+    for (i = 0; i < ARRAY_COUNT(sBankOffset); i++)
+        sBankOffset[i] = i * 16;
     sAnimPrimaryCount = 0;
     sAnimSecondaryCount = 0;
     ResetPool();
@@ -215,11 +221,23 @@ void FieldCompositorFree(void)
 // crossing can swap a different secondary tileset into the same id range while composites built from
 // the old graphics are still live, so clear that range's animation overrides and recomposite the
 // live slots from the new ROM source. Both are no-ops on first load (nothing composited yet).
+// Cache a tileset's bank base-offsets into sBankOffset for the banks it owns. A NULL
+// paletteOffsets table (the common case) means default banks (base = bank*16).
+static void LoadBankOffsets(const struct Tileset *tileset, u32 firstBank, u32 lastBank)
+{
+    const u8 *po = tileset->paletteOffsets;
+    u32 i;
+
+    for (i = firstBank; i <= lastBank; i++)
+        sBankOffset[i] = po ? po[i] : i * 16;
+}
+
 void FieldCompositorLoadPrimaryTiles(const struct Tileset *tileset)
 {
     if (tileset == NULL)
         return;
     sPrimaryTiles = (const u8 *)tileset->tiles;
+    LoadBankOffsets(tileset, 0, NUM_PALS_IN_PRIMARY - 1);
     ClearAnimOverrides(0, NUM_TILES_IN_PRIMARY - 1, TRUE);
     FieldCompositorInvalidateSourceRange(0, NUM_TILES_IN_PRIMARY - 1);
 }
@@ -229,13 +247,16 @@ void FieldCompositorLoadSecondaryTiles(const struct Tileset *tileset)
     if (tileset == NULL)
         return;
     sSecondaryTiles = (const u8 *)tileset->tiles;
+    LoadBankOffsets(tileset, NUM_PALS_IN_PRIMARY, NUM_PALS_TOTAL - 1);
     ClearAnimOverrides(NUM_TILES_IN_PRIMARY, NUM_TILES_TOTAL - 1, FALSE);
     FieldCompositorInvalidateSourceRange(NUM_TILES_IN_PRIMARY, NUM_TILES_TOTAL - 1);
 }
 
-// Flatten a slot's recipe (bottom->top) into one 8BPP tile and DMA it to VRAM. Each non-zero
-// 4BPP source pixel becomes (palBank << 4) | pix against the unified 256-colour overworld
-// palette; zero stays transparent so upper layers show the layers below.
+// Flatten a slot's recipe (bottom->top) into one 8BPP tile and DMA it to VRAM. The 8BPP source
+// pixels are relative indices; each non-zero one becomes (pix + sBankOffset[palField]) against the
+// unified 256-colour overworld palette. For legacy 16-colour art (pix 0..15, base a multiple of
+// 16) this is identical to the old (palBank << 4) | pix. Zero stays transparent so upper layers
+// show the layers below.
 static void ComposeSlot(u16 slot)
 {
     ALIGNED(4) u8 out[TILE_SIZE_8BPP];
@@ -249,39 +270,33 @@ static void ComposeSlot(u16 slot)
     {
         u16 e = s->entries[layer];
         const u8 *src = GetSourceTilePtr(e & SUBTILE_ENTRY_TILE_MASK);
-        u32 palBase = (e >> SUBTILE_ENTRY_PAL_SHIFT) << 4;
+        u32 palBase = sBankOffset[(e >> SUBTILE_ENTRY_PAL_SHIFT) & 0xF];
         bool32 hflip = e & SUBTILE_ENTRY_HFLIP;
         bool32 vflip = e & SUBTILE_ENTRY_VFLIP;
 
         if (src == NULL)
             continue;
-        // Each source byte holds two 4BPP pixels (low nibble = left). Specialise on hflip so
-        // the per-pixel flip branch leaves the inner loop; vflip just picks the source row.
+        // Each source byte is one 8BPP pixel. Specialise on hflip so the per-pixel flip branch
+        // leaves the inner loop; vflip just picks the source row.
         for (row = 0; row < 8; row++)
         {
-            const u8 *srcRow = src + (vflip ? 7 - row : row) * 4;
+            const u8 *srcRow = src + (vflip ? 7 - row : row) * 8;
             u8 *o = out + row * 8;
 
             if (!hflip)
             {
-                for (b = 0; b < 4; b++)
+                for (b = 0; b < 8; b++)
                 {
-                    u8 byte = srcRow[b];
-                    u8 lo = byte & 0xF;
-                    u8 hi = byte >> 4;
-                    if (lo) o[b * 2] = palBase | lo;
-                    if (hi) o[b * 2 + 1] = palBase | hi;
+                    u8 pix = srcRow[b];
+                    if (pix) o[b] = pix + palBase;
                 }
             }
             else
             {
-                for (b = 0; b < 4; b++)
+                for (b = 0; b < 8; b++)
                 {
-                    u8 byte = srcRow[3 - b];
-                    u8 lo = byte & 0xF;
-                    u8 hi = byte >> 4;
-                    if (hi) o[b * 2] = palBase | hi;
-                    if (lo) o[b * 2 + 1] = palBase | lo;
+                    u8 pix = srcRow[7 - b];
+                    if (pix) o[b] = pix + palBase;
                 }
             }
         }
@@ -435,7 +450,7 @@ static u8 *AcquireAnimOverride(u16 tileId)
         }
         sAnimOverrideIndex[tileId] = idx;
     }
-    return sAnimTiles + idx * TILE_SIZE_4BPP;
+    return sAnimTiles + idx * TILE_SIZE_8BPP;
 }
 
 // ROM source is immutable, so dynamic tile graphics (animation frames, door frames) land in the
@@ -449,7 +464,7 @@ static void WriteSourceOverride(u16 firstTileId, const void *src, u16 numTiles)
     {
         u8 *dest = AcquireAnimOverride(firstTileId + k);
         if (dest != NULL)
-            CpuFastCopy(in + k * TILE_SIZE_4BPP, dest, TILE_SIZE_4BPP);
+            CpuFastCopy(in + k * TILE_SIZE_8BPP, dest, TILE_SIZE_8BPP);
     }
 }
 

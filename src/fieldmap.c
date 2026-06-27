@@ -1456,12 +1456,13 @@ static void LoadTilesetPalette(struct Tileset const *tileset, u16 destOffset, u1
         if (tileset->isSecondary == FALSE)
         {
             LoadPalette(&black, destOffset, PLTT_SIZEOF(1));
-            LoadPalette(tileset->palettes[0] + 1, destOffset + 1, size - PLTT_SIZEOF(1));
+            LoadPalette(tileset->palettes + 1, destOffset + 1, size - PLTT_SIZEOF(1));
             ApplyGlobalTintToPaletteEntries(destOffset + 1, (size - PLTT_SIZEOF(1)) >> 1);
         }
         else if (tileset->isSecondary == TRUE)
         {
-            LoadPalette(tileset->palettes[NUM_PALS_IN_PRIMARY], destOffset, size);
+            // secondary palettes array is flat and starts at bank 6 (index 0)
+            LoadPalette(tileset->palettes, destOffset, size);
             ApplyGlobalTintToPaletteEntries(destOffset, size >> 1);
         }
         else

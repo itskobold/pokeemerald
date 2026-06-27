@@ -83,6 +83,17 @@ void ConvertPngToGba(char *inputPath, char *outputPath, struct PngToGbaOptions *
 
     ReadPng(inputPath, &image);
 
+    // The tileset PNGs store absolute indices into the combined palette so they
+    // display correctly; the runtime wants per-bank relative indices (0..15), so
+    // reduce each pixel modulo the bank size. Since absolute = bank*mod + relative,
+    // this recovers exactly the relative index regardless of which bank was used.
+    if (options->paletteMod > 0 && image.bitDepth == 8)
+    {
+        int numPixels = image.width * image.height;
+        for (int i = 0; i < numPixels; i++)
+            image.pixels[i] %= options->paletteMod;
+    }
+
     if (options->isTiled)
         WriteTileImage(outputPath, options->numTilesMode, options->numTiles, options->metatileWidth, options->metatileHeight, &image, !image.hasPalette);
     else
@@ -214,12 +225,26 @@ void HandlePngToGbaCommand(char *inputPath, char *outputPath, int argc, char **a
     options.isAffineMap = false;
     options.isTiled = true;
     options.dataWidth = 1;
+    options.paletteMod = 0;
 
     for (int i = 3; i < argc; i++)
     {
         char *option = argv[i];
 
-        if (strcmp(option, "-num_tiles") == 0)
+        if (strcmp(option, "-palette_mod") == 0)
+        {
+            if (i + 1 >= argc)
+                FATAL_ERROR("No value following \"-palette_mod\".\n");
+
+            i++;
+
+            if (!ParseNumber(argv[i], NULL, 10, &options.paletteMod))
+                FATAL_ERROR("Failed to parse palette mod.\n");
+
+            if (options.paletteMod < 1)
+                FATAL_ERROR("palette mod must be positive.\n");
+        }
+        else if (strcmp(option, "-num_tiles") == 0)
         {
             if (i + 1 >= argc)
                 FATAL_ERROR("No number of tiles following \"-num_tiles\".\n");

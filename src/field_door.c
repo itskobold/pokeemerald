@@ -30,107 +30,107 @@ struct DoorAnimFrame
 
 static bool8 ShouldUseMultiCorridorDoor(void);
 
-static const u8 sDoorAnimTiles_Littleroot[] = INCGFX_U8("graphics/door_anims/littleroot.png", ".4bpp");
+static const u8 sDoorAnimTiles_Littleroot[] = INCGFX_U8("graphics/door_anims/littleroot.png", ".8bpp");
 static const u16 sDoorNullPalette1[16] = {};
-static const u8 sDoorAnimTiles_BirchsLab[] = INCGFX_U8("graphics/door_anims/birchs_lab.png", ".4bpp");
+static const u8 sDoorAnimTiles_BirchsLab[] = INCGFX_U8("graphics/door_anims/birchs_lab.png", ".8bpp");
 static const u16 sDoorNullPalette2[16] = {};
-static const u8 sDoorAnimTiles_FallarborLightRoof[] = INCGFX_U8("graphics/door_anims/fallarbor_light_roof.png", ".4bpp");
+static const u8 sDoorAnimTiles_FallarborLightRoof[] = INCGFX_U8("graphics/door_anims/fallarbor_light_roof.png", ".8bpp");
 static const u16 sDoorNullPalette3[16] = {};
-static const u8 sDoorAnimTiles_Lilycove[] = INCGFX_U8("graphics/door_anims/lilycove.png", ".4bpp");
+static const u8 sDoorAnimTiles_Lilycove[] = INCGFX_U8("graphics/door_anims/lilycove.png", ".8bpp");
 static const u16 sDoorNullPalette4[16] = {};
-static const u8 sDoorAnimTiles_LilycoveWooden[] = INCGFX_U8("graphics/door_anims/lilycove_wooden.png", ".4bpp");
+static const u8 sDoorAnimTiles_LilycoveWooden[] = INCGFX_U8("graphics/door_anims/lilycove_wooden.png", ".8bpp");
 static const u16 sDoorNullPalette5[16] = {};
-static const u8 sDoorAnimTiles_General[] = INCGFX_U8("graphics/door_anims/general.png", ".4bpp");
+static const u8 sDoorAnimTiles_General[] = INCGFX_U8("graphics/door_anims/general.png", ".8bpp");
 static const u16 sDoorNullPalette6[16] = {};
-static const u8 sDoorAnimTiles_PokeCenter[] = INCGFX_U8("graphics/door_anims/poke_center.png", ".4bpp");
-static const u8 sDoorAnimTiles_Gym[] = INCGFX_U8("graphics/door_anims/gym.png", ".4bpp");
-static const u8 sDoorAnimTiles_PokeMart[] = INCGFX_U8("graphics/door_anims/poke_mart.png", ".4bpp");
-static const u8 sDoorAnimTiles_RustboroTan[] = INCGFX_U8("graphics/door_anims/rustboro_tan.png", ".4bpp");
+static const u8 sDoorAnimTiles_PokeCenter[] = INCGFX_U8("graphics/door_anims/poke_center.png", ".8bpp");
+static const u8 sDoorAnimTiles_Gym[] = INCGFX_U8("graphics/door_anims/gym.png", ".8bpp");
+static const u8 sDoorAnimTiles_PokeMart[] = INCGFX_U8("graphics/door_anims/poke_mart.png", ".8bpp");
+static const u8 sDoorAnimTiles_RustboroTan[] = INCGFX_U8("graphics/door_anims/rustboro_tan.png", ".8bpp");
 static const u16 sDoorNullPalette7[16] = {};
-static const u8 sDoorAnimTiles_RustboroGray[] = INCGFX_U8("graphics/door_anims/rustboro_gray.png", ".4bpp");
+static const u8 sDoorAnimTiles_RustboroGray[] = INCGFX_U8("graphics/door_anims/rustboro_gray.png", ".8bpp");
 static const u16 sDoorNullPalette8[16] = {};
-static const u8 sDoorAnimTiles_Oldale[] = INCGFX_U8("graphics/door_anims/oldale.png", ".4bpp");
+static const u8 sDoorAnimTiles_Oldale[] = INCGFX_U8("graphics/door_anims/oldale.png", ".8bpp");
 static const u8 sFiller1[0x5900] = {};
-static const u8 sDoorAnimTiles_UnusedTops[] = INCGFX_U8("graphics/door_anims/unused_top.png", ".4bpp");
+static const u8 sDoorAnimTiles_UnusedTops[] = INCGFX_U8("graphics/door_anims/unused_top.png", ".8bpp");
 static const u8 sFiller2[0x140] = {};
-static const u8 sDoorAnimTiles_UnusedBottoms[] = INCGFX_U8("graphics/door_anims/unused_bottom.png", ".4bpp");
+static const u8 sDoorAnimTiles_UnusedBottoms[] = INCGFX_U8("graphics/door_anims/unused_bottom.png", ".8bpp");
 static const u16 sDoorNullPalette11[16] = {};
-static const u8 sDoorAnimTiles_Mauville[] = INCGFX_U8("graphics/door_anims/mauville.png", ".4bpp");
+static const u8 sDoorAnimTiles_Mauville[] = INCGFX_U8("graphics/door_anims/mauville.png", ".8bpp");
 static const u16 sDoorNullPalette12[16] = {};
-static const u8 sDoorAnimTiles_Verdanturf[] = INCGFX_U8("graphics/door_anims/verdanturf.png", ".4bpp");
+static const u8 sDoorAnimTiles_Verdanturf[] = INCGFX_U8("graphics/door_anims/verdanturf.png", ".8bpp");
 static const u16 sDoorNullPalette13[16] = {};
-static const u8 sDoorAnimTiles_Slateport[] = INCGFX_U8("graphics/door_anims/slateport.png", ".4bpp");
+static const u8 sDoorAnimTiles_Slateport[] = INCGFX_U8("graphics/door_anims/slateport.png", ".8bpp");
 static const u16 sDoorNullPalette14[16] = {};
-static const u8 sDoorAnimTiles_Dewford[] = INCGFX_U8("graphics/door_anims/dewford.png", ".4bpp");
+static const u8 sDoorAnimTiles_Dewford[] = INCGFX_U8("graphics/door_anims/dewford.png", ".8bpp");
 static const u16 sDoorNullPalette15[16] = {};
-static const u8 sDoorAnimTiles_Contest[] = INCGFX_U8("graphics/door_anims/contest.png", ".4bpp");
+static const u8 sDoorAnimTiles_Contest[] = INCGFX_U8("graphics/door_anims/contest.png", ".8bpp");
 static const u16 sDoorNullPalette16[16] = {};
-static const u8 sDoorAnimTiles_Mossdeep[] = INCGFX_U8("graphics/door_anims/mossdeep.png", ".4bpp");
+static const u8 sDoorAnimTiles_Mossdeep[] = INCGFX_U8("graphics/door_anims/mossdeep.png", ".8bpp");
 static const u16 sDoorNullPalette17[16] = {};
-static const u8 sDoorAnimTiles_SootopolisPeakedRoof[] = INCGFX_U8("graphics/door_anims/sootopolis_peaked_roof.png", ".4bpp");
+static const u8 sDoorAnimTiles_SootopolisPeakedRoof[] = INCGFX_U8("graphics/door_anims/sootopolis_peaked_roof.png", ".8bpp");
 static const u16 sDoorNullPalette18[16] = {};
-static const u8 sDoorAnimTiles_Sootopolis[] = INCGFX_U8("graphics/door_anims/sootopolis.png", ".4bpp");
+static const u8 sDoorAnimTiles_Sootopolis[] = INCGFX_U8("graphics/door_anims/sootopolis.png", ".8bpp");
 static const u16 sDoorNullPalette19[16] = {};
-static const u8 sDoorAnimTiles_PokemonLeague[] = INCGFX_U8("graphics/door_anims/pokemon_league.png", ".4bpp");
+static const u8 sDoorAnimTiles_PokemonLeague[] = INCGFX_U8("graphics/door_anims/pokemon_league.png", ".8bpp");
 static const u16 sDoorNullPalette20[16] = {};
-static const u8 sDoorAnimTiles_Pacifidlog[] = INCGFX_U8("graphics/door_anims/pacifidlog.png", ".4bpp");
+static const u8 sDoorAnimTiles_Pacifidlog[] = INCGFX_U8("graphics/door_anims/pacifidlog.png", ".8bpp");
 static const u16 sDoorNullPalette21[16] = {};
-static const u8 sDoorAnimTiles_PetalburgGym[] = INCGFX_U8("graphics/door_anims/petalburg_gym.png", ".4bpp");
+static const u8 sDoorAnimTiles_PetalburgGym[] = INCGFX_U8("graphics/door_anims/petalburg_gym.png", ".8bpp");
 static const u16 sDoorNullPalette22[16] = {};
-static const u8 sDoorAnimTiles_CyclingRoad[] = INCGFX_U8("graphics/door_anims/cycling_road.png", ".4bpp");
+static const u8 sDoorAnimTiles_CyclingRoad[] = INCGFX_U8("graphics/door_anims/cycling_road.png", ".8bpp");
 static const u16 sDoorNullPalette23[16] = {};
-static const u8 sDoorAnimTiles_LilycoveDeptStore[] = INCGFX_U8("graphics/door_anims/lilycove_dept_store.png", ".4bpp");
+static const u8 sDoorAnimTiles_LilycoveDeptStore[] = INCGFX_U8("graphics/door_anims/lilycove_dept_store.png", ".8bpp");
 static const u16 sDoorNullPalette24[16] = {};
-static const u8 sDoorAnimTiles_SafariZone[] = INCGFX_U8("graphics/door_anims/safari_zone.png", ".4bpp");
+static const u8 sDoorAnimTiles_SafariZone[] = INCGFX_U8("graphics/door_anims/safari_zone.png", ".8bpp");
 static const u16 sDoorNullPalette25[16] = {};
-static const u8 sDoorAnimTiles_MossdeepSpaceCenter[] = INCGFX_U8("graphics/door_anims/mossdeep_space_center.png", ".4bpp");
+static const u8 sDoorAnimTiles_MossdeepSpaceCenter[] = INCGFX_U8("graphics/door_anims/mossdeep_space_center.png", ".8bpp");
 static const u16 sDoorNullPalette26[16] = {};
-static const u8 sDoorAnimTiles_CableClub[] = INCGFX_U8("graphics/door_anims/cable_club.png", ".4bpp");
+static const u8 sDoorAnimTiles_CableClub[] = INCGFX_U8("graphics/door_anims/cable_club.png", ".8bpp");
 static const u16 sDoorNullPalette27[16] = {};
-static const u8 sDoorAnimTiles_AbandonedShip[] = INCGFX_U8("graphics/door_anims/abandoned_ship.png", ".4bpp");
+static const u8 sDoorAnimTiles_AbandonedShip[] = INCGFX_U8("graphics/door_anims/abandoned_ship.png", ".8bpp");
 static const u16 sDoorNullPalette28[16] = {};
-static const u8 sDoorAnimTiles_FallarborDarkRoof[] = INCGFX_U8("graphics/door_anims/fallarbor_dark_roof.png", ".4bpp");
+static const u8 sDoorAnimTiles_FallarborDarkRoof[] = INCGFX_U8("graphics/door_anims/fallarbor_dark_roof.png", ".8bpp");
 static const u16 sDoorNullPalette29[16] = {};
-static const u8 sDoorAnimTiles_AbandonedShipRoom[] = INCGFX_U8("graphics/door_anims/abandoned_ship_room.png", ".4bpp");
+static const u8 sDoorAnimTiles_AbandonedShipRoom[] = INCGFX_U8("graphics/door_anims/abandoned_ship_room.png", ".8bpp");
 static const u16 sDoorNullPalette30[16] = {};
-static const u8 sDoorAnimTiles_LilycoveDeptStoreElevator[] = INCGFX_U8("graphics/door_anims/lilycove_dept_store_elevator.png", ".4bpp");
+static const u8 sDoorAnimTiles_LilycoveDeptStoreElevator[] = INCGFX_U8("graphics/door_anims/lilycove_dept_store_elevator.png", ".8bpp");
 static const u16 sDoorNullPalette31[16] = {};
-static const u8 sDoorAnimTiles_BattleTowerOld[] = INCGFX_U8("graphics/door_anims/battle_tower_old.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleTowerOld[] = INCGFX_U8("graphics/door_anims/battle_tower_old.png", ".8bpp");
 static const u16 sDoorNullPalette32[16] = {};
-static const u8 sDoorAnimTiles_BattleTowerElevator[] = INCGFX_U8("graphics/door_anims/battle_tower_elevator.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleTowerElevator[] = INCGFX_U8("graphics/door_anims/battle_tower_elevator.png", ".8bpp");
 static const u16 sDoorNullPalette33[16] = {};
-static const u8 sDoorAnimTiles_UnusedBattleFrontier[] = INCGFX_U8("graphics/door_anims/unused_battle_frontier.png", ".4bpp");
+static const u8 sDoorAnimTiles_UnusedBattleFrontier[] = INCGFX_U8("graphics/door_anims/unused_battle_frontier.png", ".8bpp");
 static const u16 sDoorNullPalette34[16] = {};
-static const u8 sDoorAnimTiles_BattleDome[] = INCGFX_U8("graphics/door_anims/battle_dome.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleDome[] = INCGFX_U8("graphics/door_anims/battle_dome.png", ".8bpp");
 static const u16 sDoorNullPalette35[16] = {};
-static const u8 sDoorAnimTiles_BattleFactory[] = INCGFX_U8("graphics/door_anims/battle_factory.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleFactory[] = INCGFX_U8("graphics/door_anims/battle_factory.png", ".8bpp");
 static const u16 sDoorNullPalette36[16] = {};
-static const u8 sDoorAnimTiles_BattleTower[] = INCGFX_U8("graphics/door_anims/battle_tower.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleTower[] = INCGFX_U8("graphics/door_anims/battle_tower.png", ".8bpp");
 static const u16 sDoorNullPalette37[16] = {};
-static const u8 sDoorAnimTiles_BattleArena[] = INCGFX_U8("graphics/door_anims/battle_arena.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleArena[] = INCGFX_U8("graphics/door_anims/battle_arena.png", ".8bpp");
 static const u16 sDoorNullPalette38[16] = {};
-static const u8 sDoorAnimTiles_BattleArenaLobby[] = INCGFX_U8("graphics/door_anims/battle_arena_lobby.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleArenaLobby[] = INCGFX_U8("graphics/door_anims/battle_arena_lobby.png", ".8bpp");
 static const u16 sDoorNullPalette39[16] = {};
-static const u8 sDoorAnimTiles_BattleDomeLobby[] = INCGFX_U8("graphics/door_anims/battle_dome_lobby.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleDomeLobby[] = INCGFX_U8("graphics/door_anims/battle_dome_lobby.png", ".8bpp");
 static const u16 sDoorNullPalette40[16] = {};
-static const u8 sDoorAnimTiles_BattlePalaceLobby[] = INCGFX_U8("graphics/door_anims/battle_palace_lobby.png", ".4bpp");
-static const u8 sDoorAnimTiles_BattleTent[] = INCGFX_U8("graphics/door_anims/battle_tent.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattlePalaceLobby[] = INCGFX_U8("graphics/door_anims/battle_palace_lobby.png", ".8bpp");
+static const u8 sDoorAnimTiles_BattleTent[] = INCGFX_U8("graphics/door_anims/battle_tent.png", ".8bpp");
 static const u16 sDoorNullPalette41[16] = {};
-static const u8 sDoorAnimTiles_BattleDomeCorridor[] = INCGFX_U8("graphics/door_anims/battle_dome_corridor.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleDomeCorridor[] = INCGFX_U8("graphics/door_anims/battle_dome_corridor.png", ".8bpp");
 static const u16 sDoorNullPalette42[16] = {};
-static const u8 sDoorAnimTiles_BattleTowerMultiCorridor[] = INCGFX_U8("graphics/door_anims/battle_tower_multi_corridor.png", ".4bpp", "-mwidth 2 -mheight 4");
+static const u8 sDoorAnimTiles_BattleTowerMultiCorridor[] = INCGFX_U8("graphics/door_anims/battle_tower_multi_corridor.png", ".8bpp", "-mwidth 2 -mheight 4");
 static const u16 sDoorNullPalette43[16] = {};
-static const u8 sDoorAnimTiles_BattleFrontier[] = INCGFX_U8("graphics/door_anims/battle_frontier.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleFrontier[] = INCGFX_U8("graphics/door_anims/battle_frontier.png", ".8bpp");
 static const u16 sDoorNullPalette44[16] = {};
-static const u8 sDoorAnimTiles_BattleFrontierSliding[] = INCGFX_U8("graphics/door_anims/battle_frontier_sliding.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleFrontierSliding[] = INCGFX_U8("graphics/door_anims/battle_frontier_sliding.png", ".8bpp");
 static const u16 sDoorNullPalette45[16] = {};
-static const u8 sDoorAnimTiles_BattleDomePreBattleRoom[] = INCGFX_U8("graphics/door_anims/battle_dome_pre_battle_room.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleDomePreBattleRoom[] = INCGFX_U8("graphics/door_anims/battle_dome_pre_battle_room.png", ".8bpp");
 static const u16 sDoorNullPalette46[16] = {};
-static const u8 sDoorAnimTiles_BattleTentInterior[] = INCGFX_U8("graphics/door_anims/battle_tent_interior.png", ".4bpp");
+static const u8 sDoorAnimTiles_BattleTentInterior[] = INCGFX_U8("graphics/door_anims/battle_tent_interior.png", ".8bpp");
 static const u16 sDoorNullPalette47[16] = {};
-static const u8 sDoorAnimTiles_TrainerHillLobbyElevator[] = INCGFX_U8("graphics/door_anims/trainer_hill_lobby_elevator.png", ".4bpp");
+static const u8 sDoorAnimTiles_TrainerHillLobbyElevator[] = INCGFX_U8("graphics/door_anims/trainer_hill_lobby_elevator.png", ".8bpp");
 static const u16 sDoorNullPalette48[16] = {};
-static const u8 sDoorAnimTiles_TrainerHillRoofElevator[] = INCGFX_U8("graphics/door_anims/trainer_hill_roof_elevator.png", ".4bpp");
+static const u8 sDoorAnimTiles_TrainerHillRoofElevator[] = INCGFX_U8("graphics/door_anims/trainer_hill_roof_elevator.png", ".8bpp");
 static const u16 sDoorNullPalette49[16] = {};
 
 static const struct DoorAnimFrame sDoorOpenAnimFrames[] =
@@ -287,12 +287,26 @@ static const struct DoorGraphics sDoorAnimGraphicsTable[] =
 #define DOOR_TILE_START_SIZE1 (NUM_TILES_TOTAL - 8)
 #define DOOR_TILE_START_SIZE2 (NUM_TILES_TOTAL - 16)
 
+// Holds the masked door frame fed to the compositor. In EWRAM (IWRAM is nearly full) and static
+// rather than on the stack.
+EWRAM_DATA static u8 sDoorTileBuffer[16 * TILE_SIZE_8BPP] = {0};
+
 static void CopyDoorTilesToVram(const struct DoorGraphics *gfx, const struct DoorAnimFrame *frame)
 {
-    if (gfx->size == 2)
-        FieldCompositorUpdateSourceTilesImmediate(DOOR_TILE_START_SIZE2, gfx->tiles + frame->offset, 16);
-    else
-        FieldCompositorUpdateSourceTilesImmediate(DOOR_TILE_START_SIZE1, gfx->tiles + frame->offset, 8);
+    u32 numTiles = (gfx->size == 2) ? 16 : 8;
+    u16 tileStart = (gfx->size == 2) ? DOOR_TILE_START_SIZE2 : DOOR_TILE_START_SIZE1;
+    // Door graphics are now 8BPP, so the per-frame byte offset (authored in 4BPP tile units)
+    // doubles to index the same tiles in the wider sheet.
+    const u8 *src = gfx->tiles + frame->offset * 2;
+    u32 i;
+
+    // Multi-palette door art stores a preview sub-palette in each pixel's high nibble (values up to
+    // 31); the actual palette is selected per-subtile by BuildDoorTiles (paletteNum). The compositor
+    // adds paletteNum*16 to every pixel, so the source must carry only the low nibble - matching the
+    // old 4BPP build, which dropped the high nibble via the 8->4 bit-depth conversion.
+    for (i = 0; i < numTiles * TILE_SIZE_8BPP; i++)
+        sDoorTileBuffer[i] = src[i] & 0x0F;
+    FieldCompositorUpdateSourceTilesImmediate(tileStart, sDoorTileBuffer, numTiles);
 }
 
 static void BuildDoorTiles(u16 *tiles, u16 tileNum, const u8 *paletteNums)

@@ -270,7 +270,7 @@ static const struct SpriteTemplate sSpriteTemplate_SandPillar =
     .callback = SpriteCB_SandPillar_BreakTop,
 };
 
-const struct SpritePalette gSpritePalette_SandPillar = {gTilesetPalettes_SecretBase[5], FLDEFF_PAL_TAG_SAND_PILLAR};
+const struct SpritePalette gSpritePalette_SandPillar = {&gTilesetPalettes_SecretBase[5 * 16], FLDEFF_PAL_TAG_SAND_PILLAR};
 
 static const u8 sRecordMixLights_Gfx[] = INCGFX_U8("graphics/field_effects/pics/record_mix_lights.png", ".4bpp", "-mwidth 4 -mheight 1");
 static const u16 sRecordMixLights_Pal[] = INCGFX_U16("graphics/field_effects/palettes/record_mix_lights.pal", ".gbapal");

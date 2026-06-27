@@ -3,8 +3,8 @@
 
 extern const u32 gTilesetTiles_General[];
 extern const u32 gTilesetTiles_Terrain[];
-extern const u16 gTilesetPalettes_General[][16];
-extern const u16 gTilesetPalettes_Terrain[][16];
+extern const u16 gTilesetPalettes_General[];
+extern const u16 gTilesetPalettes_Terrain[];
 
 extern const struct Tileset *const gTilesetPointer_SecretBase;
 extern const struct Tileset *const gTilesetPointer_SecretBaseRedCave;
