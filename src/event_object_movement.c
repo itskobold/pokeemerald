@@ -1615,7 +1615,14 @@ static u8 TrySetupObjectEventSpriteAt(const struct ObjectEventTemplate *objectEv
     }
 
     sprite = &gSprites[spriteId];
-    GetMapCoordsFromSpritePos(objectEvent->currentCoords.x + cameraX, objectEvent->currentCoords.y + cameraY, &sprite->x, &sprite->y);
+    // Position via SetSpritePosToMapCoords (the same call MoveObjectEventToMapCoords uses), not
+    // GetMapCoordsFromSpritePos + a cameraX/cameraY tile-delta nudge. The delta nudge assumes gCameraPos
+    // and gTotalCameraPixelOffset agree, but the tile step fires eagerly in the travel direction, so
+    // reversing mid-tile (Mach Bike back-and-forth) leaves them up to a full tile apart for a frame.
+    // SetSpritePosToMapCoords folds in gFieldCamera.x, giving the same result in either phase, so a
+    // spawn landing in that window no longer bakes a whole-tile offset that persists until respawn.
+    (void)cameraX; (void)cameraY;
+    SetSpritePosToMapCoords(objectEvent->currentCoords.x, objectEvent->currentCoords.y, &sprite->x, &sprite->y);
     sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
     sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
     sprite->x += 8;

@@ -1244,6 +1244,14 @@ void CameraUpdate(void)
     gFieldCamera.y += movementSpeedY;
     gFieldCamera.y %= 16;
 
+    // Advance the sprite pixel offset here, in lockstep with gFieldCamera.x above, rather than at the
+    // end of the frame. The spawn inside UpdateObjectEventsForCameraUpdate positions via
+    // SetSpritePosToMapCoords, which assumes gFieldCamera.x == -gTotalCameraPixelOffset (mod 16). If the
+    // decrement lags until end-of-frame the two are movementSpeed px out of phase during the spawn, so a
+    // freshly spawned object bakes a sub-tile offset (up to Mach Bike speed) that persists until respawn.
+    gTotalCameraPixelOffsetX -= movementSpeedX;
+    gTotalCameraPixelOffsetY -= movementSpeedY;
+
     if (deltaX != 0 || deltaY != 0)
     {
         CameraMove(deltaX, deltaY);
@@ -1264,8 +1272,6 @@ void CameraUpdate(void)
     }
 
     AddCameraPixelOffset(&sFieldCameraOffset, movementSpeedX, movementSpeedY);
-    gTotalCameraPixelOffsetX -= movementSpeedX;
-    gTotalCameraPixelOffsetY -= movementSpeedY;
 }
 
 void SetCameraPanningCallback(void (*callback)(void))
