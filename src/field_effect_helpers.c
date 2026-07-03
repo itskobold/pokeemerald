@@ -271,6 +271,11 @@ void UpdateShadowFieldEffect(struct Sprite *sprite)
         {
             FieldEffectStop(sprite, FLDEFF_SHADOW);
         }
+        else
+        {
+            // Hide while behind a cliff, else the shadow pokes out in front of the cliff face.
+            UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
+        }
     }
 }
 
