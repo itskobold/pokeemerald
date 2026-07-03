@@ -307,7 +307,13 @@ static void ComposeSlot(u16 slot)
         }
     }
 
-    DmaCopy32(3, out, (void *)(BG_VRAM + slot * TILE_SIZE_8BPP), TILE_SIZE_8BPP);
+    // CPU copy, not DmaCopy32: this runs in the main loop during active display, and the field VBlank
+    // handler also drives DMA3 (FlushFieldBgTilemap, sprite/palette transfers). A VBlank landing between
+    // the DMA register writes here would leave DMA3's source pointing at the VBlank transfer, so this
+    // copy would flatten the wrong source into the slot - one corrupted 8x8 tile, timing-dependent and
+    // worst under the heavy slot churn of fast movement. A 64-byte CpuFastCopy shares no channel with
+    // VBlank, so it can't be clobbered.
+    CpuFastCopy(out, (void *)(BG_VRAM + slot * TILE_SIZE_8BPP), TILE_SIZE_8BPP);
 }
 
 static u32 HashRecipe(const u16 *entries, u32 count)
