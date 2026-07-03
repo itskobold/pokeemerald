@@ -915,7 +915,7 @@ void TryUpdateMapLocationSilent(s16 x, s16 y)
 // Loads the active location's secondary tileset graphics and palette into VRAM and restarts its
 // animation. Shared by the deferred (Task_UpdateMapLocationGfx) and synchronous
 // (UpdateMapLocationGfxImmediate) location swaps; callers SetActiveMapLocation first and redraw
-// the map (DrawWholeMapView) afterwards.
+// the map afterwards.
 static void ApplyActiveLocationSecondaryTileset(void)
 {
     s32 paletteIndex;
@@ -941,11 +941,13 @@ static void Task_UpdateMapLocationGfx(u8 taskId)
     SetActiveMapLocationForMap(gTasks[taskId].data[2], gTasks[taskId].data[3], gTasks[taskId].data[0]);
 
     // Most location boundaries within a map (and many across connections) share a secondary tileset;
-    // only pay the decompress + full redraw when the new location's tileset isn't already in VRAM.
+    // only pay the tileset swap + redraw when the new location's tileset isn't already resident. The
+    // map grid is unchanged across the crossing, so only secondary-range metatiles are reinterpreted
+    // by the new tileset - DrawSecondaryMapView redraws just those, skipping the untouched primaries.
     if (GetActiveLocationData()->secondaryTileset != GetLoadedSecondaryTileset())
     {
         ApplyActiveLocationSecondaryTileset();
-        DrawWholeMapView();
+        DrawSecondaryMapView();
     }
 
     if (gTasks[taskId].data[1])

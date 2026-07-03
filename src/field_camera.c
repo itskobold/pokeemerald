@@ -42,6 +42,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
+static void DrawMetatileAtWithId(const struct MapLayout *, u16, int, int, u16 metatileId);
 static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32);
 static bool32 IsCliffPromotedCell(int, int);
 static void CameraPanningCB_PanAhead(void);
@@ -199,6 +200,42 @@ static void DrawWholeMapViewInternal(int x, int y, const struct MapLayout *mapLa
     }
 }
 
+// Redraw only the on-screen metatiles in the secondary id range. Used after a location crossing
+// swaps the secondary tileset in place: the map grid is unchanged (the player merely stepped over a
+// boundary, camera tile-aligned), so every primary metatile still resolves to the exact same
+// composite slot and re-resolving it is pure waste. Only secondary metatiles are reinterpreted by
+// the new tileset, so only they need re-composing. NOT valid after a camera jump (view content
+// changes wholesale) - use DrawWholeMapView there.
+void DrawSecondaryMapView(void)
+{
+    const struct MapLayout *mapLayout = gMapHeader.mapLayout;
+    int x = gCameraPos.x;
+    int y = gCameraPos.y;
+    u8 i;
+    u8 j;
+    u32 r6;
+    u8 temp;
+
+    for (i = 0; i < 32; i += 2)
+    {
+        temp = sFieldCameraOffset.yTileOffset + i;
+        if (temp >= 32)
+            temp -= 32;
+        r6 = temp * 32;
+        for (j = 0; j < 32; j += 2)
+        {
+            temp = sFieldCameraOffset.xTileOffset + j;
+            if (temp >= 32)
+                temp -= 32;
+            {
+                u16 metatileId = MapGridGetMetatileIdAt(x + j / 2, y + i / 2);
+                if (metatileId >= NUM_METATILES_IN_PRIMARY)
+                    DrawMetatileAtWithId(mapLayout, r6 + temp, x + j / 2, y + i / 2, metatileId);
+            }
+        }
+    }
+}
+
 static void RedrawMapSlicesForCameraUpdate(struct FieldCameraOffset *cameraOffset, int x, int y)
 {
     const struct MapLayout *mapLayout = gMapHeader.mapLayout;
@@ -311,8 +348,13 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 
 static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x, int y)
 {
-    u16 metatileId = MapGridGetMetatileIdAt(x, y);
-    u8 bgMaterial = MapGridGetBgMaterialAt(x, y);
+    DrawMetatileAtWithId(mapLayout, offset, x, y, MapGridGetMetatileIdAt(x, y));
+}
+
+// As DrawMetatileAt, but with the metatile id already resolved (lets callers that have fetched it —
+// e.g. the secondary-only redraw's id filter — skip a redundant map-grid lookup).
+static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, int x, int y, u16 metatileId)
+{
     const u16 *tiles;
     // Set for flagged metatiles: the tile's bottom layer is replaced by primary metatile
     // #bgMaterial (0-15)'s bottom layer. NULL = normal render.
@@ -329,9 +371,10 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
         metatileId = 0;
     fgMask = promote ? METATILE_COMPOSITE_BEHIND(GetMetatileCompositingById(metatileId))
                      : METATILE_COMPOSITE_FRONT(GetMetatileCompositingById(metatileId));
-    // Only metatiles flagged "use bg material" take the bgMaterial render path.
+    // Only metatiles flagged "use bg material" take the bgMaterial render path — fetch the material
+    // (a second map-grid read) only then, since the vast majority of metatiles don't use it.
     if (UNPACK_USES_BGMATERIAL(GetMetatileAttributesById(metatileId)))
-        materialTiles = mapLayout->primaryTileset->metatiles + bgMaterial * NUM_TILES_PER_METATILE;
+        materialTiles = mapLayout->primaryTileset->metatiles + MapGridGetBgMaterialAt(x, y) * NUM_TILES_PER_METATILE;
     if (metatileId < NUM_METATILES_IN_PRIMARY)
         tiles = mapLayout->primaryTileset->metatiles + metatileId * NUM_TILES_PER_METATILE;
     else

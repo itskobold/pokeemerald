@@ -21,6 +21,7 @@ extern u8 gCameraElevation;
 extern u8 gCameraBiome;
 
 void DrawWholeMapView(void);
+void DrawSecondaryMapView(void);
 void CurrentMapDrawMetatileAt(int x, int y);
 void GetCameraOffsetWithPan(s16 *x, s16 *y);
 void DrawDoorMetatileAt(int x, int y, u16 *tiles);

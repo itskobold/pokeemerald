@@ -219,8 +219,13 @@ void FieldCompositorFree(void)
 
 // Point the compositor at a tileset's (uncompressed, ROM-resident) 4BPP graphics. A location
 // crossing can swap a different secondary tileset into the same id range while composites built from
-// the old graphics are still live, so clear that range's animation overrides and recomposite the
-// live slots from the new ROM source. Both are no-ops on first load (nothing composited yet).
+// the old graphics are still live, so clear that range's animation overrides and mark the live slots
+// referencing it dirty. Every tileset swap is immediately followed by a full DrawWholeMapView, which
+// re-resolves each visible cell against the new metatile definitions: changed recipes acquire fresh
+// (correctly composed) slots and free the stale ones, so the dirty mark only has to cover the rare
+// slot whose recipe survives the swap unchanged - those drain via FieldCompositorTickAnim within a
+// frame or two. Recompositing every live slot up front here instead just redoes work the redraw is
+// about to discard. All no-ops on first load (nothing composited yet).
 // Cache a tileset's bank base-offsets into sBankOffset for the banks it owns. A NULL
 // paletteOffsets table (the common case) means default banks (base = bank*16).
 static void LoadBankOffsets(const struct Tileset *tileset, u32 firstBank, u32 lastBank)
@@ -239,7 +244,7 @@ void FieldCompositorLoadPrimaryTiles(const struct Tileset *tileset)
     sPrimaryTiles = (const u8 *)tileset->tiles;
     LoadBankOffsets(tileset, 0, NUM_PALS_IN_PRIMARY - 1);
     ClearAnimOverrides(0, NUM_TILES_IN_PRIMARY - 1, TRUE);
-    FieldCompositorInvalidateSourceRange(0, NUM_TILES_IN_PRIMARY - 1);
+    RecomposeSourceRange(0, NUM_TILES_IN_PRIMARY - 1, TRUE);
 }
 
 void FieldCompositorLoadSecondaryTiles(const struct Tileset *tileset)
@@ -249,7 +254,7 @@ void FieldCompositorLoadSecondaryTiles(const struct Tileset *tileset)
     sSecondaryTiles = (const u8 *)tileset->tiles;
     LoadBankOffsets(tileset, NUM_PALS_IN_PRIMARY, NUM_PALS_TOTAL - 1);
     ClearAnimOverrides(NUM_TILES_IN_PRIMARY, NUM_TILES_TOTAL - 1, FALSE);
-    FieldCompositorInvalidateSourceRange(NUM_TILES_IN_PRIMARY, NUM_TILES_TOTAL - 1);
+    RecomposeSourceRange(NUM_TILES_IN_PRIMARY, NUM_TILES_TOTAL - 1, TRUE);
 }
 
 // Flatten a slot's recipe (bottom->top) into one 8BPP tile and DMA it to VRAM. The 8BPP source
@@ -515,13 +520,6 @@ static void RecomposeSourceRange(u16 firstTileId, u16 lastTileId, bool32 deferre
             }
         }
     }
-}
-
-// Immediate recomposite, used on a tileset swap (location crossing) where the new graphics must be
-// on screen right away rather than fading in over the next few frames.
-void FieldCompositorInvalidateSourceRange(u16 firstTileId, u16 lastTileId)
-{
-    RecomposeSourceRange(firstTileId, lastTileId, FALSE);
 }
 
 // Drains a bounded number of animation-dirtied slots per frame (call once per frame). The cursor

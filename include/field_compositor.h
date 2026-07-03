@@ -51,11 +51,6 @@ void FieldCompositorRelease(u16 slot);
 // on-screen) tear for a frame.
 void FieldCompositorReclaimFreedSlots(void);
 
-// Mark every composite slot whose recipe references a source tile in [firstTileId, lastTileId]
-// as needing a recomposite, and rebuild them from the (newly updated) source cache. Used by the
-// tileset animation system after it writes a new frame into the source cache.
-void FieldCompositorInvalidateSourceRange(u16 firstTileId, u16 lastTileId);
-
 // Write `numTiles` 4BPP tiles of new graphics into the source cache at `firstTileId`, then
 // recomposite any on-screen tile that uses them. The tileset animation system calls this with a
 // frame's worth of animated tiles in place of its old DMA-to-VRAM. No-op if the compositor is idle.
