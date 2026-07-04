@@ -380,12 +380,13 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
 
     fgMask = promote ? METATILE_COMPOSITE_BEHIND(GetMetatileCompositingById(metatileId))
                      : METATILE_COMPOSITE_FRONT(GetMetatileCompositingById(metatileId));
-    // Behind an object, add the ground (bottom) layer to the foreground plane ONLY when the tile's
-    // promoted foreground layers are all blank — i.e. plain elevated ground whose graphic lives in the
-    // ground layer. There the ground is the only thing that can occlude the behind-object, and the part
-    // it covers is fully obscured. When the promoted layers DO have content (a painted cliff face/fringe)
-    // that authored foreground does the occluding; forcing the ground forward would wrongly hide a
-    // partly-obscured sprite that should still draw behind the (transparent-in-places) foreground layer.
+    // Behind an object, when the tile's promoted foreground layers are all blank — i.e. plain elevated
+    // ground with no painted cliff face — promote every layer that HAS content so the whole ground tile
+    // occludes the behind-object. (Promoting only the bottom layer left upper-layer content in the
+    // background plane, drawn behind the sprite and hidden, so multi-layer ground showed only its base.)
+    // When the promoted layers DO have content (a painted cliff face/fringe) that authored foreground
+    // does the occluding; forcing extra layers forward would wrongly hide a partly-obscured sprite that
+    // should still draw behind the (transparent-in-places) foreground layer.
     if (promote)
     {
         bool32 fgEmpty = TRUE;
@@ -395,7 +396,9 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
                 for (sub = 0; sub < 4; sub++)
                     if ((tiles[l * 4 + sub] & 0x3FF) != 0) { fgEmpty = FALSE; break; }
         if (fgEmpty)
-            fgMask |= 1;
+            for (l = 0; l < 3; l++)
+                for (sub = 0; sub < 4; sub++)
+                    if ((tiles[l * 4 + sub] & 0x3FF) != 0) { fgMask |= (1 << l); break; }
     }
 
     // For each of the metatile's four sub-tiles, route its three layers (ground/middle/top) into the
