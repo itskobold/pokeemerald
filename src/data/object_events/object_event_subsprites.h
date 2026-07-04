@@ -1570,3 +1570,7 @@ static const struct SubspriteTable sFrontSplitTables_32x32[] = {
     {ARRAY_COUNT(sFrontSplit_32x32_2), sFrontSplit_32x32_2},
     {ARRAY_COUNT(sFrontSplit_32x32_3), sFrontSplit_32x32_3},
 };
+
+#undef FRONT_ROW
+#undef FRONT_SPLIT_16x32
+#undef FRONT_SPLIT_32x32

@@ -15,6 +15,7 @@
 #include "field_compositor.h"
 #include "field_control_avatar.h"
 #include "field_effect.h"
+#include "field_effect_helpers.h"
 #include "field_message_box.h"
 #include "field_player_avatar.h"
 #include "field_screen_effect.h"
@@ -1668,6 +1669,7 @@ static void OverworldBasic(void)
     CameraUpdate();
     UpdateCliffFacePromotion();
     UpdateObjectEventsFrontSplit();
+    UpdateGrassFieldEffectsFrontSplit();
     UpdateCameraPanning();
     BuildOamBuffer();
     UpdatePaletteFade();
