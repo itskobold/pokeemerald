@@ -369,8 +369,6 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
 
     if (metatileId > NUM_METATILES_TOTAL)
         metatileId = 0;
-    fgMask = promote ? METATILE_COMPOSITE_BEHIND(GetMetatileCompositingById(metatileId))
-                     : METATILE_COMPOSITE_FRONT(GetMetatileCompositingById(metatileId));
     // Only metatiles flagged "use bg material" take the bgMaterial render path — fetch the material
     // (a second map-grid read) only then, since the vast majority of metatiles don't use it.
     if (UNPACK_USES_BGMATERIAL(GetMetatileAttributesById(metatileId)))
@@ -379,6 +377,26 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
         tiles = mapLayout->primaryTileset->metatiles + metatileId * NUM_TILES_PER_METATILE;
     else
         tiles = GetActiveLocationData()->secondaryTileset->metatiles + (metatileId - NUM_METATILES_IN_PRIMARY) * NUM_TILES_PER_METATILE;
+
+    fgMask = promote ? METATILE_COMPOSITE_BEHIND(GetMetatileCompositingById(metatileId))
+                     : METATILE_COMPOSITE_FRONT(GetMetatileCompositingById(metatileId));
+    // Behind an object, add the ground (bottom) layer to the foreground plane ONLY when the tile's
+    // promoted foreground layers are all blank — i.e. plain elevated ground whose graphic lives in the
+    // ground layer. There the ground is the only thing that can occlude the behind-object, and the part
+    // it covers is fully obscured. When the promoted layers DO have content (a painted cliff face/fringe)
+    // that authored foreground does the occluding; forcing the ground forward would wrongly hide a
+    // partly-obscured sprite that should still draw behind the (transparent-in-places) foreground layer.
+    if (promote)
+    {
+        bool32 fgEmpty = TRUE;
+        u32 l, sub;
+        for (l = 0; l < 3 && fgEmpty; l++)
+            if (fgMask & (1 << l))
+                for (sub = 0; sub < 4; sub++)
+                    if ((tiles[l * 4 + sub] & 0x3FF) != 0) { fgEmpty = FALSE; break; }
+        if (fgEmpty)
+            fgMask |= 1;
+    }
 
     // For each of the metatile's four sub-tiles, route its three layers (ground/middle/top) into the
     // foreground or background plane per fgMask, preserving bottom->top order within each plane.
@@ -465,6 +483,14 @@ static bool32 IsCliffPromotedCell(int x, int y)
             return TRUE;
     }
     return FALSE;
+}
+
+// Public query: is this tile currently cliff-promoted (a behind-object is hiding under it)? A FRONT
+// object overlapping such a tile splits its sprite so the overlapping rows draw over the promotion
+// (see UpdateObjectEventFrontSplit) rather than being wrongly hidden by it.
+bool32 IsTileCliffPromoted(s16 x, s16 y)
+{
+    return IsCliffPromotedCell(x, y);
 }
 
 static void AddCliffPromotedTile(s16 x, s16 y)

@@ -207,6 +207,7 @@ u8 GetWalkSlowMovementAction(u32);
 u8 GetJumpMovementAction(u32);
 u8 ElevationToPriority(u8 elevation);
 void ObjectEventUpdateElevation(struct ObjectEvent *objEvent);
+void UpdateObjectEventsFrontSplit(void);
 void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 subpriority);
 void UnfreezeObjectEvent(struct ObjectEvent *objectEvent);
 u8 FindLockedObjectEventIndex(struct ObjectEvent *objectEvent);

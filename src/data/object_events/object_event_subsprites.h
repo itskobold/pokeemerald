@@ -1528,3 +1528,45 @@ static const struct SubspriteTable sOamTables_88x32[] = {
     {ARRAY_COUNT(sOamTable_88x32_3), sOamTable_88x32_3},
     {ARRAY_COUNT(sOamTable_88x32_3), sOamTable_88x32_3}
 };
+
+// Front-split tables (see UpdateObjectEventFrontSplit in event_object_movement.c). A FRONT object whose
+// footprint overlaps a cliff-promoted tile is decomposed into tile-rows; each row that overlaps the
+// promotion is raised to priority 1 so it draws OVER the promoted cliff (the object is in front of the
+// cliff), while non-overlapping rows stay at the normal priority 2. Table index = bitmask of raised
+// rows (bit r = row r from the top). Priorities below are listed top-to-bottom.
+#define FRONT_ROW(xx, yy, toff, wxh, prio) \
+    { .x = xx, .y = yy, .shape = SPRITE_SHAPE(wxh), .size = SPRITE_SIZE(wxh), .tileOffset = toff, .priority = prio }
+
+// 16x16: one 16x16 row.
+static const struct Subsprite sFrontSplit_16x16_0[] = { FRONT_ROW(-8, -8, 0, 16x16, 2) };
+static const struct Subsprite sFrontSplit_16x16_1[] = { FRONT_ROW(-8, -8, 0, 16x16, 1) };
+static const struct SubspriteTable sFrontSplitTables_16x16[] = {
+    {ARRAY_COUNT(sFrontSplit_16x16_0), sFrontSplit_16x16_0},
+    {ARRAY_COUNT(sFrontSplit_16x16_1), sFrontSplit_16x16_1},
+};
+
+// 16x32: two 16x16 rows (tileOffset 0, 4).
+#define FRONT_SPLIT_16x32(p0, p1) { FRONT_ROW(-8, -16, 0, 16x16, p0), FRONT_ROW(-8, 0, 4, 16x16, p1) }
+static const struct Subsprite sFrontSplit_16x32_0[] = FRONT_SPLIT_16x32(2, 2);
+static const struct Subsprite sFrontSplit_16x32_1[] = FRONT_SPLIT_16x32(1, 2);
+static const struct Subsprite sFrontSplit_16x32_2[] = FRONT_SPLIT_16x32(2, 1);
+static const struct Subsprite sFrontSplit_16x32_3[] = FRONT_SPLIT_16x32(1, 1);
+static const struct SubspriteTable sFrontSplitTables_16x32[] = {
+    {ARRAY_COUNT(sFrontSplit_16x32_0), sFrontSplit_16x32_0},
+    {ARRAY_COUNT(sFrontSplit_16x32_1), sFrontSplit_16x32_1},
+    {ARRAY_COUNT(sFrontSplit_16x32_2), sFrontSplit_16x32_2},
+    {ARRAY_COUNT(sFrontSplit_16x32_3), sFrontSplit_16x32_3},
+};
+
+// 32x32: two 32x16 rows (tileOffset 0, 8).
+#define FRONT_SPLIT_32x32(p0, p1) { FRONT_ROW(-16, -16, 0, 32x16, p0), FRONT_ROW(-16, 0, 8, 32x16, p1) }
+static const struct Subsprite sFrontSplit_32x32_0[] = FRONT_SPLIT_32x32(2, 2);
+static const struct Subsprite sFrontSplit_32x32_1[] = FRONT_SPLIT_32x32(1, 2);
+static const struct Subsprite sFrontSplit_32x32_2[] = FRONT_SPLIT_32x32(2, 1);
+static const struct Subsprite sFrontSplit_32x32_3[] = FRONT_SPLIT_32x32(1, 1);
+static const struct SubspriteTable sFrontSplitTables_32x32[] = {
+    {ARRAY_COUNT(sFrontSplit_32x32_0), sFrontSplit_32x32_0},
+    {ARRAY_COUNT(sFrontSplit_32x32_1), sFrontSplit_32x32_1},
+    {ARRAY_COUNT(sFrontSplit_32x32_2), sFrontSplit_32x32_2},
+    {ARRAY_COUNT(sFrontSplit_32x32_3), sFrontSplit_32x32_3},
+};

@@ -120,6 +120,7 @@ static bool8 IsMetatileDirectionallyImpassable(struct ObjectEvent *, s16, s16, u
 static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *, s16, s16);
 static void UpdateObjectEventOffscreen(struct ObjectEvent *, struct Sprite *);
 static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *, struct Sprite *);
+static void UpdateObjectEventFrontSplit(struct ObjectEvent *, struct Sprite *);
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent *);
 static void GetGroundEffectFlags_Reflection(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_TallGrassOnSpawn(struct ObjectEvent *, u32 *);
@@ -8597,6 +8598,23 @@ static void UpdateObjectEventVisibility(struct ObjectEvent *objectEvent, struct 
     UpdateObjectEventSpriteVisibility(objectEvent, sprite);
 }
 
+// Second pass over every object, run after UpdateCliffFacePromotion has rebuilt this frame's promoted-
+// tile set (see CB1/OverworldBasic) and before the OAM is built. Front-split reads that set, so it must
+// run after it — doing it inside the per-object sprite callback (AnimateSprites) would read last frame's
+// set and leave a front object hidden for one frame as a behind-object slides under its tile.
+void UpdateObjectEventsFrontSplit(void)
+{
+    u32 i;
+
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+    {
+        struct ObjectEvent *objEvent = &gObjectEvents[i];
+
+        if (objEvent->active && objEvent->spriteId < MAX_SPRITES)
+            UpdateObjectEventFrontSplit(objEvent, &gSprites[objEvent->spriteId]);
+    }
+}
+
 static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     u16 x, y;
@@ -9059,6 +9077,61 @@ static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Spri
     sprite->subspriteTableNum = sElevationToSubspriteTableNum[FLAT_RENDER_ELEVATION];
     sprite->subspriteMode = SUBSPRITES_ON;
     sprite->oam.priority = sElevationToPriority[FLAT_RENDER_ELEVATION];
+}
+
+// A FRONT object standing on a tile that is cliff-promoted (a behind-object is hiding under it) would be
+// wrongly hidden by that promotion, since the promoted cliff draws over the whole tile at priority 1 and
+// every field sprite is priority 2. Split the sprite into tile-rows and raise just the rows that overlap
+// a promoted tile to priority 1, so those draw OVER the cliff (the object is in front of it) while the
+// rest render normally. Behind-objects stay priority 2 and remain correctly hidden. Runs every frame;
+// costs nothing until an overlap actually occurs (the common case restores the normal single-piece table).
+static void UpdateObjectEventFrontSplit(struct ObjectEvent *objEvent, struct Sprite *sprite)
+{
+    const struct ObjectEventGraphicsInfo *gfx = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    const struct SubspriteTable *splitTables = NULL;
+    s16 half, colStart, colEnd, rows = 0, r, c, pass;
+    u8 mask = 0;
+
+    if (objEvent->cliffLayer == CLIFF_LAYER_FRONT && !objEvent->drawAtHighestElevation
+     && gfx->subspriteTables != NULL)
+    {
+        if (gfx->width == 16 && gfx->height == 16)      { splitTables = sFrontSplitTables_16x16; rows = 1; }
+        else if (gfx->width == 16 && gfx->height == 32) { splitTables = sFrontSplitTables_16x32; rows = 2; }
+        else if (gfx->width == 32 && gfx->height == 32) { splitTables = sFrontSplitTables_32x32; rows = 2; }
+    }
+
+    if (splitTables != NULL)
+    {
+        half = gfx->width / 2;
+        colStart = (8 - half) >> 4;
+        colEnd = (8 + half - 1) >> 4;
+
+        // Raise a tile-row when any tile it covers — at the tile being left or entered — is cliff-promoted.
+        for (r = 0; r < rows; r++)
+        {
+            for (pass = 0; pass < 2 && !(mask & (1 << r)); pass++)
+            {
+                s16 fx = pass ? objEvent->previousCoords.x : objEvent->currentCoords.x;
+                s16 fy = pass ? objEvent->previousCoords.y : objEvent->currentCoords.y;
+                s16 ty = fy - (rows - 1) + r;
+                for (c = colStart; c <= colEnd; c++)
+                    if (IsTileCliffPromoted(fx + c, ty)) { mask |= (1 << r); break; }
+            }
+        }
+    }
+
+    if (mask != 0)
+    {
+        sprite->subspriteTables = splitTables;
+        sprite->subspriteTableNum = mask;
+        sprite->subspriteMode = SUBSPRITES_ON;
+    }
+    else if (gfx->subspriteTables != NULL && sprite->subspriteTables != gfx->subspriteTables)
+    {
+        // No overlap (or not eligible): undo any earlier split repoint, back to normal rendering.
+        sprite->subspriteTables = gfx->subspriteTables;
+        sprite->subspriteTableNum = sElevationToSubspriteTableNum[FLAT_RENDER_ELEVATION];
+    }
 }
 
 static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)

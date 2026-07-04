@@ -1667,6 +1667,7 @@ static void OverworldBasic(void)
     AnimateSprites();
     CameraUpdate();
     UpdateCliffFacePromotion();
+    UpdateObjectEventsFrontSplit();
     UpdateCameraPanning();
     BuildOamBuffer();
     UpdatePaletteFade();
