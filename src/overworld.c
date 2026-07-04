@@ -1668,7 +1668,7 @@ static void OverworldBasic(void)
     AnimateSprites();
     CameraUpdate();
     UpdateCliffFacePromotion();
-    UpdateObjectEventsFrontSplit();
+    UpdateObjectEventsRender();
     UpdateGrassFieldEffectsFrontSplit();
     UpdateCameraPanning();
     BuildOamBuffer();
@@ -3271,7 +3271,7 @@ static u8 GetLinkPlayerElevation(u8 linkPlayerId)
 {
     u8 objEventId = gLinkPlayerObjectEvents[linkPlayerId].objEventId;
     struct ObjectEvent *objEvent = &gObjectEvents[objEventId];
-    return objEvent->currentElevation;
+    return objEvent->baseElevation;
 }
 
 static s32 UNUSED GetLinkPlayerObjectStepTimer(u8 linkPlayerId)
@@ -3466,8 +3466,7 @@ static void SpriteCB_LinkPlayer(struct Sprite *sprite)
     struct ObjectEvent *objEvent = &gObjectEvents[linkPlayerObjEvent->objEventId];
     sprite->x = objEvent->initialCoords.x;
     sprite->y = objEvent->initialCoords.y;
-    SetObjectSubpriorityByElevation(objEvent->previousElevation, sprite, 1);
-    sprite->oam.priority = ElevationToPriority(objEvent->previousElevation);
+    SetSpriteRenderBand(sprite, GetObjectEventRenderBand(objEvent), 1);
 
     if (linkPlayerObjEvent->movementMode == MOVEMENT_MODE_FREE)
         StartSpriteAnim(sprite, GetFaceDirectionAnimNum(linkDirection(objEvent)));

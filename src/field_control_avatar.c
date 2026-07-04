@@ -193,7 +193,10 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
         if (TryStartStepBasedScript(&position, metatileBehavior, playerDirection) == TRUE)
             return TRUE;
     }
-    if (input->checkStandardWildEncounter && CheckStandardWildEncounter(metatileBehavior) == TRUE)
+    // No encounters while behind/under a cliff: the player isn't really in the grass on top of it.
+    if (input->checkStandardWildEncounter
+     && gObjectEvents[gPlayerAvatar.objectEventId].cliffLayer == CLIFF_LAYER_FRONT
+     && CheckStandardWildEncounter(metatileBehavior) == TRUE)
         return TRUE;
     if (input->heldDirection && input->dpadDirection == playerDirection)
     {
@@ -244,14 +247,14 @@ static void GetInFrontOfPlayerPosition(struct MapPosition *position)
     position->elevation = PlayerGetElevation();
 }
 
-// Behind a cliff the player is rendered down at the frozen base level (previousElevation) while the
+// Behind a cliff the player is rendered down at the frozen base level (baseElevation) while the
 // foreground tiles sit on the higher plateau. Restrict interaction to the base level so you can't
 // reach surf, PCs, etc. on the elevation you climbed past.
 static bool32 IsInteractionBlockedBehindCliff(struct MapPosition *position)
 {
     struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
     return player->cliffLayer != CLIFF_LAYER_FRONT
-        && MapGridGetElevationAt(position->x, position->y) > player->previousElevation;
+        && MapGridGetElevationAt(position->x, position->y) > player->baseElevation;
 }
 
 static u16 GetPlayerCurMetatileBehavior(int runningState)

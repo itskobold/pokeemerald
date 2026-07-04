@@ -48,6 +48,26 @@ enum ReflectionTypes
     NUM_REFLECTION_TYPES
 };
 
+// Field sprites draw in one flat plane between the two composite BG planes (foreground BG1 at
+// priority 1, background BG2 at priority 3). Draw order among them is a render band plus a
+// screen-Y sort within the band; cross-band order is absolute. Cliff occlusion itself is done by
+// the map (tile promotion into the foreground plane, see UpdateCliffFacePromotion), not by these
+// bands — the bands only make sprites of different cliff states sort correctly against each other.
+enum ObjectEventRenderBand
+{
+    RENDER_BAND_FRONT,  // normal objects, in front of any cliff
+    RENDER_BAND_BEHIND, // objects hiding behind a cliff face: behind every FRONT sprite
+    RENDER_BAND_TOP,    // "any elevation" objects: in front of every field sprite (OAM priority 1)
+};
+
+// Subpriority band bases (lower = drawn in front). Each band spans base .. base+36 (screen-Y term
+// 2-32 plus a 0-4 offset), so bands can never bleed into each other. The sprite sort key is
+// (oam.priority << 8) | subpriority, so these only order sprites that share an OAM priority.
+#define OBJ_SUBPRIORITY_TOP     16  // TOP-band objects (and scripted setobjectsubpriority overrides)
+#define OBJ_SUBPRIORITY_FRONT   80  // FRONT-band objects and their attached effects
+#define OBJ_SUBPRIORITY_SHADOW  140 // object shadows: behind all FRONT sprites, before BEHIND ones
+#define OBJ_SUBPRIORITY_BEHIND  144 // BEHIND-band objects
+
 #define FIGURE_8_LENGTH 72
 
 #define GROUND_EFFECT_FLAG_TALL_GRASS_ON_SPAWN   (1 << 0)
@@ -205,10 +225,10 @@ void GetCameraViewAnchor(struct ViewMap *anchor);
 bool8 GetDisplacedObjectFrameCoordsByLocalId(u8 localId, u8 mapNum, u8 mapGroup, s16 *x, s16 *y);
 u8 GetWalkSlowMovementAction(u32);
 u8 GetJumpMovementAction(u32);
-u8 ElevationToPriority(u8 elevation);
 void ObjectEventUpdateElevation(struct ObjectEvent *objEvent);
-void UpdateObjectEventsFrontSplit(void);
-void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 subpriority);
+void UpdateObjectEventsRender(void);
+u8 GetObjectEventRenderBand(const struct ObjectEvent *objEvent);
+void SetSpriteRenderBand(struct Sprite *sprite, u8 band, u8 subpriorityOffset);
 void UnfreezeObjectEvent(struct ObjectEvent *objectEvent);
 u8 FindLockedObjectEventIndex(struct ObjectEvent *objectEvent);
 void SetAndStartSpriteAnim(struct Sprite *sprite, u8 animNum, u8 animCmdIndex);

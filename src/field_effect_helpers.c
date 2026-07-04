@@ -19,7 +19,7 @@ static void UpdateObjectReflectionSprite(struct Sprite *);
 static void LoadObjectReflectionPalette(struct ObjectEvent *objectEvent, struct Sprite *sprite);
 static void LoadObjectHighBridgeReflectionPalette(struct ObjectEvent *, u8);
 static void LoadObjectRegularReflectionPalette(struct ObjectEvent *, u8);
-static void UpdateGrassFieldEffectSubpriority(struct Sprite *, u8, u8);
+static void UpdateGrassFieldEffectSubpriority(struct Sprite *, u8);
 static void RaiseFieldEffectSubpriorityBehindObjects(struct Sprite *, u8);
 static void FadeFootprintsTireTracks_Step0(struct Sprite *);
 static void FadeFootprintsTireTracks_Step1(struct Sprite *);
@@ -235,7 +235,7 @@ u32 FldEff_Shadow(void)
 {
     u8 objectEventId = GetObjectEventIdByLocalIdAndMap(gFieldEffectArguments[0], gFieldEffectArguments[1], gFieldEffectArguments[2]);
     const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(gObjectEvents[objectEventId].graphicsId);
-    u8 spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[sShadowEffectTemplateIds[graphicsInfo->shadowSize]], 0, 0, 148);
+    u8 spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[sShadowEffectTemplateIds[graphicsInfo->shadowSize]], 0, 0, OBJ_SUBPRIORITY_SHADOW);
     if (spriteId != MAX_SPRITES)
     {
         gSprites[spriteId].coordOffsetEnabled = TRUE;
@@ -247,23 +247,39 @@ u32 FldEff_Shadow(void)
     return 0;
 }
 
-// A FRONT object on a cliff-promoted tile is raised over the promotion so it draws in front of the cliff
-// (see UpdateObjectEventFrontSplit). A follower effect sprite that sits at the object must match, else
-// the promoted cliff (foreground plane) draws over the priority-2 effect while the object itself stays
-// in front. The effect's Update re-sets its base priority each frame; this then raises it. Called from
-// UpdateGrassFieldEffectsFrontSplit AFTER the promoted set is rebuilt, so it stays in frame-sync.
-static void MatchFieldEffectToFrontSplit(struct Sprite *sprite, struct ObjectEvent *objEvent)
+// Emits the whole 16x16 grass tile at OAM priority 1 (over the cliff foreground plane) while leaving the
+// sprite's oam.priority at 2 so it still SORTS in the priority-2 band (tucks behind heads by subpriority,
+// not over them). Without this a grass sprite whose tile is cliff-promoted draws behind the promoted cliff
+// face (foreground plane, BG priority 1) and vanishes.
+static const struct Subsprite sGrassCliffPromoteSubsprites[] = {
+    { .x = -8, .y = -8, .shape = SPRITE_SHAPE(16x16), .size = SPRITE_SIZE(16x16), .tileOffset = 0, .priority = 1 },
+};
+static const struct SubspriteTable sGrassCliffPromoteSubspriteTable[] = {
+    { ARRAY_COUNT(sGrassCliffPromoteSubsprites), sGrassCliffPromoteSubsprites },
+};
+
+// Keep a grass effect visible over a cliff promotion: emit priority 1 via a subsprite (over the foreground
+// plane) while leaving oam.priority/subpriority alone. Keyed on the grass's OWN tile so it tracks the tile
+// it sits on, not the object's current tile (they diverge as the object steps off). NOTE: promotion is
+// driven by behind-cliff objects, so this toggles as one walks under the tile — that coupling is inherent
+// to the dynamic cliff plane and is the price of the grass not vanishing behind the cliff face.
+static void MatchFieldEffectToFrontSplit(struct Sprite *sprite, struct ObjectEvent *objEvent, s16 tileX, s16 tileY)
 {
-    if (objEvent->cliffLayer == CLIFF_LAYER_FRONT
-     && IsTileCliffPromoted(objEvent->currentCoords.x, objEvent->currentCoords.y))
-        sprite->oam.priority = 1;
+    if (objEvent->cliffLayer == CLIFF_LAYER_FRONT && IsTileCliffPromoted(tileX, tileY))
+    {
+        sprite->subspriteTables = sGrassCliffPromoteSubspriteTable;
+        sprite->subspriteTableNum = 0;
+        sprite->subspriteMode = SUBSPRITES_ON;
+    }
+    else if (sprite->subspriteTables == sGrassCliffPromoteSubspriteTable)
+    {
+        sprite->subspriteTables = NULL;
+        sprite->subspriteMode = SUBSPRITES_OFF;
+    }
 }
 
-// Post-promotion pass (OverworldBasic, after UpdateCliffFacePromotion / UpdateObjectEventsFrontSplit):
-// re-apply the front-split match to every live grass effect using THIS frame's promoted set. Doing it in
-// the grass sprite callbacks (AnimateSprites, before the set is rebuilt) read last frame's set, so the
-// grass flickered for one frame as a behind-object entered its tile. Grass sprites persist while an
-// object stands in them, so they are the effects that visibly need this.
+// Post-promotion pass (OverworldBasic, after the cliff-promoted set is rebuilt): match every live grass
+// effect to this frame's set. Done here, not in the grass callbacks, else it reads last frame's set.
 void UpdateGrassFieldEffectsFrontSplit(void)
 {
     u32 i;
@@ -272,6 +288,7 @@ void UpdateGrassFieldEffectsFrontSplit(void)
     {
         struct Sprite *sprite = &gSprites[i];
         u8 objectEventId, localId, mapNum, mapGroup;
+        s16 tileX, tileY;
 
         if (!sprite->inUse)
             continue;
@@ -294,8 +311,22 @@ void UpdateGrassFieldEffectsFrontSplit(void)
             continue;
         }
 
-        if (!TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
-            MatchFieldEffectToFrontSplit(sprite, &gObjectEvents[objectEventId]);
+        if (TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
+            continue;
+
+        // Tall/long grass is tile-anchored (own tile in sX/sY); short grass follows its object.
+        if (sprite->callback == UpdateShortGrassFieldEffect)
+        {
+            tileX = gObjectEvents[objectEventId].currentCoords.x;
+            tileY = gObjectEvents[objectEventId].currentCoords.y;
+        }
+        else
+        {
+            tileX = sprite->data[1];        // sX
+            tileY = sprite->data[2];        // sY
+        }
+
+        MatchFieldEffectToFrontSplit(sprite, &gObjectEvents[objectEventId], tileX, tileY);
     }
 }
 
@@ -311,7 +342,9 @@ void UpdateShadowFieldEffect(struct Sprite *sprite)
     {
         struct ObjectEvent *objectEvent = &gObjectEvents[objectEventId];
         struct Sprite *linkedSprite = &gSprites[objectEvent->spriteId];
-        sprite->oam.priority = linkedSprite->oam.priority;
+        // Always the normal field-sprite priority, even under a TOP-band owner: the shadow is a
+        // ground mark, and inheriting OAM priority 1 would draw it over every other object's body.
+        sprite->oam.priority = 2;
         sprite->x = linkedSprite->x;
         sprite->y = linkedSprite->y + sprite->sYOffset;
         if (!objectEvent->active || !objectEvent->hasShadow
@@ -411,11 +444,7 @@ void UpdateTallGrassFieldEffect(struct Sprite *sprite)
 
         // Hide while the triggering object is behind a cliff, else the grass pokes out in front of it.
         UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
-        // Base priority (the tall-grass effect is always created with 2) re-set each frame;
-        // UpdateGrassFieldEffectsFrontSplit (post-promotion) then raises it over a behind-object's
-        // promotion so the grass isn't hidden with it (resets after).
-        sprite->oam.priority = 2;
-        UpdateGrassFieldEffectSubpriority(sprite, sprite->sElevation, metatileBehavior);
+        UpdateGrassFieldEffectSubpriority(sprite, metatileBehavior);
     }
 }
 
@@ -466,7 +495,7 @@ u32 FldEff_LongGrass(void)
     {
         struct Sprite *sprite = &gSprites[spriteId];
         sprite->coordOffsetEnabled = TRUE;
-        sprite->oam.priority = ElevationToPriority(gFieldEffectArguments[2]);
+        sprite->oam.priority = 2;
         sprite->sElevation = gFieldEffectArguments[2];
         sprite->sX = gFieldEffectArguments[0];
         sprite->sY = gFieldEffectArguments[1];
@@ -514,10 +543,7 @@ void UpdateLongGrassFieldEffect(struct Sprite *sprite)
 
         // Hide while the triggering object is behind a cliff, else the grass pokes out in front of it.
         UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
-        // Base priority re-set each frame; UpdateGrassFieldEffectsFrontSplit (post-promotion) then
-        // raises it over a behind-object's promotion so the grass isn't hidden with it (resets after).
-        sprite->oam.priority = ElevationToPriority(sprite->sElevation);
-        UpdateGrassFieldEffectSubpriority(sprite, sprite->sElevation, 0);
+        UpdateGrassFieldEffectSubpriority(sprite, 0);
     }
 }
 
@@ -603,8 +629,6 @@ void UpdateShortGrassFieldEffect(struct Sprite *sprite)
         sprite->y2 = (graphicsInfo->height >> 1) - 8;
         sprite->subpriority = linkedSprite->subpriority - 1;
         RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
-        // Base priority re-set each frame; UpdateGrassFieldEffectsFrontSplit (post-promotion) then
-        // raises it over a behind-object's promotion on this tile so the grass isn't hidden with it.
         sprite->oam.priority = linkedSprite->oam.priority;
         // Hide while the object is behind a cliff: this sprite follows it, so it'd otherwise poke
         // out in front of the cliff face.
@@ -1079,7 +1103,8 @@ u32 FldEff_SurfBlob(void)
     u8 spriteId;
 
     SetSpritePosToOffsetMapCoords((s16 *)&gFieldEffectArguments[0], (s16 *)&gFieldEffectArguments[1], 8, 8);
-    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_SURF_BLOB], gFieldEffectArguments[0], gFieldEffectArguments[1], 150);
+    // Behind every FRONT-band sprite (the surfer sits on top of it) but out of the BEHIND band.
+    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_SURF_BLOB], gFieldEffectArguments[0], gFieldEffectArguments[1], OBJ_SUBPRIORITY_SHADOW + 1);
     if (spriteId != MAX_SPRITES)
     {
         struct Sprite *sprite = &gSprites[spriteId];
@@ -1801,7 +1826,7 @@ void UpdateJumpImpactEffect(struct Sprite *sprite)
     else
     {
         UpdateObjectEventSpriteInvisibility(sprite, FALSE);
-        SetObjectSubpriorityByElevation(sprite->sJumpElevation, sprite, 0);
+        SetSpriteRenderBand(sprite, RENDER_BAND_FRONT, 0);
     }
 }
 
@@ -1813,9 +1838,9 @@ void WaitFieldEffectSpriteAnim(struct Sprite *sprite)
         UpdateObjectEventSpriteInvisibility(sprite, FALSE);
 }
 
-static void UpdateGrassFieldEffectSubpriority(struct Sprite *sprite, u8 elevation, u8 subpriority)
+static void UpdateGrassFieldEffectSubpriority(struct Sprite *sprite, u8 subpriorityOffset)
 {
-    SetObjectSubpriorityByElevation(elevation, sprite, subpriority);
+    SetSpriteRenderBand(sprite, RENDER_BAND_FRONT, subpriorityOffset);
     // Tile-anchored: no object to skip, so it tucks behind every object standing in the grass.
     RaiseFieldEffectSubpriorityBehindObjects(sprite, OBJECT_EVENTS_COUNT);
 }
@@ -1834,7 +1859,11 @@ static void RaiseFieldEffectSubpriorityBehindObjects(struct Sprite *sprite, u8 s
     for (i = 0; i < OBJECT_EVENTS_COUNT; i ++)
     {
         struct ObjectEvent *objectEvent = &gObjectEvents[i];
-        if (objectEvent->active && i != skipObjectId)
+        // Only objects in the FRONT band can push the effect back: a TOP-band object already draws
+        // over it by OAM priority, a BEHIND-band one sorts behind it by band, and chasing either's
+        // subpriority would drag the effect out of its own band.
+        if (objectEvent->active && i != skipObjectId && !objectEvent->fixedPriority
+         && GetObjectEventRenderBand(objectEvent) == RENDER_BAND_FRONT)
         {
             struct Sprite *linkedSprite = &gSprites[objectEvent->spriteId];
 

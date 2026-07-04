@@ -343,8 +343,10 @@ struct ObjectEvent
     /*0x08*/ u8 localId;
     /*0x09*/ u8 mapNum;
     /*0x0A*/ u8 mapGroup;
-    /*0x0B*/ u8 currentElevation:4;
-             u8 previousElevation:4;
+    // The elevation level the object belongs to: normally the elevation of the tile it stands
+    // on, but frozen at the level it climbed up from while behind a cliff (see
+    // UpdateObjectEventBehindCliff). Full 8 bits to match the map grid's 0-255 elevations.
+    /*0x0B*/ u8 baseElevation;
     /*0x0C*/ struct Coords16 initialCoords;
     /*0x10*/ struct Coords16 currentCoords;
     /*0x14*/ struct Coords16 previousCoords;

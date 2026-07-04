@@ -110,7 +110,7 @@ static bool8 ShouldCopyPlayerMovement(void);
 // it has one in-flight step, so a single snapshot suffices and the save layout is untouched.
 static struct {
     u8 cliffMetatileBehavior;
-    u8 previousElevation:4;
+    u8 baseElevation;
     u8 cliffLayer:2;
     u8 surfacingFromCliff:1;
 } sPlayerCliffBackup;
@@ -120,7 +120,8 @@ static bool8 IsMetatileDirectionallyImpassable(struct ObjectEvent *, s16, s16, u
 static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *, s16, s16);
 static void UpdateObjectEventOffscreen(struct ObjectEvent *, struct Sprite *);
 static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *, struct Sprite *);
-static void UpdateObjectEventFrontSplit(struct ObjectEvent *, struct Sprite *);
+static void UpdateObjectEventRender(struct ObjectEvent *, struct Sprite *);
+static void InitObjectEventBehindCliff(struct ObjectEvent *);
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent *);
 static void GetGroundEffectFlags_Reflection(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_TallGrassOnSpawn(struct ObjectEvent *, u32 *);
@@ -138,9 +139,6 @@ static void GetGroundEffectFlags_Seaweed(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *, u32 *);
 static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *);
 static u8 GetReflectionTypeByMetatileBehavior(u32);
-static void InitObjectPriorityByElevation(struct Sprite *, u8);
-static void ObjectEventUpdateSubpriority(struct ObjectEvent *, struct Sprite *);
-static void SetObjectEventSubpriority(struct ObjectEvent *, struct Sprite *);
 static void DoTracksGroundEffect_None(struct ObjectEvent *, struct Sprite *, u8);
 static void DoTracksGroundEffect_Footprints(struct ObjectEvent *, struct Sprite *, u8);
 static void DoTracksGroundEffect_BikeTireTracks(struct ObjectEvent *, struct Sprite *, u8);
@@ -1447,8 +1445,7 @@ static u8 InitObjectEventStateFromTemplateAt(const struct ObjectEventTemplate *t
     objectEvent->previousCoords.x = x;
     objectEvent->previousCoords.y = y;
     objectEvent->drawAtHighestElevation = (template->elevation & EVENT_ELEVATION_ANY) != 0;
-    objectEvent->currentElevation = template->elevation & EVENT_ELEVATION_MASK;
-    objectEvent->previousElevation = template->elevation & EVENT_ELEVATION_MASK;
+    objectEvent->baseElevation = template->elevation & EVENT_ELEVATION_MASK;
     objectEvent->range.rangeX = template->movementRangeX;
     objectEvent->range.rangeY = template->movementRangeY;
     objectEvent->trainerType = template->trainerType;
@@ -1636,7 +1633,10 @@ static u8 TrySetupObjectEventSpriteAt(const struct ObjectEventTemplate *objectEv
     if (!objectEvent->inanimate)
         StartSpriteAnim(sprite, GetFaceDirectionAnimNum(objectEvent->facingDirection));
 
-    SetObjectEventSubpriority(objectEvent, sprite);
+    // Resolve the behind-cliff plane from the template elevation now, so the very first render
+    // (below, and this frame's render pass) already draws the object on the right side of the cliff.
+    InitObjectEventBehindCliff(objectEvent);
+    UpdateObjectEventRender(objectEvent, sprite);
     UpdateObjectEventVisibility(objectEvent, sprite);
     return objectEventId;
 }
@@ -1809,8 +1809,10 @@ u8 CreateVirtualObject(u8 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevatio
             SetSubspriteTables(sprite, subspriteTables);
             sprite->subspriteMode = SUBSPRITES_IGNORE_PRIORITY;
         }
-        InitObjectPriorityByElevation(sprite, elevation);
-        SetObjectSubpriorityByElevation(elevation, sprite, 1);
+        // Virtual objects are plain front-band field sprites; their stored elevation only matters
+        // to scripts (SetVirtualObjectInvisibility etc.), not to draw order.
+        sprite->subspriteTableNum = 1;
+        SetSpriteRenderBand(sprite, RENDER_BAND_FRONT, 1);
         StartSpriteAnim(sprite, GetFaceDirectionAnimNum(direction));
     }
     return spriteId;
@@ -2644,7 +2646,8 @@ static void SpawnObjectEventOnReturnToField(u8 objectEventId, s16 x, s16 y)
             StartSpriteAnim(sprite, GetFaceDirectionAnimNum(objectEvent->facingDirection));
 
         ResetObjectEventFldEffData(objectEvent);
-        SetObjectEventSubpriority(objectEvent, sprite);
+        // Persisted object state (cliffLayer etc.) is already valid here; just render it.
+        UpdateObjectEventRender(objectEvent, sprite);
     }
 }
 
@@ -3077,7 +3080,7 @@ static bool8 ObjectEventDoesElevationMatch(struct ObjectEvent *objectEvent, u8 e
     // otherwise the object must be on exactly that level.
     return elevation == ELEVATION_MATCH_ANY
         || objectEvent->drawAtHighestElevation
-        || objectEvent->currentElevation == elevation;
+        || objectEvent->baseElevation == elevation;
 }
 
 void UpdateObjectEventsForCameraUpdate(s16 x, s16 y)
@@ -5619,11 +5622,11 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // Cliff collision (bit 6) walls off tiles up on the cliff plane (above the object's committed level).
     // Applies in front too, so the climb-entry step onto a wall tile is blocked BEFORE it commits rather
     // than after (no one-tile overstep). The elevation check keeps same-level walking and the descent
-    // back to base/below free; a behind object reads its frozen base as previousElevation. Stairs are the
+    // back to base/below free; a behind object reads its frozen base as baseElevation. Stairs are the
     // legitimate path up, so a front object pathing onto one is exempt (a behind/obscured one stays walled
     // so it can't escape the region via a stairs tile).
     bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
-     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation
+     && MapGridGetElevationAt(x, y) > objectEvent->baseElevation
      && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator));
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
@@ -5651,9 +5654,9 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
             return COLLISION_IMPASSABLE;
 
         // Block a DOWNWARD step (an UPWARD step is the climb behind the cliff). Skipped behind a cliff,
-        // and when stepping OFF a stairs tile (previousElevation may sit above the stairs' exit level).
+        // and when stepping OFF a stairs tile (baseElevation may sit above the stairs' exit level).
         if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs
-         && MapGridGetElevationAt(x, y) < objectEvent->previousElevation)
+         && MapGridGetElevationAt(x, y) < objectEvent->baseElevation)
             return COLLISION_ELEVATION_MISMATCH;
     }
 
@@ -5755,7 +5758,7 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
     bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
      || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
     bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
-     && MapGridGetElevationAt(x, y) > objectEvent->previousElevation
+     && MapGridGetElevationAt(x, y) > objectEvent->baseElevation
      && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator));
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
@@ -5774,7 +5777,7 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
          && !MetatileBehavior_IsSurfableWaterOrUnderwater(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y)))
             flags |= 1 << (COLLISION_IMPASSABLE - 1);
         // Stepping off a stairs tile is not elevation-gated; see GetVanillaCollision.
-        if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs && MapGridGetElevationAt(x, y) < objectEvent->previousElevation)
+        if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs && MapGridGetElevationAt(x, y) < objectEvent->baseElevation)
             flags |= 1 << (COLLISION_ELEVATION_MISMATCH - 1);
     }
     if (DoesObjectCollideWithObjectAt(objectEvent, x, y))
@@ -5860,12 +5863,12 @@ static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *objectEvent, s16 
             // can sit a level apart from its neighbour yet still be walked between, so comparing render
             // levels alone would let two such objects pass through each other; being in front of the
             // cliff is the real "same plane" test here.
-            // Behind a cliff an object is on a separate render plane: previousElevation freezes at the
+            // Behind a cliff an object is on a separate render plane: baseElevation freezes at the
             // climbed-from base, so the render-level match keeps opposite sides of a face apart while
             // colliding objects frozen at the same base.
             if (occupied
              && ((moverInFront && curObject->cliffLayer == CLIFF_LAYER_FRONT)
-              || AreElevationsCompatible(objectEvent->previousElevation, curObject->previousElevation)))
+              || AreElevationsCompatible(objectEvent->baseElevation, curObject->baseElevation)))
                 return TRUE;
         }
     }
@@ -6071,7 +6074,8 @@ void UpdateObjectEventCurrentMovement(struct ObjectEvent *objectEvent, struct Sp
     DoGroundEffects_OnFinishStep(objectEvent, sprite);
     UpdateObjectEventSpriteAnimPause(objectEvent, sprite);
     UpdateObjectEventVisibility(objectEvent, sprite);
-    ObjectEventUpdateSubpriority(objectEvent, sprite);
+    // Draw order (priority/subpriority/subsprite tables) is set by the per-frame render pass
+    // (UpdateObjectEventsRender), which runs after this frame's cliff promotions are rebuilt.
 }
 
 #define dirn_to_anim(name, table)\
@@ -8598,11 +8602,13 @@ static void UpdateObjectEventVisibility(struct ObjectEvent *objectEvent, struct 
     UpdateObjectEventSpriteVisibility(objectEvent, sprite);
 }
 
-// Second pass over every object, run after UpdateCliffFacePromotion has rebuilt this frame's promoted-
-// tile set (see CB1/OverworldBasic) and before the OAM is built. Front-split reads that set, so it must
-// run after it — doing it inside the per-object sprite callback (AnimateSprites) would read last frame's
-// set and leave a front object hidden for one frame as a behind-object slides under its tile.
-void UpdateObjectEventsFrontSplit(void)
+// The per-frame render pass over every object, run after UpdateCliffFacePromotion has rebuilt this
+// frame's promoted-tile set (see CB1/OverworldBasic) and before the OAM is built. The cliff split
+// reads that set, so it must run after it — doing it inside the per-object sprite callback
+// (AnimateSprites) would read last frame's set and leave a front object hidden for one frame as a
+// behind-object slides under its tile. Running after CameraUpdate also means the subpriority
+// screen-Y term sees this frame's final camera offset.
+void UpdateObjectEventsRender(void)
 {
     u32 i;
 
@@ -8611,7 +8617,7 @@ void UpdateObjectEventsFrontSplit(void)
         struct ObjectEvent *objEvent = &gObjectEvents[i];
 
         if (objEvent->active && objEvent->spriteId < MAX_SPRITES)
-            UpdateObjectEventFrontSplit(objEvent, &gSprites[objEvent->spriteId]);
+            UpdateObjectEventRender(objEvent, &gSprites[objEvent->spriteId]);
     }
 }
 
@@ -8646,6 +8652,79 @@ static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct S
         objectEvent->offScreen = TRUE;
 }
 
+#define sSilhouetteObjEventId data[0]
+#define sSilhouetteLocalId    data[1]
+
+// Companion sprite for an OBSCURED object while silhouettes are up: an object-window copy of the
+// main sprite, carving the cloud overlay's window in the object's exact shape so the buried body
+// paints as a flat dark silhouette (darkening in ApplyCliffSilhouetteBlend). A SEPARATE sprite so
+// the real sprite keeps rendering normally at the same time: its buried pixels sit behind the
+// promoted cliff anyway, while the parts of a wide (e.g. 32x32) sprite hanging past the cliff edge
+// stay visible as real pixels instead of reading as silhouette on open ground. Mirrors the main
+// sprite every frame (reflection-style) and frees itself when the object surfaces, despawns or the
+// silhouettes fade out. Freed via inUse (not DestroySprite) since the tiles belong to the main sprite.
+static void SpriteCB_CliffSilhouette(struct Sprite *sprite)
+{
+    struct ObjectEvent *objectEvent = &gObjectEvents[sprite->sSilhouetteObjEventId];
+    struct Sprite *mainSprite = &gSprites[objectEvent->spriteId];
+
+    if (!objectEvent->active || objectEvent->localId != sprite->sSilhouetteLocalId
+     || objectEvent->cliffLayer != CLIFF_LAYER_OBSCURED || !ShouldDrawCliffSilhouettes())
+    {
+        sprite->inUse = FALSE;
+        return;
+    }
+
+    sprite->oam.shape = mainSprite->oam.shape;
+    sprite->oam.size = mainSprite->oam.size;
+    sprite->oam.tileNum = mainSprite->oam.tileNum;
+    sprite->oam.paletteNum = mainSprite->oam.paletteNum;
+    sprite->x = mainSprite->x;
+    sprite->y = mainSprite->y;
+    sprite->x2 = mainSprite->x2;
+    sprite->y2 = mainSprite->y2;
+    sprite->centerToCornerVecX = mainSprite->centerToCornerVecX;
+    sprite->centerToCornerVecY = mainSprite->centerToCornerVecY;
+    sprite->coordOffsetEnabled = mainSprite->coordOffsetEnabled;
+    sprite->invisible = mainSprite->invisible;
+}
+
+static void EnsureCliffSilhouetteSprite(struct ObjectEvent *objectEvent, struct Sprite *mainSprite)
+{
+    u8 objectEventId = objectEvent - gObjectEvents;
+    struct Sprite *sprite;
+    u32 i;
+    u8 spriteId;
+
+    for (i = 0; i < MAX_SPRITES; i++)
+    {
+        if (gSprites[i].inUse && gSprites[i].callback == SpriteCB_CliffSilhouette
+         && gSprites[i].sSilhouetteObjEventId == objectEventId)
+            return;
+    }
+
+    spriteId = CreateCopySpriteAt(mainSprite, mainSprite->x, mainSprite->y, mainSprite->subpriority);
+    if (spriteId == MAX_SPRITES)
+        return;
+
+    sprite = &gSprites[spriteId];
+    sprite->callback = SpriteCB_CliffSilhouette;
+    sprite->oam.objMode = ST_OAM_OBJ_WINDOW;
+    // The window mask only needs the whole sprite's shape, so render as one plain OAM entry off
+    // the main sprite's tiles; no anims of its own (tileNum is mirrored each frame instead).
+    sprite->usingSheet = TRUE;
+    sprite->anims = gDummySpriteAnimTable;
+    StartSpriteAnim(sprite, 0);
+    sprite->affineAnims = gDummySpriteAffineAnimTable;
+    sprite->affineAnimBeginning = TRUE;
+    sprite->subspriteMode = SUBSPRITES_OFF;
+    sprite->sSilhouetteObjEventId = objectEventId;
+    sprite->sSilhouetteLocalId = objectEvent->localId;
+}
+
+#undef sSilhouetteObjEventId
+#undef sSilhouetteLocalId
+
 static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     sprite->invisible = FALSE;
@@ -8657,15 +8736,13 @@ static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, s
     }
     else if (objectEvent->cliffLayer == CLIFF_LAYER_OBSCURED)
     {
-        // Fully buried in a cliff: the promoted terrain (UpdateCliffFacePromotion) already hides the
-        // sprite, so drawing it normally adds nothing. While the player is buried too and the clouds have
-        // fully faded, draw the buried object (the player included) as a flat dark silhouette by switching
-        // its sprite to object-window mode so it carves the cloud overlay's window (the darkening is
-        // applied in ApplyCliffSilhouetteBlend); otherwise just hide it.
+        // Fully buried in a cliff. The sprite keeps rendering normally: the promoted terrain
+        // (UpdateCliffFacePromotion) occludes every buried pixel, while the parts of a sprite wider
+        // than its tile that hang past the cliff edge stay properly visible. While the player is
+        // buried too and the clouds have fully faded, a companion object-window sprite additionally
+        // paints the buried shape as a flat dark silhouette alongside those real pixels.
         if (ShouldDrawCliffSilhouettes())
-            sprite->oam.objMode = ST_OAM_OBJ_WINDOW;
-        else
-            sprite->invisible = TRUE;
+            EnsureCliffSilhouetteSprite(objectEvent, sprite);
     }
 }
 
@@ -8745,27 +8822,28 @@ static void GetGroundEffectFlags_Reflection(struct ObjectEvent *objEvent, u32 *f
     }
 }
 
+// No grass rustle while behind/under a cliff: the object is hidden below it, not in the grass on top.
 static void GetGroundEffectFlags_TallGrassOnSpawn(struct ObjectEvent *objEvent, u32 *flags)
 {
-    if (MetatileBehavior_IsTallGrass(objEvent->currentMetatileBehavior))
+    if (MetatileBehavior_IsTallGrass(objEvent->currentMetatileBehavior) && objEvent->cliffLayer == CLIFF_LAYER_FRONT)
         *flags |= GROUND_EFFECT_FLAG_TALL_GRASS_ON_SPAWN;
 }
 
 static void GetGroundEffectFlags_TallGrassOnBeginStep(struct ObjectEvent *objEvent, u32 *flags)
 {
-    if (MetatileBehavior_IsTallGrass(objEvent->currentMetatileBehavior))
+    if (MetatileBehavior_IsTallGrass(objEvent->currentMetatileBehavior) && objEvent->cliffLayer == CLIFF_LAYER_FRONT)
         *flags |= GROUND_EFFECT_FLAG_TALL_GRASS_ON_MOVE;
 }
 
 static void GetGroundEffectFlags_LongGrassOnSpawn(struct ObjectEvent *objEvent, u32 *flags)
 {
-    if (MetatileBehavior_IsLongGrass(objEvent->currentMetatileBehavior))
+    if (MetatileBehavior_IsLongGrass(objEvent->currentMetatileBehavior) && objEvent->cliffLayer == CLIFF_LAYER_FRONT)
         *flags |= GROUND_EFFECT_FLAG_LONG_GRASS_ON_SPAWN;
 }
 
 static void GetGroundEffectFlags_LongGrassOnBeginStep(struct ObjectEvent *objEvent, u32 *flags)
 {
-    if (MetatileBehavior_IsLongGrass(objEvent->currentMetatileBehavior))
+    if (MetatileBehavior_IsLongGrass(objEvent->currentMetatileBehavior) && objEvent->cliffLayer == CLIFF_LAYER_FRONT)
         *flags |= GROUND_EFFECT_FLAG_LONG_GRASS_ON_MOVE;
 }
 
@@ -8911,6 +8989,9 @@ static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *objEvent, u32 *
         {
             if (metatileFuncs[i](objEvent->currentMetatileBehavior))
             {
+                // No grass rustle while behind/under a cliff (tall/long grass are entries 0-1).
+                if (i <= 1 && objEvent->cliffLayer != CLIFF_LAYER_FRONT)
+                    return;
                 *flags |= jumpLandingFlags[i];
                 return;
             }
@@ -8989,50 +9070,43 @@ u8 GetLedgeJumpDirection(s16 x, s16 y, u8 direction)
     return DIR_NONE;
 }
 
-static void SetObjectEventSpriteOamTableForLongGrass(struct ObjectEvent *objEvent, struct Sprite *sprite)
+// Subpriority band base per render band (see RENDER_BAND_* / OBJ_SUBPRIORITY_* in the header).
+static const u8 sRenderBandSubpriorityBases[] = {
+    [RENDER_BAND_FRONT]  = OBJ_SUBPRIORITY_FRONT,
+    [RENDER_BAND_BEHIND] = OBJ_SUBPRIORITY_BEHIND,
+    [RENDER_BAND_TOP]    = OBJ_SUBPRIORITY_TOP,
+};
+
+// The render band an object event's sprite (and any sprite anchored to it) draws in.
+u8 GetObjectEventRenderBand(const struct ObjectEvent *objEvent)
 {
-    if (objEvent->disableCoveringGroundEffects)
-        return;
-
-    if (!MetatileBehavior_IsLongGrass(objEvent->currentMetatileBehavior))
-        return;
-
-    if (!MetatileBehavior_IsLongGrass(objEvent->previousMetatileBehavior))
-        return;
-
-    sprite->subspriteTableNum = 4;
-
-    if (ElevationToPriority(objEvent->previousElevation) == 1)
-        sprite->subspriteTableNum = 5;
+    if (objEvent->drawAtHighestElevation)
+        return RENDER_BAND_TOP;
+    if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
+        return RENDER_BAND_BEHIND;
+    return RENDER_BAND_FRONT;
 }
 
-// Indexed by elevation value. Values 0-3 are the special elevations (transition,
-// collision, surf, multi-level); 4+ are ordinary levels which alternate draw
-// priority to layer over one another (e.g. bridges), with odd levels drawn behind
-// (priority 2) and even levels drawn in front (priority 1).
-static const u8 sElevationToSubpriority[] = {
-    115, 115, 115, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115,
-    83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115, 83, 115,
-};
+// Set a field sprite's draw order from its render band. OAM priority is the sprite sort key's
+// high byte, so the TOP band rides priority 1 and sorts in front of every priority-2 field
+// sprite; FRONT and BEHIND share priority 2 and are separated by their subpriority bases.
+// Within a band, the screen-Y term (2-32, north first) draws southern sprites in front;
+// subpriorityOffset (0-4) lets effect sprites tuck just behind/in front within the band.
+void SetSpriteRenderBand(struct Sprite *sprite, u8 band, u8 subpriorityOffset)
+{
+    u16 y = (sprite->y - sprite->centerToCornerVecY + gSpriteCoordOffsetY + 8) & 0xFF;
+    y = (16 - (y >> 4)) << 1;
 
-static const u8 sElevationToPriority[] = {
-    2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
-    1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
-};
+    sprite->oam.priority = (band == RENDER_BAND_TOP) ? 1 : 2;
+    sprite->subpriority = sRenderBandSubpriorityBases[band] + y + subpriorityOffset;
+}
 
-static const u8 sElevationToSubspriteTableNum[] = {
-    1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
-    2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
-};
-
-// Render level used by "any elevation" object events (drawAtHighestElevation): the top
-// even level in the tables above, so they draw in front of all terrain and lower objects.
-#define OBJECT_EVENT_HIGHEST_ELEVATION 30
-
-// True when every tile the sprite spans is higher terrain than the frozen base, i.e. the whole sprite
-// sits within the cliff. Bottom-anchored sprites grow north, so an h-px sprite spans ceil(h/16) tile
-// rows up from the feet tile; checking them all keeps this size-independent. A 1-tile sprite is always
-// fully behind once behind; taller ones stay partial until their head clears the cliff lip.
+// True when the object's BODY is buried in the cliff: every feet-column tile the sprite spans is
+// higher terrain than the frozen base. Bottom-anchored sprites grow north, so an h-px sprite spans
+// ceil(h/16) tile rows up from the feet tile; a 1-tile sprite is fully behind once behind, taller
+// ones stay partial until their head clears the cliff lip. Deliberately ignores the side columns of
+// a wide (e.g. 32x32) sprite: on the cliff edge its overhang pokes out unobscured, and OBSCURED
+// renders that case as real pixels + silhouette simultaneously (see UpdateObjectEventSpriteVisibility).
 static bool32 IsObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
 {
     const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
@@ -9043,108 +9117,106 @@ static bool32 IsObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
 
     for (r = 0; r < rows; r++)
     {
-        if (MapGridGetElevationAt(x, y - r) <= objEvent->previousElevation)
+        if (MapGridGetElevationAt(x, y - r) <= objEvent->baseElevation)
             return FALSE;
     }
     return TRUE;
 }
 
-// Height-based elevations no longer layer front-object sprites: the behind-cliff system owns all
-// cross-level occlusion, so every front sprite shares one draw band (OAM priority 2, full-sprite
-// subsprite table, one subpriority base) and sorts against other front sprites only by screen Y.
-// Feeding this flat elevation to the elevation tables selects that band without magic numbers.
-#define FLAT_RENDER_ELEVATION 3
-
-// Set the sprite's draw priority/subsprite table from the object's current elevation and cliff
-// state. Does not touch the elevation value itself.
-static void SetObjectEventDrawPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
+// True when the tile is cliff-promoted (its layers occlude some hiding object) but THIS object is
+// in front of that promotion, so its sprite must not be hidden by it. A FRONT object is south of
+// any higher terrain its sprite overlaps, so it is in front of every promotion it touches. A
+// BEHIND object is in front only of promoted tiles at or below its own base — those were promoted
+// for some deeper object; tiles above its base are the cliff it is itself hiding under.
+static bool32 ObjectEventIsInFrontOfPromotionAt(struct ObjectEvent *objEvent, s16 x, s16 y)
 {
-    // "Any elevation" object: always draw in front of terrain at the top render level,
-    // ignoring behind-cliff/elevation occlusion entirely.
-    if (objEvent->drawAtHighestElevation)
-    {
-        sprite->subspriteTableNum = sElevationToSubspriteTableNum[OBJECT_EVENT_HIGHEST_ELEVATION];
-        sprite->subspriteMode = SUBSPRITES_ON;
-        sprite->oam.priority = sElevationToPriority[OBJECT_EVENT_HIGHEST_ELEVATION];
-        return;
-    }
-
-    // All field object sprites share one draw band between the two composite planes: OAM priority
-    // 2, so the foreground plane (priority 1) draws over them and the background plane (priority 3)
-    // behind them. They sort against each other only by screen Y (subpriority). Cross-level / cliff
-    // occlusion is now handled by promoting a tile's middle layer into the foreground plane for the
-    // object hiding behind it (see DrawMetatileAt / IsCliffPromotedCell), not by sprite priority.
-    sprite->subspriteTableNum = sElevationToSubspriteTableNum[FLAT_RENDER_ELEVATION];
-    sprite->subspriteMode = SUBSPRITES_ON;
-    sprite->oam.priority = sElevationToPriority[FLAT_RENDER_ELEVATION];
+    if (!IsTileCliffPromoted(x, y))
+        return FALSE;
+    return objEvent->cliffLayer == CLIFF_LAYER_FRONT
+        || MapGridGetElevationAt(x, y) <= objEvent->baseElevation;
 }
 
-// A FRONT object standing on a tile that is cliff-promoted (a behind-object is hiding under it) would be
-// wrongly hidden by that promotion, since the promoted cliff draws over the whole tile at priority 1 and
-// every field sprite is priority 2. Split the sprite into tile-rows and raise just the rows that overlap
-// a promoted tile to priority 1, so those draw OVER the cliff (the object is in front of it) while the
-// rest render normally. Behind-objects stay priority 2 and remain correctly hidden. Runs every frame;
-// costs nothing until an overlap actually occurs (the common case restores the normal single-piece table).
-static void UpdateObjectEventFrontSplit(struct ObjectEvent *objEvent, struct Sprite *sprite)
+// An object overlapping a cliff-promoted tile it is in front of would be wrongly hidden by the
+// promotion (the promoted layers draw over the whole tile at BG priority 1, field sprites at OAM
+// priority 2). Compute the bitmask of the sprite's 16px tile-rows that overlap such a tile; the
+// caller switches those rows to the priority-1 split tables so they draw OVER the promotion while
+// the rest render normally. Rows over the object's OWN cliff (tiles above its base) stay down and
+// remain correctly hidden. Checks the tile being left and entered so a mid-step sprite is covered
+// across its whole span. Returns 0 (and *splitTables = NULL) for unsupported sprite sizes.
+static u8 GetObjectEventCliffSplitMask(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *gfx,
+                                       const struct SubspriteTable **splitTables)
 {
-    const struct ObjectEventGraphicsInfo *gfx = GetObjectEventGraphicsInfo(objEvent->graphicsId);
-    const struct SubspriteTable *splitTables = NULL;
-    s16 half, colStart, colEnd, rows = 0, r, c, pass;
+    s16 half, colStart, colEnd, rows, r, c, pass;
     u8 mask = 0;
 
-    if (objEvent->cliffLayer == CLIFF_LAYER_FRONT && !objEvent->drawAtHighestElevation
-     && gfx->subspriteTables != NULL)
-    {
-        if (gfx->width == 16 && gfx->height == 16)      { splitTables = sFrontSplitTables_16x16; rows = 1; }
-        else if (gfx->width == 16 && gfx->height == 32) { splitTables = sFrontSplitTables_16x32; rows = 2; }
-        else if (gfx->width == 32 && gfx->height == 32) { splitTables = sFrontSplitTables_32x32; rows = 2; }
-    }
+    if (gfx->width == 16 && gfx->height == 16)      { *splitTables = sFrontSplitTables_16x16; rows = 1; }
+    else if (gfx->width == 16 && gfx->height == 32) { *splitTables = sFrontSplitTables_16x32; rows = 2; }
+    else if (gfx->width == 32 && gfx->height == 32) { *splitTables = sFrontSplitTables_32x32; rows = 2; }
+    else { *splitTables = NULL; return 0; }
 
-    if (splitTables != NULL)
-    {
-        half = gfx->width / 2;
-        colStart = (8 - half) >> 4;
-        colEnd = (8 + half - 1) >> 4;
+    half = gfx->width / 2;
+    colStart = (8 - half) >> 4;
+    colEnd = (8 + half - 1) >> 4;
 
-        // Raise a tile-row when any tile it covers — at the tile being left or entered — is cliff-promoted.
-        for (r = 0; r < rows; r++)
+    for (r = 0; r < rows; r++)
+    {
+        for (pass = 0; pass < 2 && !(mask & (1 << r)); pass++)
         {
-            for (pass = 0; pass < 2 && !(mask & (1 << r)); pass++)
-            {
-                s16 fx = pass ? objEvent->previousCoords.x : objEvent->currentCoords.x;
-                s16 fy = pass ? objEvent->previousCoords.y : objEvent->currentCoords.y;
-                s16 ty = fy - (rows - 1) + r;
-                for (c = colStart; c <= colEnd; c++)
-                    if (IsTileCliffPromoted(fx + c, ty)) { mask |= (1 << r); break; }
-            }
+            s16 fx = pass ? objEvent->previousCoords.x : objEvent->currentCoords.x;
+            s16 fy = pass ? objEvent->previousCoords.y : objEvent->currentCoords.y;
+            s16 ty = fy - (rows - 1) + r;
+            for (c = colStart; c <= colEnd; c++)
+                if (ObjectEventIsInFrontOfPromotionAt(objEvent, fx + c, ty)) { mask |= (1 << r); break; }
         }
     }
+    return mask;
+}
+
+// Single per-frame render update for an object event's sprite: render band (OAM priority + banded
+// subpriority) and subsprite table (cliff split / long-grass cover / plain). Runs for every object
+// after UpdateCliffFacePromotion has rebuilt this frame's promoted-tile set (see OverworldBasic),
+// so the split reads current data, and also once directly at sprite (re)creation so a fresh sprite
+// never draws with default priority. Everything the old scattered updates (step triggers, per-frame
+// subpriority, front-split pass, long-grass table swap) decided is decided here, in one place.
+static void UpdateObjectEventRender(struct ObjectEvent *objEvent, struct Sprite *sprite)
+{
+    const struct ObjectEventGraphicsInfo *gfx = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    const struct SubspriteTable *splitTables;
+    u8 band, mask = 0;
+
+    if (objEvent->fixedPriority)
+        return;
+
+    band = GetObjectEventRenderBand(objEvent);
+    SetSpriteRenderBand(sprite, band, 1);
+
+    if (gfx->subspriteTables == NULL)
+        return;
+
+    // TOP-band sprites already draw over the foreground plane everywhere, so they never split.
+    if (band != RENDER_BAND_TOP)
+        mask = GetObjectEventCliffSplitMask(objEvent, gfx, &splitTables);
 
     if (mask != 0)
     {
         sprite->subspriteTables = splitTables;
         sprite->subspriteTableNum = mask;
-        sprite->subspriteMode = SUBSPRITES_ON;
     }
-    else if (gfx->subspriteTables != NULL && sprite->subspriteTables != gfx->subspriteTables)
+    else
     {
-        // No overlap (or not eligible): undo any earlier split repoint, back to normal rendering.
         sprite->subspriteTables = gfx->subspriteTables;
-        sprite->subspriteTableNum = sElevationToSubspriteTableNum[FLAT_RENDER_ELEVATION];
+        if (!objEvent->disableCoveringGroundEffects
+         && MetatileBehavior_IsLongGrass(objEvent->currentMetatileBehavior)
+         && MetatileBehavior_IsLongGrass(objEvent->previousMetatileBehavior))
+            sprite->subspriteTableNum = (band == RENDER_BAND_TOP) ? 5 : 4;
+        else
+            sprite->subspriteTableNum = (band == RENDER_BAND_TOP) ? 2 : 1;
     }
-}
-
-static void UpdateObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
-{
-    if (objEvent->fixedPriority)
-        return;
-
-    ObjectEventUpdateElevation(objEvent);
-    SetObjectEventDrawPriority(objEvent, sprite);
+    sprite->subspriteMode = SUBSPRITES_ON;
 }
 
 // Resolve the behind-cliff state on spawn directly from the object's (initial) elevation, since
-// there's no step to climb it behind. A tile higher than the object's render base (previousElevation)
+// there's no step to climb it behind. A tile higher than the object's render base (baseElevation)
 // means the object belongs to the lower level and is drawn behind the cliff; fully buried -> obscured
 // (hidden / silhouetted). Mirrors the step-up climb in UpdateObjectEventBehindCliff.
 static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
@@ -9165,7 +9237,7 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
         return;
     }
 
-    if (MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y) > objEvent->previousElevation)
+    if (MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y) > objEvent->baseElevation)
     {
         // Spawned already behind a cliff: no tile was left to inherit, so fall back to plain ground.
         objEvent->cliffLayer = IsObjectEventFullyBehindCliff(objEvent) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
@@ -9181,7 +9253,8 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
 // tile they were placed on, so a designer-assigned object elevation isn't overwritten every load.
 // Only the player derives its elevation from the spawn tile (warp/heal arrival). The behind-cliff
 // state is then resolved from that elevation so a placed object obscures/silhouettes correctly.
-static void InitObjectEventElevationAndPriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
+// Draw order itself is the render pass's job (UpdateObjectEventRender).
+static void InitObjectEventElevation(struct ObjectEvent *objEvent)
 {
     if (objEvent->fixedPriority)
         return;
@@ -9189,7 +9262,6 @@ static void InitObjectEventElevationAndPriority(struct ObjectEvent *objEvent, st
     if (objEvent == &gObjectEvents[gPlayerAvatar.objectEventId])
         ObjectEventUpdateElevation(objEvent);
     InitObjectEventBehindCliff(objEvent);
-    SetObjectEventDrawPriority(objEvent, sprite);
 }
 
 // Promote/demote OBSCURED while behind a cliff. OBSCURED can't be a priority (OAM maxes at 3, where a
@@ -9211,17 +9283,6 @@ static void RevealObjectEventLeavingFullyBehindCliff(struct ObjectEvent *objEven
 {
     if (objEvent->cliffLayer == CLIFF_LAYER_OBSCURED && !IsObjectEventFullyBehindCliff(objEvent))
         objEvent->cliffLayer = CLIFF_LAYER_BEHIND;
-}
-
-static void InitObjectPriorityByElevation(struct Sprite *sprite, u8 elevation)
-{
-    sprite->subspriteTableNum = sElevationToSubspriteTableNum[elevation];
-    sprite->oam.priority = sElevationToPriority[elevation];
-}
-
-u8 ElevationToPriority(u8 elevation)
-{
-    return sElevationToPriority[elevation];
 }
 
 void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
@@ -9248,17 +9309,15 @@ void ObjectEventUpdateElevation(struct ObjectEvent *objEvent)
 
     // Behind a cliff, stairs are walked as plain terrain and the frozen render base must persist, so
     // hold the level we arrived with. In front of a cliff, read the stairs tile's real elevation so two
-    // objects sharing a stairs tile get the same previousElevation (which decides draw order) instead
+    // objects sharing a stairs tile get the same baseElevation (which decides draw order) instead
     // of sorting by the side each stepped on from.
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT && MetatileBehavior_IsElevationChange(curBehavior))
         return;
 
-    // currentElevation always tracks the real tile (collision uses the collision bit, not this).
-    // previousElevation stays frozen at the base while behind (see UpdateObjectEventBehindCliff),
+    // baseElevation stays frozen while behind a cliff (see UpdateObjectEventBehindCliff),
     // keeping the object drawn behind the higher cliff.
-    objEvent->currentElevation = curElevation;
     if (objEvent->cliffLayer == CLIFF_LAYER_FRONT)
-        objEvent->previousElevation = curElevation;
+        objEvent->baseElevation = curElevation;
 
     if (isPlayer)
         gPlayerElevation = curElevation;
@@ -9280,7 +9339,7 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
     {
         sPlayerCliffBackup.cliffLayer = objEvent->cliffLayer;
         sPlayerCliffBackup.surfacingFromCliff = objEvent->surfacingFromCliff;
-        sPlayerCliffBackup.previousElevation = objEvent->previousElevation;
+        sPlayerCliffBackup.baseElevation = objEvent->baseElevation;
         sPlayerCliffBackup.cliffMetatileBehavior = objEvent->cliffMetatileBehavior;
     }
 
@@ -9304,49 +9363,22 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
         // back to the base or below: surface. The clear is deferred to step finish so the sprite stays
         // behind the top 2 layers for the whole leaving step (see DoGroundEffects_OnFinishStep).
         // Otherwise lateral along the face band, or part-way down it: hold behind.
-        if ((toElevation > objEvent->previousElevation && toElevation > fromElevation)
-         || toElevation <= objEvent->previousElevation)
+        if ((toElevation > objEvent->baseElevation && toElevation > fromElevation)
+         || toElevation <= objEvent->baseElevation)
             objEvent->surfacingFromCliff = TRUE;
     }
     else if (toElevation > fromElevation && !MetatileBehavior_IsElevationChange(fromBehavior))
     {
         // Stepped UP onto non-stairs terrain: climb behind the cliff, freezing the render base
-        // (previousElevation) at the level we left. Stepping OFF a stairs tile is excluded — its higher
+        // (baseElevation) at the level we left. Stepping OFF a stairs tile is excluded — its higher
         // exit is the stairs' legitimate destination (matches the onStairs collision exception).
         // Remember the tile being left so its behavior is held while behind (see
         // ObjectEventUpdateMetatileBehaviors).
-        objEvent->previousElevation = fromElevation;
+        objEvent->baseElevation = fromElevation;
         objEvent->cliffLayer = CLIFF_LAYER_BEHIND;
         objEvent->cliffMetatileBehavior = fromBehavior;
         objEvent->surfacingFromCliff = FALSE;
     }
-}
-
-void SetObjectSubpriorityByElevation(u8 elevation, struct Sprite *sprite, u8 subpriority)
-{
-    u16 y = (sprite->y - sprite->centerToCornerVecY + gSpriteCoordOffsetY + 8) & 0xFF;
-    y = (16 - (y >> 4)) << 1;
-
-    sprite->subpriority = sElevationToSubpriority[elevation] + y + subpriority;
-}
-
-// Subpriority orders front sprites against each other. "Any elevation" objects take 0 (the frontmost
-// value) so they draw on top of everything; every other front sprite uses the one flat band so the
-// only thing separating them is the screen-Y term (see SetObjectSubpriorityByElevation).
-static void SetObjectEventSubpriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
-{
-    if (objEvent->drawAtHighestElevation)
-        sprite->subpriority = 0;
-    else
-        SetObjectSubpriorityByElevation(FLAT_RENDER_ELEVATION, sprite, 1);
-}
-
-static void ObjectEventUpdateSubpriority(struct ObjectEvent *objEvent, struct Sprite *sprite)
-{
-    if (objEvent->fixedPriority)
-        return;
-
-    SetObjectEventSubpriority(objEvent, sprite);
 }
 
 static bool8 AreElevationsCompatible(u8 a, u8 b)
@@ -9358,7 +9390,7 @@ void GroundEffect_SpawnOnTallGrass(struct ObjectEvent *objEvent, struct Sprite *
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = 2; // priority
     gFieldEffectArguments[4] = objEvent->localId << 8 | objEvent->mapNum;
     gFieldEffectArguments[5] = objEvent->mapGroup;
@@ -9371,7 +9403,7 @@ void GroundEffect_StepOnTallGrass(struct ObjectEvent *objEvent, struct Sprite *s
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = 2; // priority
     gFieldEffectArguments[4] = objEvent->localId << 8 | objEvent->mapNum;
     gFieldEffectArguments[5] = objEvent->mapGroup;
@@ -9384,7 +9416,7 @@ void GroundEffect_SpawnOnLongGrass(struct ObjectEvent *objEvent, struct Sprite *
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = 2;
     gFieldEffectArguments[4] = objEvent->localId << 8 | objEvent->mapNum;
     gFieldEffectArguments[5] = objEvent->mapGroup;
@@ -9397,7 +9429,7 @@ void GroundEffect_StepOnLongGrass(struct ObjectEvent *objEvent, struct Sprite *s
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = 2;
     gFieldEffectArguments[4] = (objEvent->localId << 8) | objEvent->mapNum;
     gFieldEffectArguments[5] = objEvent->mapGroup;
@@ -9508,7 +9540,7 @@ void GroundEffect_JumpOnTallGrass(struct ObjectEvent *objEvent, struct Sprite *s
 
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = 2;
     FieldEffectStart(FLDEFF_JUMP_TALL_GRASS);
 
@@ -9527,7 +9559,7 @@ void GroundEffect_JumpOnLongGrass(struct ObjectEvent *objEvent, struct Sprite *s
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = 2;
     FieldEffectStart(FLDEFF_JUMP_LONG_GRASS);
 }
@@ -9536,7 +9568,7 @@ void GroundEffect_JumpOnShallowWater(struct ObjectEvent *objEvent, struct Sprite
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = sprite->oam.priority;
     FieldEffectStart(FLDEFF_JUMP_SMALL_SPLASH);
 }
@@ -9545,7 +9577,7 @@ void GroundEffect_JumpOnWater(struct ObjectEvent *objEvent, struct Sprite *sprit
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = sprite->oam.priority;
     FieldEffectStart(FLDEFF_JUMP_BIG_SPLASH);
 }
@@ -9554,7 +9586,7 @@ void GroundEffect_JumpLandingDust(struct ObjectEvent *objEvent, struct Sprite *s
 {
     gFieldEffectArguments[0] = objEvent->currentCoords.x;
     gFieldEffectArguments[1] = objEvent->currentCoords.y;
-    gFieldEffectArguments[2] = objEvent->previousElevation;
+    gFieldEffectArguments[2] = objEvent->baseElevation;
     gFieldEffectArguments[3] = sprite->oam.priority;
     FieldEffectStart(FLDEFF_DUST);
 }
@@ -9650,10 +9682,9 @@ static void DoGroundEffects_OnSpawn(struct ObjectEvent *objEvent, struct Sprite 
 #endif
     {
         flags = 0;
-        InitObjectEventElevationAndPriority(objEvent, sprite);
+        InitObjectEventElevation(objEvent);
         UpdateObjectEventFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnSpawn(objEvent, &flags);
-        SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);
         DoFlaggedGroundEffects(objEvent, sprite, flags);
         objEvent->triggerGroundEffectsOnMove = FALSE;
         objEvent->disableCoveringGroundEffects = 0;
@@ -9671,10 +9702,10 @@ static void DoGroundEffects_OnBeginStep(struct ObjectEvent *objEvent, struct Spr
 #endif
     {
         flags = 0;
-        UpdateObjectEventElevationAndPriority(objEvent, sprite);
+        if (!objEvent->fixedPriority)
+            ObjectEventUpdateElevation(objEvent);
         RevealObjectEventLeavingFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnBeginStep(objEvent, &flags);
-        SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);
         filters_out_some_ground_effects(objEvent, &flags);
         DoFlaggedGroundEffects(objEvent, sprite, flags);
         objEvent->triggerGroundEffectsOnMove = FALSE;
@@ -9693,18 +9724,18 @@ static void DoGroundEffects_OnFinishStep(struct ObjectEvent *objEvent, struct Sp
 #endif
     {
         flags = 0;
-        // Arrived: a surface deferred at step-commit takes effect now, before the priority update below,
-        // so the sprite returns to the front exactly on arrival (see UpdateObjectEventBehindCliff).
-        // FRONT also clears any OBSCURED state in one shot.
+        // Arrived: a surface deferred at step-commit takes effect now, before the elevation update
+        // below, so the sprite returns to the front exactly on arrival (see
+        // UpdateObjectEventBehindCliff). FRONT also clears any OBSCURED state in one shot.
         if (objEvent->surfacingFromCliff)
         {
             objEvent->cliffLayer = CLIFF_LAYER_FRONT;
             objEvent->surfacingFromCliff = FALSE;
         }
-        UpdateObjectEventElevationAndPriority(objEvent, sprite);
+        if (!objEvent->fixedPriority)
+            ObjectEventUpdateElevation(objEvent);
         UpdateObjectEventFullyBehindCliff(objEvent);
         GetAllGroundEffectFlags_OnFinishStep(objEvent, &flags);
-        SetObjectEventSpriteOamTableForLongGrass(objEvent, sprite);
         FilterOutStepOnPuddleGroundEffectIfJumping(objEvent, &flags);
         DoFlaggedGroundEffects(objEvent, sprite, flags);
         objEvent->triggerGroundEffectsOnStop = 0;
@@ -10033,7 +10064,7 @@ bool8 ObjectEventReverseHeldMovement(struct ObjectEvent *objectEvent)
     {
         objectEvent->cliffLayer = sPlayerCliffBackup.cliffLayer;
         objectEvent->surfacingFromCliff = sPlayerCliffBackup.surfacingFromCliff;
-        objectEvent->previousElevation = sPlayerCliffBackup.previousElevation;
+        objectEvent->baseElevation = sPlayerCliffBackup.baseElevation;
         objectEvent->cliffMetatileBehavior = sPlayerCliffBackup.cliffMetatileBehavior;
     }
 
@@ -10440,7 +10471,7 @@ void UpdateObjectEventSpriteInvisibility(struct Sprite *sprite, bool8 invisible)
 static void SpriteCB_VirtualObject(struct Sprite *sprite)
 {
     VirtualObject_UpdateAnim(sprite);
-    SetObjectSubpriorityByElevation(sprite->sVirtualObjElev, sprite, 1);
+    SetSpriteRenderBand(sprite, RENDER_BAND_FRONT, 1);
     UpdateObjectEventSpriteInvisibility(sprite, sprite->sInvisible);
 }
 

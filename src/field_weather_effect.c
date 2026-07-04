@@ -1883,8 +1883,10 @@ static void ApplyCliffSilhouetteBlend(void)
 {
     s8 brightness = -gWeatherPtr->cliffSilhouetteBrightness;
 
+    // BGs only — no BLDCNT_TGT1_OBJ. Real sprite pixels inside the window (a wide buried sprite's
+    // exposed overhang past the cliff edge, or a front object crossing a silhouette) stay full-bright.
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3
-                               | BLDCNT_TGT1_OBJ | WEATHER_BLEND_EFFECT(brightness));
+                               | WEATHER_BLEND_EFFECT(brightness));
     SetGpuReg(REG_OFFSET_BLDY, FadeScaledBlendLevel(WEATHER_BLEND_LEVEL(brightness)));
 }
 

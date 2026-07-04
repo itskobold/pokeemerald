@@ -1219,7 +1219,10 @@ bool8 ScrCmd_setobjectsubpriority(struct ScriptContext *ctx)
     u8 mapNum = ScriptReadByte(ctx);
     u8 priority = ScriptReadByte(ctx);
 
-    SetObjectSubpriority(localId, mapNum, mapGroup, priority + 83);
+    // Scripted overrides sit in the TOP subpriority range so they draw in front of every normal
+    // (FRONT-band, OAM priority 2) object; the script's value orders scripted objects among
+    // themselves. TOP-band objects (OAM priority 1) still draw over them.
+    SetObjectSubpriority(localId, mapNum, mapGroup, priority + OBJ_SUBPRIORITY_TOP);
     return FALSE;
 }
 

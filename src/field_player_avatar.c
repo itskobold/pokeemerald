@@ -1307,7 +1307,7 @@ u8 GetPlayerMovementDirection(void)
 
 u8 PlayerGetElevation(void)
 {
-    return gObjectEvents[gPlayerAvatar.objectEventId].previousElevation;
+    return gObjectEvents[gPlayerAvatar.objectEventId].baseElevation;
 }
 
 void MovePlayerToMapCoords(s16 x, s16 y)
@@ -1443,7 +1443,7 @@ bool8 IsPlayerFacingSurfableFishableWater(void)
     MoveCoords(playerObjEvent->facingDirection, &x, &y);
     if (!(gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
      && MetatileBehavior_IsSurfableFishableWater(MapGridGetMetatileBehaviorAt(x, y))
-     && MapGridGetElevationAt(x, y) == playerObjEvent->previousElevation)
+     && MapGridGetElevationAt(x, y) == playerObjEvent->baseElevation)
         return TRUE;
     else
         return FALSE;
@@ -1631,7 +1631,7 @@ static bool8 PushBoulder_Move(struct Task *task, struct ObjectEvent *player, str
         ObjectEventSetHeldMovement(boulder, GetWalkSlowMovementAction((u8)task->tDirection));
         gFieldEffectArguments[0] = boulder->currentCoords.x;
         gFieldEffectArguments[1] = boulder->currentCoords.y;
-        gFieldEffectArguments[2] = boulder->previousElevation;
+        gFieldEffectArguments[2] = boulder->baseElevation;
         gFieldEffectArguments[3] = gSprites[boulder->spriteId].oam.priority;
         FieldEffectStart(FLDEFF_DUST);
         PlaySE(SE_M_STRENGTH);

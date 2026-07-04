@@ -528,7 +528,7 @@ static bool32 WasInTileList(const struct Coords16 *list, u8 count, s16 x, s16 y)
 // Promote every tile of the sprite's footprint when the object stands (feet) at tile (cx, cy): the
 // sprite is bottom-anchored and horizontally centred on that tile, so it spans ceil(width/16) tile
 // columns either side of centre and ceil(height/16) rows up from the feet. Each covered tile higher
-// than the frozen base (previousElevation) is a cliff face in front of that band, so its middle layer
+// than the frozen base (baseElevation) is a cliff face in front of that band, so its middle layer
 // is promoted over the sprite; rows/cols at or below the base are normal ground it stands in front of.
 // Only called for objects whose feet are behind a cliff (see UpdateCliffFacePromotion) — a FRONT object
 // at the base of a taller cliff is in front of the wall, so its head must NOT be promoted behind it.
@@ -542,7 +542,7 @@ static void PromoteSpriteFootprint(struct ObjectEvent *objEvent, const struct Ob
 
     for (r = 0; r < rows; r++)
         for (c = colStart; c <= colEnd; c++)
-            if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->previousElevation)
+            if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->baseElevation)
                 AddCliffPromotedTile(cx + c, cy - r);
 }
 
