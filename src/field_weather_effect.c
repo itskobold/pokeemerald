@@ -2822,6 +2822,9 @@ static const struct SpriteSheet sSandstormSpriteSheet =
     .tag = GFXTAG_SANDSTORM,
 };
 
+// DOWP: weather sprite palettes load dynamically by tag.
+static const struct SpritePalette sSandstormSpritePalette = {gSandstormWeatherPalette, PALTAG_WEATHER_2};
+
 // Regular sandstorm sprites
 #define tSpriteColumn  data[0]
 #define tSpriteRow     data[1]
@@ -2834,7 +2837,7 @@ static void CreateSandstormSprites(void)
     if (!gWeatherPtr->sandstormSpritesCreated)
     {
         LoadSpriteSheet(&sSandstormSpriteSheet);
-        LoadCustomWeatherSpritePalette(gSandstormWeatherPalette);
+        LoadCustomWeatherSpritePalette(&sSandstormSpritePalette);
         for (i = 0; i < NUM_SANDSTORM_SPRITES; i++)
         {
             spriteId = CreateSpriteAtEnd(&sSandstormSpriteTemplate, 0, (i / 5) * 64, 1);

@@ -3,6 +3,7 @@
 #include "event_data.h"
 #include "event_object_movement.h"
 #include "field_camera.h"
+#include "field_weather.h"
 #include "fieldmap.h"
 #include "rotating_gate.h"
 #include "sound.h"
@@ -467,7 +468,7 @@ static const union AffineAnimCmd *const sSpriteAffineAnimTable_RotatingGate[] =
 static const struct SpriteTemplate sSpriteTemplate_RotatingGateLarge =
 {
     .tileTag = ROTATING_GATE_TILE_TAG,
-    .paletteTag = TAG_NONE,
+    .paletteTag = 0x1103, // OBJ_EVENT_PAL_TAG_NPC_1
     .oam = &sOamData_RotatingGateLarge,
     .anims = sSpriteAnimTable_RotatingGateLarge,
     .images = NULL,
@@ -478,7 +479,7 @@ static const struct SpriteTemplate sSpriteTemplate_RotatingGateLarge =
 static const struct SpriteTemplate sSpriteTemplate_RotatingGateRegular =
 {
     .tileTag = ROTATING_GATE_TILE_TAG,
-    .paletteTag = TAG_NONE,
+    .paletteTag = 0x1103, // OBJ_EVENT_PAL_TAG_NPC_1
     .oam = &sOamData_RotatingGateRegular,
     .anims = sSpriteAnimTable_RotatingGateRegular,
     .images = NULL,
@@ -741,6 +742,13 @@ static u8 RotatingGate_CreateGate(u8 gateId, s16 deltaX, s16 deltaY)
         template = sSpriteTemplate_RotatingGateLarge;
 
     template.tileTag = gate->shape + ROTATING_GATE_TILE_TAG;
+
+    // DOWP: load the gate's palette into a free slot before creating the sprite.
+    if (template.paletteTag != TAG_NONE)
+    {
+        LoadObjectEventPalette(template.paletteTag);
+        UpdatePaletteGammaType(IndexOfSpritePaletteTag(template.paletteTag), GAMMA_ALT);
+    }
 
     spriteId = CreateSprite(&template, 0, 0, 0x94);
     if (spriteId == MAX_SPRITES)

@@ -168,7 +168,7 @@ static const union AnimCmd *const sSpriteAnimTable_Icons[] =
 static const struct SpriteTemplate sSpriteTemplate_ExclamationQuestionMark =
 {
     .tileTag = TAG_NONE,
-    .paletteTag = TAG_NONE,
+    .paletteTag = 0x1100, // OBJ_EVENT_PAL_TAG_BRENDAN
     .oam = &sOamData_Icons,
     .anims = sSpriteAnimTable_Icons,
     .images = sSpriteImageTable_ExclamationQuestionMark,
@@ -179,7 +179,7 @@ static const struct SpriteTemplate sSpriteTemplate_ExclamationQuestionMark =
 static const struct SpriteTemplate sSpriteTemplate_HeartIcon =
 {
     .tileTag = TAG_NONE,
-    .paletteTag = FLDEFF_PAL_TAG_GENERAL_0,
+    .paletteTag = 0x1103, // OBJ_EVENT_PAL_TAG_NPC_1
     .oam = &sOamData_Icons,
     .anims = sSpriteAnimTable_Icons,
     .images = sSpriteImageTable_HeartIcon,
@@ -695,7 +695,10 @@ void TryPrepareSecondApproachingTrainer(void)
 
 u8 FldEff_ExclamationMarkIcon(void)
 {
-    u8 spriteId = CreateSpriteAtEnd(&sSpriteTemplate_ExclamationQuestionMark, 0, 0, 0x53);
+    u8 spriteId;
+
+    LoadObjectEventPalette(0x1100); // OBJ_EVENT_PAL_TAG_BRENDAN
+    spriteId = CreateSpriteAtEnd(&sSpriteTemplate_ExclamationQuestionMark, 0, 0, 0x53);
 
     if (spriteId != MAX_SPRITES)
         SetIconSpriteData(&gSprites[spriteId], FLDEFF_EXCLAMATION_MARK_ICON, 0);
@@ -705,7 +708,10 @@ u8 FldEff_ExclamationMarkIcon(void)
 
 u8 FldEff_QuestionMarkIcon(void)
 {
-    u8 spriteId = CreateSpriteAtEnd(&sSpriteTemplate_ExclamationQuestionMark, 0, 0, 0x52);
+    u8 spriteId;
+
+    LoadObjectEventPalette(0x1100); // OBJ_EVENT_PAL_TAG_BRENDAN
+    spriteId = CreateSpriteAtEnd(&sSpriteTemplate_ExclamationQuestionMark, 0, 0, 0x52);
 
     if (spriteId != MAX_SPRITES)
         SetIconSpriteData(&gSprites[spriteId], FLDEFF_QUESTION_MARK_ICON, 1);
@@ -715,14 +721,17 @@ u8 FldEff_QuestionMarkIcon(void)
 
 u8 FldEff_HeartIcon(void)
 {
-    u8 spriteId = CreateSpriteAtEnd(&sSpriteTemplate_HeartIcon, 0, 0, 0x52);
+    u8 spriteId;
+
+    LoadObjectEventPalette(0x1103); // OBJ_EVENT_PAL_TAG_NPC_1
+    spriteId = CreateSpriteAtEnd(&sSpriteTemplate_HeartIcon, 0, 0, 0x52);
 
     if (spriteId != MAX_SPRITES)
     {
         struct Sprite *sprite = &gSprites[spriteId];
 
         SetIconSpriteData(sprite, FLDEFF_HEART_ICON, 0);
-        sprite->oam.paletteNum = 2;
+        sprite->oam.paletteNum = IndexOfSpritePaletteTag(0x1103);
     }
 
     return 0;

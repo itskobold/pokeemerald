@@ -154,6 +154,16 @@ extern struct Weather gWeather;
 extern struct Weather *const gWeatherPtr;
 extern const u16 gFogPalette[];
 
+// Color map type for a dynamically-allocated OBJ palette (DOWP).
+enum
+{
+    GAMMA_NONE,
+    GAMMA_NORMAL,
+    GAMMA_ALT,
+};
+
+void UpdatePaletteGammaType(u8 index, u8 gammaType);
+
 // field_weather_effect.c
 extern const u8 gWeatherFogHorizontalTiles[];
 
@@ -167,7 +177,7 @@ void FadeScreen(u8 mode, s8 delay);
 bool8 IsWeatherNotFadingIn(void);
 void UpdateSpritePaletteWithWeather(u8 spritePaletteIndex);
 void ApplyWeatherColorMapToPal(u8 paletteIndex);
-void LoadCustomWeatherSpritePalette(const u16 *palette);
+void LoadCustomWeatherSpritePalette(const struct SpritePalette *palette);
 void ResetDroughtWeatherPaletteLoading(void);
 bool8 LoadDroughtWeatherPalettes(void);
 void DroughtStateInit(void);

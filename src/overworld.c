@@ -2394,10 +2394,8 @@ static void ResumeMap(bool32 a1)
     ResetAllPicSprites();
     ResetCameraUpdateInfo();
     InstallCameraPanAheadCallback();
-    if (!a1)
-        InitObjectEventPalettes(0);
-    else
-        InitObjectEventPalettes(1);
+    // DOWP: object palettes are now loaded dynamically as sprites spawn, so just free everything here.
+    FreeAllSpritePalettes();
 
     FieldEffectActiveListClear();
     StartWeather();

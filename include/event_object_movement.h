@@ -118,11 +118,10 @@ struct LockedAnimObjectEvents
 extern const struct OamData gObjectEventBaseOam_32x8;
 extern const struct OamData gObjectEventBaseOam_32x32;
 extern const struct SpriteTemplate *const gFieldEffectObjectTemplatePointers[];
-extern const u8 gReflectionEffectPaletteMap[];
 
 extern const u8 *const gBerryTreeObjectEventGraphicsIdTablePointers[];
 extern const struct SpriteFrameImage *const gBerryTreePicTablePointers[];
-extern const u8 *const gBerryTreePaletteSlotTablePointers[];
+extern const u16 *const gBerryTreePaletteTagTablePointers[];
 
 void ResetObjectEvents(void);
 u8 GetMoveDirectionAnimNum(u8 direction);
@@ -139,6 +138,7 @@ void SetObjEventMovementTypeByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, 
 void SetObjEventCoordsPermByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y);
 void CopyObjEventCoordsToPermByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup);
 void PatchObjectPalette(u16 paletteTag, u8 paletteSlot);
+void LoadObjectEventPalette(u16 paletteTag);
 void SpawnObjectEventsOnReturnToField(s16 x, s16 y);
 void OverrideSecretBaseDecorationSpriteScript(u8 localId, u8 mapNum, u8 mapGroup, u8 decorationCategory);
 void GetMapCoordsFromSpritePos(s16 x, s16 y, s16 *destX, s16 *destY);
