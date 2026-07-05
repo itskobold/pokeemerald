@@ -603,6 +603,22 @@ static void PromoteSurfBlobOverhang(struct ObjectEvent *objEvent, const struct O
     }
 }
 
+// Redraw a promoted/unpromoted cliff tile, but only when it is safely on-screen. The BG is a 32-tile
+// (16-metatile) torus while the view is 15 metatiles wide, so the 16th column (dx == 15, one metatile
+// past the right edge) shares its torus cell with the tile one step off the LEFT edge (dx == -1) —
+// whose far sub-column is briefly visible as a sliver mid-scroll. An object stays live up to 3
+// metatiles off-screen (see RemoveObjectEventIfOutsideView), so its promotion can reach that aliasing
+// column: redrawing it there would stamp the object's foreground onto the opposite edge's sliver
+// (the reported "stale tile flashes on the far edge" glitch). The row axis (dy == 15) aliases the same
+// way. These tiles are off-screen (a 1-column sliver at most), so skip them; the slice redraw refreshes
+// their torus cell with the live state when they actually scroll into view.
+static void RedrawCliffTile(s16 x, s16 y)
+{
+    if ((u32)(x - gCameraPos.x) >= 15 || (u32)(y - gCameraPos.y) >= 15)
+        return;
+    CurrentMapDrawMetatileAt(x, y);
+}
+
 // Rebuild the cliff-promoted tile set from current object positions and redraw any tile that
 // entered or left it (its foreground recipe changed). Called once per frame from the overworld.
 void UpdateCliffFacePromotion(void)
@@ -646,13 +662,13 @@ void UpdateCliffFacePromotion(void)
     }
 
     // Redraw tiles whose promotion state flipped. Off-screen tiles are skipped by
-    // CurrentMapDrawMetatileAt and pick up the live state when they scroll back into view.
+    // RedrawCliffTile (and pick up the live state via the slice redraw when they scroll into view).
     for (i = 0; i < prevCount; i++)
         if (!IsCliffPromotedCell(prev[i].x, prev[i].y))
-            CurrentMapDrawMetatileAt(prev[i].x, prev[i].y);
+            RedrawCliffTile(prev[i].x, prev[i].y);
     for (i = 0; i < sCliffPromotedTileCount; i++)
         if (!WasInTileList(prev, prevCount, sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y))
-            CurrentMapDrawMetatileAt(sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y);
+            RedrawCliffTile(sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y);
 }
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)
