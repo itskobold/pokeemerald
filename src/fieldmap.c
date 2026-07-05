@@ -883,6 +883,14 @@ u8 MapGridGetMetatileLayerTypeAt(int x, int y)
     return UNPACK_LAYER_TYPE(GetMetatileAttributesById(metatile));
 }
 
+// Reflection type of the tile (METATILE_REFLECTION_*, == REFL_TYPE_*). Drives object reflections
+// and the BG3 reflective-background render path.
+u8 MapGridGetMetatileReflectionAt(int x, int y)
+{
+    u16 metatile = MapGridGetMetatileIdAt(x, y);
+    return UNPACK_REFLECTION(GetMetatileAttributesById(metatile));
+}
+
 void MapGridSetMetatileIdAt(int x, int y, u16 metatile)
 {
     int i;

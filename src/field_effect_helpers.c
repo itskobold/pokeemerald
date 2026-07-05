@@ -56,6 +56,9 @@ void SetUpReflection(struct ObjectEvent *objectEvent, struct Sprite *sprite, boo
 
     reflectionSprite = &gSprites[CreateCopySpriteAt(sprite, sprite->x, sprite->y, 152)];
     reflectionSprite->callback = UpdateObjectReflectionSprite;
+    // OAM priority 3 puts the reflection between the two background planes: over BG3 (the reflective
+    // tile's surface, priority 3 - the sprite wins the tie) and under BG2 (normal background,
+    // priority 2), so shoreline/edge tiles on BG2 correctly clip a reflection that spills past.
     reflectionSprite->oam.priority = 3;
     reflectionSprite->usingSheet = TRUE;
     reflectionSprite->anims = gDummySpriteAnimTable;
@@ -384,8 +387,8 @@ void UpdateShadowFieldEffect(struct Sprite *sprite)
          || MetatileBehavior_IsPokeGrass(objectEvent->currentMetatileBehavior)
          || MetatileBehavior_IsSurfableWaterOrUnderwater(objectEvent->currentMetatileBehavior)
          || MetatileBehavior_IsSurfableWaterOrUnderwater(objectEvent->previousMetatileBehavior)
-         || MetatileBehavior_IsReflective(objectEvent->currentMetatileBehavior)
-         || MetatileBehavior_IsReflective(objectEvent->previousMetatileBehavior))
+         || MapGridGetMetatileReflectionAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y)
+         || MapGridGetMetatileReflectionAt(objectEvent->previousCoords.x, objectEvent->previousCoords.y))
         {
             FieldEffectStop(sprite, FLDEFF_SHADOW);
         }

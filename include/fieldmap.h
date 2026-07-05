@@ -38,6 +38,7 @@ u16 GetMetatileAttributesById(u16 metatile);
 u8 GetMetatileCompositingById(u16 metatile);
 void GetCameraFocusCoords(u16 *x, u16 *y);
 u8 MapGridGetMetatileLayerTypeAt(int x, int y);
+u8 MapGridGetMetatileReflectionAt(int x, int y);
 u8 MapGridGetElevationAt(int x, int y);
 u8 MapGridGetElevationOrZeroAt(int x, int y);
 u8 MapGridGetBgMaterialAt(int x, int y);

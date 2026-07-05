@@ -43,7 +43,7 @@ static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
 static void DrawMetatileAtWithId(const struct MapLayout *, u16, int, int, u16 metatileId);
-static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32);
+static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32, const u16 *, u32);
 static bool32 IsCliffPromotedCell(int, int);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
@@ -152,6 +152,7 @@ void FieldUpdateBgTilemapScroll(void)
     {
         FlushFieldBgTilemap(1, gOverworldTilemapBuffer_Bg1);
         FlushFieldBgTilemap(2, gOverworldTilemapBuffer_Bg2);
+        FlushFieldBgTilemap(3, gOverworldTilemapBuffer_Bg3);
         sFieldTilemapDirty = FALSE;
     }
 
@@ -341,7 +342,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
         {
             u16 bg = tiles[p];
             u16 fg = tiles[4 + p];
-            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1);
+            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1, NULL, 0);
         }
     }
 }
@@ -365,13 +366,19 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     // 3-bit mask (one bit per layer 0/1/2) selecting which layers go to the foreground plane for
     // this cell's current cliff state; the rest go to the background plane. See METATILE_COMPOSITE_*.
     u32 fgMask;
+    u16 attributes;
+    // 3-bit mask (one bit per layer 0/1/2) of layers routed to the BG3 reflective plane. They render
+    // behind the reflection sprites and punch a hole through the BG2 background composite. Resolved
+    // from the compositing byte's reflection-layer selector below, after fgMask is finalised.
+    u32 reflMask;
     u32 p;
 
     if (metatileId > NUM_METATILES_TOTAL)
         metatileId = 0;
+    attributes = GetMetatileAttributesById(metatileId);
     // Only metatiles flagged "use bg material" take the bgMaterial render path — fetch the material
     // (a second map-grid read) only then, since the vast majority of metatiles don't use it.
-    if (UNPACK_USES_BGMATERIAL(GetMetatileAttributesById(metatileId)))
+    if (UNPACK_USES_BGMATERIAL(attributes))
         materialTiles = mapLayout->primaryTileset->metatiles + MapGridGetBgMaterialAt(x, y) * NUM_TILES_PER_METATILE;
     if (metatileId < NUM_METATILES_IN_PRIMARY)
         tiles = mapLayout->primaryTileset->metatiles + metatileId * NUM_TILES_PER_METATILE;
@@ -401,14 +408,21 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
                     if ((tiles[l * 4 + sub] & 0x3FF) != 0) { fgMask |= (1 << l); break; }
     }
 
+    // Reflection layers: the explicit per-layer selector wins; a background layer it names goes to
+    // BG3. As a fallback, a metatile with a reflection type but no selector routes ALL its background
+    // layers to BG3 (the simple "whole-tile reflective" case). Foreground layers never reflect.
+    reflMask = METATILE_COMPOSITE_REFLECTION_LAYERMASK(GetMetatileCompositingById(metatileId)) & ~fgMask;
+    if (reflMask == 0 && UNPACK_REFLECTION(attributes) != METATILE_REFLECTION_NONE)
+        reflMask = METATILE_COMPOSITE_LAYER_MASK & ~fgMask;
+
     // For each of the metatile's four sub-tiles, route its three layers (ground/middle/top) into the
-    // foreground or background plane per fgMask, preserving bottom->top order within each plane.
+    // foreground, background, or reflection plane, preserving bottom->top order within each plane.
     // bgMaterial swaps the ground layer for the material metatile's ground.
     for (p = 0; p < 4; p++)
     {
         u16 layers[3];
-        u16 bg[3], fg[3];
-        u32 bgCount = 0, fgCount = 0;
+        u16 bg[3], fg[3], refl[3];
+        u32 bgCount = 0, fgCount = 0, reflCount = 0;
         u32 l;
 
         layers[0] = materialTiles ? materialTiles[p] : tiles[p];
@@ -419,39 +433,53 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
         {
             if (fgMask & (1 << l))
                 fg[fgCount++] = layers[l];
+            else if (reflMask & (1 << l))
+                refl[reflCount++] = layers[l];
             else
                 bg[bgCount++] = layers[l];
         }
-        DrawCompositeCell(offset + sSubTileCellOffsets[p], bg, bgCount, fg, fgCount);
+        DrawCompositeCell(offset + sSubTileCellOffsets[p], bg, bgCount, fg, fgCount, refl, reflCount);
     }
 }
 
-// Resolve composite slots for one 8x8 cell and write them to the two plane tilemaps. The cell's
-// current slots (stored as the tilemap tile indices) are released after acquiring the new ones,
-// so an unchanged recipe keeps its slot alive across the swap.
-static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount)
+// Resolve composite slots for one 8x8 cell and write them to the three plane tilemaps. The cell's
+// current slots (stored as the tilemap tile indices) are released after acquiring the new ones, so
+// an unchanged recipe keeps its slot alive across the swap. Each plane is independent:
+//   BG1 (fg)   = foreground entries
+//   BG2 (bg)   = background entries, with holes punched wherever a reflection entry is opaque
+//   BG3 (refl) = reflection entries (the reflective surface, drawn behind the reflection sprites)
+// The reflection entries drive both BG3 (drawn) and the BG2 mask, so the surface shows through the
+// hole it cuts in the background plane.
+static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount, const u16 *reflEntries, u32 reflCount)
 {
-    u16 oldBg = gOverworldTilemapBuffer_Bg2[offset] & 0x3FF;
     u16 oldFg = gOverworldTilemapBuffer_Bg1[offset] & 0x3FF;
-    u16 newBg = FieldCompositorAcquire(bgEntries, bgCount);
+    u16 oldBg = gOverworldTilemapBuffer_Bg2[offset] & 0x3FF;
+    u16 oldRefl = gOverworldTilemapBuffer_Bg3[offset] & 0x3FF;
     u16 newFg = FieldCompositorAcquire(fgEntries, fgCount);
+    u16 newBg = FieldCompositorAcquireMasked(bgEntries, bgCount, reflEntries, reflCount);
+    u16 newRefl = FieldCompositorAcquire(reflEntries, reflCount);
 
     // On pool exhaustion Acquire returns COMPOSITE_SLOT_KEEP: leave the cell's current tile in place
     // (keep its slot, don't write the sentinel) so it shows stale content for a frame instead of
     // flashing blank. The redraw is retried so it resolves once a slot frees.
-    if (newBg != COMPOSITE_SLOT_KEEP)
-    {
-        FieldCompositorRelease(oldBg);
-        gOverworldTilemapBuffer_Bg2[offset] = newBg;
-    }
     if (newFg != COMPOSITE_SLOT_KEEP)
     {
         FieldCompositorRelease(oldFg);
         gOverworldTilemapBuffer_Bg1[offset] = newFg;
     }
+    if (newBg != COMPOSITE_SLOT_KEEP)
+    {
+        FieldCompositorRelease(oldBg);
+        gOverworldTilemapBuffer_Bg2[offset] = newBg;
+    }
+    if (newRefl != COMPOSITE_SLOT_KEEP)
+    {
+        FieldCompositorRelease(oldRefl);
+        gOverworldTilemapBuffer_Bg3[offset] = newRefl;
+    }
 
     // Flag the synchronous, pre-scroll VRAM flush (see FieldUpdateBgTilemapScroll). While the field
-    // VBlank is installed that flush copies both plane tilemaps every frame, so the DMA3-queued copy
+    // VBlank is installed that flush copies the plane tilemaps every frame, so the DMA3-queued copy
     // below would just write the same buffers to the same VRAM a second time - skip it. During map
     // load (field VBlank not yet active) the sync flush doesn't run, so fall back to the queue.
     sFieldTilemapDirty = TRUE;
@@ -459,6 +487,7 @@ static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, con
     {
         ScheduleBgCopyTilemapToVram(1);
         ScheduleBgCopyTilemapToVram(2);
+        ScheduleBgCopyTilemapToVram(3);
     }
 }
 

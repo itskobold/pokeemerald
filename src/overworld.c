@@ -292,17 +292,30 @@ static const struct BgTemplate sOverworldBgTemplates[] =
         .baseTile = 0
     },
     {
-        // Background composite plane (8BPP). Priority 3 draws it behind field object sprites.
+        // Background composite plane (8BPP). Priority 2 draws it behind field object sprites (which
+        // win the priority-2 tie as sprites) but in front of the reflection sprites (OAM priority 3)
+        // and the reflective-background plane below.
         .bg = 2,
         .charBaseIndex = 0,
         .mapBaseIndex = 28,
         .screenSize = 0,
         .paletteMode = 1,
+        .priority = 2,
+        .baseTile = 0
+    },
+    {
+        // Reflective-background plane (8BPP): the background layer of reflective tiles (water/ice)
+        // is routed here instead of BG2. Priority 3 sits it below the reflection sprites (OAM
+        // priority 3, which win the tie) so reflections draw over the water surface, and below BG2
+        // so normal background tiles occlude reflections that spill past the water's edge.
+        .bg = 3,
+        .charBaseIndex = 0,
+        .mapBaseIndex = 30,
+        .screenSize = 0,
+        .paletteMode = 1,
         .priority = 3,
         .baseTile = 0
     }
-    // BG3 (the old bottom map layer) is retired: the compositor folds the map into the two
-    // 8BPP planes above, so only BG0-2 are used in the overworld now.
 };
 
 static const struct ScanlineEffectParams sFlashEffectParams =
@@ -1582,11 +1595,14 @@ static void InitOverworldBgs(void)
     InitBgsFromTemplates(0, sOverworldBgTemplates, ARRAY_COUNT(sOverworldBgTemplates));
     SetBgAttribute(1, BG_ATTR_MOSAIC, 1);
     SetBgAttribute(2, BG_ATTR_MOSAIC, 1);
-    // BG1 = foreground composite, BG2 = background composite (both 8BPP); BG3 retired.
+    SetBgAttribute(3, BG_ATTR_MOSAIC, 1);
+    // BG1 = foreground composite, BG2 = background composite, BG3 = reflective background (all 8BPP).
     gOverworldTilemapBuffer_Bg1 = AllocZeroed(BG_SCREEN_SIZE);
     gOverworldTilemapBuffer_Bg2 = AllocZeroed(BG_SCREEN_SIZE);
+    gOverworldTilemapBuffer_Bg3 = AllocZeroed(BG_SCREEN_SIZE);
     SetBgTilemapBuffer(1, gOverworldTilemapBuffer_Bg1);
     SetBgTilemapBuffer(2, gOverworldTilemapBuffer_Bg2);
+    SetBgTilemapBuffer(3, gOverworldTilemapBuffer_Bg3);
     FieldCompositorInit();
     InitStandardTextBoxWindows();
 }
@@ -1596,6 +1612,7 @@ void CleanupOverworldWindowsAndTilemaps(void)
     ClearMirageTowerPulseBlendEffect();
     FreeAllOverworldWindowBuffers();
     FieldCompositorFree();
+    TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg3);
     TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg2);
     TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg1);
 }
@@ -2381,7 +2398,7 @@ static void InitOverworldGraphicsRegisters(void)
     ShowBg(0);
     ShowBg(1);
     ShowBg(2);
-    HideBg(3);
+    ShowBg(3);
     InitFieldMessageBox();
 }
 

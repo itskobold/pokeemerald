@@ -40,6 +40,13 @@ void FieldCompositorLoadSecondaryTiles(const struct Tileset *tileset);
 // resolves to COMPOSITE_BLANK_SLOT. Increments the slot's refcount.
 u16 FieldCompositorAcquire(const u16 *entries, u32 count);
 
+// Like FieldCompositorAcquire, but after compositing the `draw` stack it punches holes: every pixel
+// where any `mask` entry is opaque is forced transparent in the result. Used for the BG2 background
+// composite of cells that have a reflection layer, so the reflective (BG3) surface shows through the
+// masked-out region. With maskCount 0 this is identical to FieldCompositorAcquire. An empty draw
+// stack resolves to COMPOSITE_BLANK_SLOT regardless of the mask.
+u16 FieldCompositorAcquireMasked(const u16 *draw, u32 drawCount, const u16 *mask, u32 maskCount);
+
 // Release a slot previously returned by FieldCompositorAcquire (no-op for the blank slot). The slot
 // isn't reusable until the next FieldCompositorReclaimFreedSlots (a one-frame hold; see below).
 void FieldCompositorRelease(u16 slot);

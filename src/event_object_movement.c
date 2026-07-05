@@ -138,7 +138,6 @@ static void GetGroundEffectFlags_Ripple(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_Seaweed(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *, u32 *);
 static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *);
-static u8 GetReflectionTypeByMetatileBehavior(u32);
 static void DoTracksGroundEffect_None(struct ObjectEvent *, struct Sprite *, u8);
 static void DoTracksGroundEffect_Footprints(struct ObjectEvent *, struct Sprite *, u8);
 static void DoTracksGroundEffect_BikeTireTracks(struct ObjectEvent *, struct Sprite *, u8);
@@ -9003,10 +9002,11 @@ static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *objEvent, u32 *
     }
 }
 
-#define RETURN_REFLECTION_TYPE_AT(x, y)              \
-    b = MapGridGetMetatileBehaviorAt(x, y);          \
-    result = GetReflectionTypeByMetatileBehavior(b); \
-    if (result != REFL_TYPE_NONE)                    \
+// Reflection type comes straight from the tile's reflection attribute (METATILE_REFLECTION_* ==
+// REFL_TYPE_*), not from any metatile behavior.
+#define RETURN_REFLECTION_TYPE_AT(x, y)          \
+    result = MapGridGetMetatileReflectionAt(x, y); \
+    if (result != REFL_TYPE_NONE)                \
         return result;
 
 static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *objEvent)
@@ -9017,7 +9017,7 @@ static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *objEvent)
     s16 width = (info->width + 8) >> 4;
     s16 height = (info->height + 8) >> 4;
     s16 i, j;
-    u8 result, b; // used by RETURN_REFLECTION_TYPE_AT
+    u8 result; // used by RETURN_REFLECTION_TYPE_AT
     s16 one = 1;
 
     for (i = 0; i < height; i++)
@@ -9037,16 +9037,6 @@ static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *objEvent)
 }
 
 #undef RETURN_REFLECTION_TYPE_AT
-
-static u8 GetReflectionTypeByMetatileBehavior(u32 behavior)
-{
-    if (MetatileBehavior_IsIce(behavior))
-        return REFL_TYPE_ICE;
-    else if (MetatileBehavior_IsReflective(behavior))
-        return REFL_TYPE_WATER;
-    else
-        return REFL_TYPE_NONE;
-}
 
 u8 GetLedgeJumpDirection(s16 x, s16 y, u8 direction)
 {

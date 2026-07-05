@@ -51,8 +51,11 @@
 struct CompositeSlot
 {
     // Normalized recipe: non-zero sub-tile entries, left-packed (entries[1] set implies entries[0]
-    // set). The layer count is therefore derivable (SlotCount), so it isn't stored.
+    // set). The layer count is therefore derivable (SlotCount), so it isn't stored. Draw entries are
+    // packed first, then any mask entries; maskBits flags which packed entries are masks (hole-punch,
+    // see ComposeSlot) rather than drawn. maskBits 0 is an ordinary all-draw recipe.
     u16 entries[COMPOSITE_MAX_LAYERS];
+    u8 maskBits;
     u16 refcount;
     u16 nextInBucket; // BUCKET_EMPTY-terminated singly linked list within its hash bucket
 };
@@ -163,6 +166,7 @@ static void ResetPool(void)
         u32 j;
         for (j = 0; j < COMPOSITE_MAX_LAYERS; j++)
             sPool[i].entries[j] = 0;
+        sPool[i].maskBits = 0;
         sPool[i].refcount = 0;
         sPool[i].nextInBucket = BUCKET_EMPTY;
     }
@@ -271,9 +275,12 @@ static void ComposeSlot(u16 slot)
     for (row = 0; row < TILE_SIZE_8BPP / 4; row++)
         ((u32 *)out)[row] = 0;
 
+    // Draw entries are packed before mask entries, so a single in-order pass composites all draws
+    // first, then lets the mask entries punch holes in the finished pixels.
     for (layer = 0; layer < SlotCount(s); layer++)
     {
         u16 e = s->entries[layer];
+        bool32 isMask = (s->maskBits >> layer) & 1;
         const u8 *src = GetSourceTilePtr(e & SUBTILE_ENTRY_TILE_MASK);
         u32 palBase = sBankOffset[(e >> SUBTILE_ENTRY_PAL_SHIFT) & 0xF];
         bool32 hflip = e & SUBTILE_ENTRY_HFLIP;
@@ -282,13 +289,22 @@ static void ComposeSlot(u16 slot)
         if (src == NULL)
             continue;
         // Each source byte is one 8BPP pixel. Specialise on hflip so the per-pixel flip branch
-        // leaves the inner loop; vflip just picks the source row.
+        // leaves the inner loop; vflip just picks the source row. A mask entry clears (holes) every
+        // pixel it covers instead of drawing it, so the layers below show through on the plane above.
         for (row = 0; row < 8; row++)
         {
             const u8 *srcRow = src + (vflip ? 7 - row : row) * 8;
             u8 *o = out + row * 8;
 
-            if (!hflip)
+            if (isMask)
+            {
+                for (b = 0; b < 8; b++)
+                {
+                    u8 pix = srcRow[hflip ? 7 - b : b];
+                    if (pix) o[b] = 0;
+                }
+            }
+            else if (!hflip)
             {
                 for (b = 0; b < 8; b++)
                 {
@@ -316,9 +332,9 @@ static void ComposeSlot(u16 slot)
     CpuFastCopy(out, (void *)(BG_VRAM + slot * TILE_SIZE_8BPP), TILE_SIZE_8BPP);
 }
 
-static u32 HashRecipe(const u16 *entries, u32 count)
+static u32 HashRecipe(const u16 *entries, u32 count, u8 maskBits)
 {
-    u32 h = count;
+    u32 h = count * 33 + maskBits;
     u32 i;
 
     for (i = 0; i < count; i++)
@@ -326,11 +342,11 @@ static u32 HashRecipe(const u16 *entries, u32 count)
     return h & (COMPOSITE_HASH_SIZE - 1);
 }
 
-static bool32 RecipeMatches(const struct CompositeSlot *s, const u16 *entries, u32 count)
+static bool32 RecipeMatches(const struct CompositeSlot *s, const u16 *entries, u32 count, u8 maskBits)
 {
     u32 i;
 
-    if (SlotCount(s) != count)
+    if (SlotCount(s) != count || s->maskBits != maskBits)
         return FALSE;
     for (i = 0; i < count; i++)
         if (s->entries[i] != entries[i])
@@ -338,27 +354,20 @@ static bool32 RecipeMatches(const struct CompositeSlot *s, const u16 *entries, u
     return TRUE;
 }
 
-u16 FieldCompositorAcquire(const u16 *entries, u32 count)
+// Find-or-create a slot for an already-normalized (left-packed, transparent entries dropped) recipe.
+static u16 AcquireNormalized(const u16 *norm, u32 n, u8 maskBits)
 {
-    u16 norm[COMPOSITE_MAX_LAYERS];
-    u32 n = 0;
     u32 bucket;
     u16 slot;
     u32 i;
 
-    // Drop transparent (tile id 0) entries; an empty stack is the shared blank tile.
-    for (i = 0; i < count; i++)
-    {
-        if ((entries[i] & SUBTILE_ENTRY_TILE_MASK) != 0 && n < COMPOSITE_MAX_LAYERS)
-            norm[n++] = entries[i];
-    }
     if (n == 0)
         return COMPOSITE_BLANK_SLOT;
 
-    bucket = HashRecipe(norm, n);
+    bucket = HashRecipe(norm, n, maskBits);
     for (slot = sHashHead[bucket]; slot != BUCKET_EMPTY; slot = sPool[slot].nextInBucket)
     {
-        if (RecipeMatches(&sPool[slot], norm, n))
+        if (RecipeMatches(&sPool[slot], norm, n, maskBits))
         {
             sPool[slot].refcount++;
             return slot;
@@ -379,11 +388,55 @@ u16 FieldCompositorAcquire(const u16 *entries, u32 count)
     // Left-pack the recipe and zero the unused layers so SlotCount reads back n.
     for (i = 0; i < COMPOSITE_MAX_LAYERS; i++)
         sPool[slot].entries[i] = (i < n) ? norm[i] : 0;
+    sPool[slot].maskBits = maskBits;
     sPool[slot].refcount = 1;
     sPool[slot].nextInBucket = sHashHead[bucket];
     sHashHead[bucket] = slot;
     ComposeSlot(slot);
     return slot;
+}
+
+u16 FieldCompositorAcquire(const u16 *entries, u32 count)
+{
+    u16 norm[COMPOSITE_MAX_LAYERS];
+    u32 n = 0;
+    u32 i;
+
+    // Drop transparent (tile id 0) entries; an empty stack is the shared blank tile.
+    for (i = 0; i < count; i++)
+    {
+        if ((entries[i] & SUBTILE_ENTRY_TILE_MASK) != 0 && n < COMPOSITE_MAX_LAYERS)
+            norm[n++] = entries[i];
+    }
+    return AcquireNormalized(norm, n, 0);
+}
+
+u16 FieldCompositorAcquireMasked(const u16 *draw, u32 drawCount, const u16 *mask, u32 maskCount)
+{
+    u16 norm[COMPOSITE_MAX_LAYERS];
+    u32 n = 0;
+    u8 maskBits = 0;
+    u32 i;
+
+    // Draws first (transparent ones dropped). No draw content -> blank cell, mask is irrelevant.
+    for (i = 0; i < drawCount; i++)
+    {
+        if ((draw[i] & SUBTILE_ENTRY_TILE_MASK) != 0 && n < COMPOSITE_MAX_LAYERS)
+            norm[n++] = draw[i];
+    }
+    if (n == 0)
+        return COMPOSITE_BLANK_SLOT;
+
+    // Mask entries fill the remaining slots (draw + mask never exceeds the 3 metatile layers).
+    for (i = 0; i < maskCount; i++)
+    {
+        if ((mask[i] & SUBTILE_ENTRY_TILE_MASK) != 0 && n < COMPOSITE_MAX_LAYERS)
+        {
+            maskBits |= (1u << n);
+            norm[n++] = mask[i];
+        }
+    }
+    return AcquireNormalized(norm, n, maskBits);
 }
 
 void FieldCompositorRelease(u16 slot)
@@ -399,7 +452,7 @@ void FieldCompositorRelease(u16 slot)
         return;
 
     // Refcount hit zero: unlink from its hash bucket and return the slot to the free list.
-    bucket = HashRecipe(sPool[slot].entries, SlotCount(&sPool[slot]));
+    bucket = HashRecipe(sPool[slot].entries, SlotCount(&sPool[slot]), sPool[slot].maskBits);
     prev = BUCKET_EMPTY;
     for (cur = sHashHead[bucket]; cur != BUCKET_EMPTY; cur = sPool[cur].nextInBucket)
     {
@@ -415,6 +468,7 @@ void FieldCompositorRelease(u16 slot)
     }
     for (i = 0; i < COMPOSITE_MAX_LAYERS; i++)
         sPool[slot].entries[i] = 0;
+    sPool[slot].maskBits = 0;
     ClearSlotDirty(slot);
     // Hold the slot until next frame (see sPendingFree) so its pixels survive one frame for the
     // still-displayed tilemap cell that referenced it before this redraw's VRAM copy lands.
