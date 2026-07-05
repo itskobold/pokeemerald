@@ -1152,6 +1152,40 @@ static u8 GetSurfBlob_HasPlayerOffset(struct Sprite *sprite)
     return (sprite->sBitfield & 0xF00) >> 8;
 }
 
+// Top 24px of the 32x32 blob: drops the bottom tile row (the 8px overhang below the surfer's feet).
+static const struct Subsprite sSurfBlobClippedSubsprites[] = {
+    { -16, -16, SPRITE_SHAPE(32x16), SPRITE_SIZE(32x16), 0, 2 },
+    { -16,   0, SPRITE_SHAPE(32x8),  SPRITE_SIZE(32x8),  8, 2 },
+};
+static const struct SubspriteTable sSurfBlobClippedSubspriteTable[] = {
+    { ARRAY_COUNT(sSurfBlobClippedSubsprites), sSurfBlobClippedSubsprites },
+};
+
+// On the cliff face's bottom row the blob's bottom overhang pokes THROUGH the wall onto the open
+// tile in front, where no promotion can cover it — clip it off. The side overhangs stay: past a
+// cliff's side edge they render as real pixels, matching the player sprite's own overhang (the
+// silhouette window mirrors these subsprites, so it keeps the same shape). Render coords track
+// the sprite's real tile mid-step, so the strip returns the moment the blob slides clear.
+static void UpdateSurfBlobClipping(struct Sprite *sprite, struct ObjectEvent *playerObj)
+{
+    s16 x, y;
+
+    GetObjectEventRenderCoords(playerObj, &x, &y);
+    if (playerObj->cliffLayer != CLIFF_LAYER_FRONT
+     && MapGridGetElevationAt(x, y) > playerObj->baseElevation
+     && MapGridGetElevationAt(x, y + 1) <= playerObj->baseElevation)
+    {
+        sprite->subspriteTables = sSurfBlobClippedSubspriteTable;
+        sprite->subspriteTableNum = 0;
+        sprite->subspriteMode = SUBSPRITES_IGNORE_PRIORITY; // keep the copied oam.priority
+    }
+    else
+    {
+        sprite->subspriteTables = NULL;
+        sprite->subspriteMode = SUBSPRITES_OFF;
+    }
+}
+
 void UpdateSurfBlobFieldEffect(struct Sprite *sprite)
 {
     struct ObjectEvent *playerObj = &gObjectEvents[sprite->sPlayerObjId];
@@ -1159,7 +1193,13 @@ void UpdateSurfBlobFieldEffect(struct Sprite *sprite)
     SynchronizeSurfAnim(playerObj, sprite);
     SynchronizeSurfPosition(playerObj, sprite);
     UpdateBobbingEffect(playerObj, playerSprite, sprite);
+    UpdateSurfBlobClipping(sprite, playerObj);
     sprite->oam.priority = playerSprite->oam.priority;
+    // Follow the player out of the FRONT band (behind a cliff / drawn on top), tucked just behind them.
+    if (GetObjectEventRenderBand(playerObj) == RENDER_BAND_FRONT)
+        sprite->subpriority = OBJ_SUBPRIORITY_SHADOW + 1;
+    else
+        sprite->subpriority = playerSprite->subpriority + 1;
     // Cull off-screen like the player sprite and every other object-anchored field effect; without this
     // the blob keeps drawing while the player is parked off-screen (freecam roaming across map seams),
     // looking like it respawns on each map the camera visits.

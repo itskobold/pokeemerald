@@ -5603,6 +5603,17 @@ u8 GetSidewaysStairsCollision(struct ObjectEvent *objectEvent, u8 dir, u8 curren
     return collision;
 }
 
+// True when a step to (x, y) stays on the cliff plane: already behind the cliff, or the upward
+// non-stairs step that climbs behind it (see UpdateObjectEventBehindCliff). Front-terrain metatile
+// semantics don't apply there — the object keeps the behavior of the tile it left.
+bool32 ObjectEventStepIsOnCliffPlane(struct ObjectEvent *objectEvent, s16 x, s16 y)
+{
+    if (objectEvent->cliffLayer != CLIFF_LAYER_FRONT)
+        return TRUE;
+    return !MetatileBehavior_IsElevationChange(MapGridGetMetatileBehaviorAt(x, y))
+        && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
+}
+
 static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 direction)
 {
     u8 nextBehavior = MapGridGetMetatileBehaviorAt(x, y);
@@ -5614,11 +5625,8 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // On a stairs tile, stepping off it down to the lower neighbour is a legitimate descent, not an
     // elevation mismatch.
     bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
-    // Ignore front-terrain metatile collisions when already behind the cliff, or on the upward
-    // non-stairs step that climbs behind it (lets the cliff's first tile be entered). See
-    // UpdateObjectEventBehindCliff.
-    bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
-     || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
+    // Ignore front-terrain metatile collisions on the cliff plane (lets the cliff's first tile be entered).
+    bool32 cliffFree = ObjectEventStepIsOnCliffPlane(objectEvent, x, y);
     // Cliff collision (bit 6) walls off tiles up on the cliff plane (above the object's committed level).
     // Applies in front too, so the climb-entry step onto a wall tile is blocked BEFORE it commits rather
     // than after (no one-tile overstep). The elevation check keeps same-level walking and the descent
@@ -8654,6 +8662,7 @@ static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct S
 
 #define sSilhouetteObjEventId data[0]
 #define sSilhouetteLocalId    data[1]
+#define sSilhouetteSurfBlob   data[2]
 
 // Companion sprite for an OBSCURED object while silhouettes are up: an object-window copy of the
 // main sprite, carving the cloud overlay's window in the object's exact shape so the buried body
@@ -8663,22 +8672,28 @@ static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct S
 // stay visible as real pixels instead of reading as silhouette on open ground. Mirrors the main
 // sprite every frame (reflection-style) and frees itself when the object surfaces, despawns or the
 // silhouettes fade out. Freed via inUse (not DestroySprite) since the tiles belong to the main sprite.
+// With sSilhouetteSurfBlob set it mirrors the buried surfer's blob instead.
 static void SpriteCB_CliffSilhouette(struct Sprite *sprite)
 {
     struct ObjectEvent *objectEvent = &gObjectEvents[sprite->sSilhouetteObjEventId];
-    struct Sprite *mainSprite = &gSprites[objectEvent->spriteId];
+    struct Sprite *mainSprite;
 
     if (!objectEvent->active || objectEvent->localId != sprite->sSilhouetteLocalId
-     || objectEvent->cliffLayer != CLIFF_LAYER_OBSCURED || !ShouldDrawCliffSilhouettes())
+     || objectEvent->cliffLayer != CLIFF_LAYER_OBSCURED || !ShouldDrawCliffSilhouettes()
+     || (sprite->sSilhouetteSurfBlob && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))))
     {
         sprite->inUse = FALSE;
         return;
     }
 
+    mainSprite = sprite->sSilhouetteSurfBlob ? &gSprites[objectEvent->fieldEffectSpriteId]
+                                             : &gSprites[objectEvent->spriteId];
+
     sprite->oam.shape = mainSprite->oam.shape;
     sprite->oam.size = mainSprite->oam.size;
     sprite->oam.tileNum = mainSprite->oam.tileNum;
     sprite->oam.paletteNum = mainSprite->oam.paletteNum;
+    sprite->oam.matrixNum = mainSprite->oam.matrixNum; // flip bits: east frames are mirrored west frames
     sprite->x = mainSprite->x;
     sprite->y = mainSprite->y;
     sprite->x2 = mainSprite->x2;
@@ -8687,9 +8702,17 @@ static void SpriteCB_CliffSilhouette(struct Sprite *sprite)
     sprite->centerToCornerVecY = mainSprite->centerToCornerVecY;
     sprite->coordOffsetEnabled = mainSprite->coordOffsetEnabled;
     sprite->invisible = mainSprite->invisible;
+    // The blob's overhang clipping (see UpdateSurfBlobClipping) must shape the window too, or the
+    // silhouette pokes past the wall where the real pixels were clipped off.
+    if (sprite->sSilhouetteSurfBlob)
+    {
+        sprite->subspriteTables = mainSprite->subspriteTables;
+        sprite->subspriteTableNum = mainSprite->subspriteTableNum;
+        sprite->subspriteMode = mainSprite->subspriteMode;
+    }
 }
 
-static void EnsureCliffSilhouetteSprite(struct ObjectEvent *objectEvent, struct Sprite *mainSprite)
+static void EnsureCliffSilhouetteSprite(struct ObjectEvent *objectEvent, struct Sprite *mainSprite, bool32 surfBlob)
 {
     u8 objectEventId = objectEvent - gObjectEvents;
     struct Sprite *sprite;
@@ -8699,7 +8722,8 @@ static void EnsureCliffSilhouetteSprite(struct ObjectEvent *objectEvent, struct 
     for (i = 0; i < MAX_SPRITES; i++)
     {
         if (gSprites[i].inUse && gSprites[i].callback == SpriteCB_CliffSilhouette
-         && gSprites[i].sSilhouetteObjEventId == objectEventId)
+         && gSprites[i].sSilhouetteObjEventId == objectEventId
+         && gSprites[i].sSilhouetteSurfBlob == surfBlob)
             return;
     }
 
@@ -8720,10 +8744,12 @@ static void EnsureCliffSilhouetteSprite(struct ObjectEvent *objectEvent, struct 
     sprite->subspriteMode = SUBSPRITES_OFF;
     sprite->sSilhouetteObjEventId = objectEventId;
     sprite->sSilhouetteLocalId = objectEvent->localId;
+    sprite->sSilhouetteSurfBlob = surfBlob;
 }
 
 #undef sSilhouetteObjEventId
 #undef sSilhouetteLocalId
+#undef sSilhouetteSurfBlob
 
 static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
@@ -8742,7 +8768,12 @@ static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, s
         // buried too and the clouds have fully faded, a companion object-window sprite additionally
         // paints the buried shape as a flat dark silhouette alongside those real pixels.
         if (ShouldDrawCliffSilhouettes())
-            EnsureCliffSilhouetteSprite(objectEvent, sprite);
+        {
+            EnsureCliffSilhouetteSprite(objectEvent, sprite, FALSE);
+            // The surfer's blob is buried with them, so silhouette it too.
+            if (objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))
+                EnsureCliffSilhouetteSprite(objectEvent, &gSprites[objectEvent->fieldEffectSpriteId], TRUE);
+        }
     }
 }
 
@@ -9141,22 +9172,21 @@ static bool32 ObjectEventIsInFrontOfPromotionAt(struct ObjectEvent *objEvent, s1
 // priority 2). Compute the bitmask of the sprite's 16px tile-rows that overlap such a tile; the
 // caller switches those rows to the priority-1 split tables so they draw OVER the promotion while
 // the rest render normally. Rows over the object's OWN cliff (tiles above its base) stay down and
-// remain correctly hidden. Checks the tile being left and entered so a mid-step sprite is covered
-// across its whole span. Returns 0 (and *splitTables = NULL) for unsupported sprite sizes.
+// remain correctly hidden. Only the CENTER column is checked: a raise is full-row-width, and a
+// wide sprite's side overhang overlapping a promoted wall BESIDE it must hide behind it, not lift
+// the row over it (the partially-behind look, see PromoteSurfBlobOverhang). Checks the tile being
+// left and entered so a mid-step sprite is covered across its whole span. Returns 0 (and
+// *splitTables = NULL) for unsupported sprite sizes.
 static u8 GetObjectEventCliffSplitMask(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *gfx,
                                        const struct SubspriteTable **splitTables)
 {
-    s16 half, colStart, colEnd, rows, r, c, pass;
+    s16 rows, r, pass;
     u8 mask = 0;
 
     if (gfx->width == 16 && gfx->height == 16)      { *splitTables = sFrontSplitTables_16x16; rows = 1; }
     else if (gfx->width == 16 && gfx->height == 32) { *splitTables = sFrontSplitTables_16x32; rows = 2; }
     else if (gfx->width == 32 && gfx->height == 32) { *splitTables = sFrontSplitTables_32x32; rows = 2; }
     else { *splitTables = NULL; return 0; }
-
-    half = gfx->width / 2;
-    colStart = (8 - half) >> 4;
-    colEnd = (8 + half - 1) >> 4;
 
     for (r = 0; r < rows; r++)
     {
@@ -9165,8 +9195,8 @@ static u8 GetObjectEventCliffSplitMask(struct ObjectEvent *objEvent, const struc
             s16 fx = pass ? objEvent->previousCoords.x : objEvent->currentCoords.x;
             s16 fy = pass ? objEvent->previousCoords.y : objEvent->currentCoords.y;
             s16 ty = fy - (rows - 1) + r;
-            for (c = colStart; c <= colEnd; c++)
-                if (ObjectEventIsInFrontOfPromotionAt(objEvent, fx + c, ty)) { mask |= (1 << r); break; }
+            if (ObjectEventIsInFrontOfPromotionAt(objEvent, fx, ty))
+                mask |= (1 << r);
         }
     }
     return mask;

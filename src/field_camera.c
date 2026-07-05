@@ -546,6 +546,34 @@ static void PromoteSpriteFootprint(struct ObjectEvent *objEvent, const struct Ob
                 AddCliffPromotedTile(cx + c, cy - r);
 }
 
+// The surf unit (blob + 32-wide surfer) overhangs the surfer's tile by 8px south and to both
+// sides. Promote overlapped neighbouring cliff tiles even while the surfer is FRONT, so the
+// overhang hides behind them — surfing alongside a wall reads as partially behind it.
+// South row: any tile off the surfer's level (face in front while hiding, or the face below at a
+// top edge). Side columns: only when the FEET-row side tile rises above the level — then the whole
+// wall column beside the surfer promotes. Gating on the feet row keeps a NORTH wall's diagonals
+// unpromoted: a surfer south of a wall is in front of it, and their whole head row must stay
+// drawn over it (promoting a diagonal would clip the head's side pixels while its center shows).
+static void PromoteSurfBlobOverhang(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *graphicsInfo, s16 cx, s16 cy)
+{
+    s16 half = graphicsInfo->width / 2;
+    s16 colStart = (8 - half) >> 4;
+    s16 colEnd = (8 + half - 1) >> 4;
+    s16 rows = (graphicsInfo->height + 15) / 16;
+    s16 c, r;
+
+    for (c = colStart; c <= colEnd; c++)
+    {
+        if (MapGridGetElevationAt(cx + c, cy + 1) != objEvent->baseElevation)
+            AddCliffPromotedTile(cx + c, cy + 1);
+        if (c == 0 || MapGridGetElevationAt(cx + c, cy) <= objEvent->baseElevation)
+            continue;
+        for (r = 0; r < rows; r++)
+            if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->baseElevation)
+                AddCliffPromotedTile(cx + c, cy - r);
+    }
+}
+
 // Rebuild the cliff-promoted tile set from current object positions and redraw any tile that
 // entered or left it (its foreground recipe changed). Called once per frame from the overworld.
 void UpdateCliffFacePromotion(void)
@@ -563,18 +591,29 @@ void UpdateCliffFacePromotion(void)
         struct ObjectEvent *objEvent = &gObjectEvents[i];
         const struct ObjectEventGraphicsInfo *graphicsInfo;
 
+        if (!objEvent->active || objEvent->drawAtHighestElevation)
+            continue;
+
+        graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+
         // Occlusion is gated on the foot-based cliff state, not per-tile elevation: only an object whose
         // feet are behind the cliff (BEHIND/OBSCURED) is promoted. This stops a FRONT object's head from
         // flipping "behind" just because the tile north of it is higher terrain it stands in front of.
-        if (!objEvent->active || objEvent->drawAtHighestElevation || objEvent->cliffLayer == CLIFF_LAYER_FRONT)
-            continue;
-
         // Cover the sprite's whole footprint at the tile it is leaving and the tile it is entering, so a
         // mid-step sprite straddling both is occluded across its full span (and its destination is set up
         // before it arrives). The two footprints coincide when not stepping; AddCliffPromotedTile dedups.
-        graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
-        PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
-        PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
+        if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
+        {
+            PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
+            PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
+        }
+
+        // The surf unit's overhang needs covering in FRONT too (top edges, walls alongside).
+        if (objEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))
+        {
+            PromoteSurfBlobOverhang(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
+            PromoteSurfBlobOverhang(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
+        }
     }
 
     // Redraw tiles whose promotion state flipped. Off-screen tiles are skipped by

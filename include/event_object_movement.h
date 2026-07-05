@@ -228,6 +228,7 @@ u8 GetJumpMovementAction(u32);
 void ObjectEventUpdateElevation(struct ObjectEvent *objEvent);
 void UpdateObjectEventsRender(void);
 u8 GetObjectEventRenderBand(const struct ObjectEvent *objEvent);
+bool32 ObjectEventStepIsOnCliffPlane(struct ObjectEvent *objectEvent, s16 x, s16 y);
 void SetSpriteRenderBand(struct Sprite *sprite, u8 band, u8 subpriorityOffset);
 void UnfreezeObjectEvent(struct ObjectEvent *objectEvent);
 u8 FindLockedObjectEventIndex(struct ObjectEvent *objectEvent);

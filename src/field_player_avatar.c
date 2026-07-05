@@ -840,8 +840,10 @@ static u8 CheckForObjectEventStaticCollision(struct ObjectEvent *objectEvent, s1
 
 static bool8 CanStopSurfing(s16 x, s16 y, u8 direction)
 {
-    // Dismount when surfing onto unoccupied land (any tile that isn't surfable water).
+    // Dismount when surfing onto unoccupied land (any tile that isn't surfable water). Never on the
+    // cliff plane: there the tile keeps the behavior of the water the player surfed in on.
     if ((gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
+     && !ObjectEventStepIsOnCliffPlane(&gObjectEvents[gPlayerAvatar.objectEventId], x, y)
      && !MetatileBehavior_IsSurfableWaterOrUnderwater(MapGridGetMetatileBehaviorAt(x, y))
      && GetObjectEventIdByPosition(x, y, ELEVATION_MATCH_ANY) == OBJECT_EVENTS_COUNT)
     {

@@ -45,6 +45,7 @@ static void TilesetAnim_MauvilleGym(u16);
 static void TilesetAnim_BikeShop(u16);
 static void TilesetAnim_BattlePyramid(u16);
 static void TilesetAnim_BattleDome(u16);
+static void QueueAnimTiles_Terrain_Water(u16);
 static void QueueAnimTiles_General_Flower(u16);
 static void QueueAnimTiles_General_Water(u16);
 static void QueueAnimTiles_General_SandWaterEdge(u16);
@@ -75,6 +76,26 @@ static void QueueAnimTiles_MauvilleGym_ElectricGates(u16);
 static void QueueAnimTiles_SootopolisGym_Waterfalls(u16);
 static void QueueAnimTiles_EliteFour_GroundLights(u16);
 static void QueueAnimTiles_EliteFour_WallLights(u16);
+
+const u16 gTilesetAnims_Terrain_Water_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/7.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water[] = {
+    gTilesetAnims_Terrain_Water_Frame0,
+    gTilesetAnims_Terrain_Water_Frame1,
+    gTilesetAnims_Terrain_Water_Frame2,
+    gTilesetAnims_Terrain_Water_Frame3,
+    gTilesetAnims_Terrain_Water_Frame4,
+    gTilesetAnims_Terrain_Water_Frame5,
+    gTilesetAnims_Terrain_Water_Frame6,
+    gTilesetAnims_Terrain_Water_Frame7
+};
 
 const u16 gTilesetAnims_General_Flower_Frame1[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/1.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_General_Flower_Frame0[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/0.png", ".8bpp", "-palette_mod 16");
@@ -675,7 +696,14 @@ static void TilesetAnim_General(u16 timer)
 
 static void TilesetAnim_Terrain(u16 timer)
 {
-    // TODO
+    if (timer % 16 == 1)
+        QueueAnimTiles_Terrain_Water(timer / 16);
+}
+
+static void QueueAnimTiles_Terrain_Water(u16 timer)
+{
+    u8 i = timer % ARRAY_COUNT(gTilesetAnims_Terrain_Water);
+    AppendTilesetAnimToBuffer(gTilesetAnims_Terrain_Water[i], (u16 *)(BG_VRAM + TILE_OFFSET_4BPP(0x170)), 4 * TILE_SIZE_4BPP);
 }
 
 static void TilesetAnim_Building(u16 timer)
