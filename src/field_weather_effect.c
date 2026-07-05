@@ -223,6 +223,24 @@ static s16 WeatherParallaxY(void)
     return gSpriteCoordOffsetY * WEATHER_PARALLAX_NUM / WEATHER_PARALLAX_DEN;
 }
 
+// The clouds get their own, much stronger parallax and - unlike the generic weather sprites - they track the
+// SAME direction as the world (an in-world sprite's screen pos is +gSpriteCoordOffset, see sprite.c). The
+// clouds sit at CLOUD_PARALLAX_NUM/DEN of the ground's motion, so they clearly lag the terrain as it scrolls
+// (a real depth cue) instead of the old 1/32 that read as glued to the screen. Tune the fraction for cloud
+// "height": smaller = higher/farther (moves less), larger = lower/closer (moves more with the ground).
+#define CLOUD_PARALLAX_NUM  1
+#define CLOUD_PARALLAX_DEN  2
+
+static s16 CloudParallaxX(void)
+{
+    return gSpriteCoordOffsetX * CLOUD_PARALLAX_NUM / CLOUD_PARALLAX_DEN;
+}
+
+static s16 CloudParallaxY(void)
+{
+    return gSpriteCoordOffsetY * CLOUD_PARALLAX_NUM / CLOUD_PARALLAX_DEN;
+}
+
 //------------------------------------------------------------------------------
 // Weather blend controls
 //------------------------------------------------------------------------------
@@ -1747,11 +1765,11 @@ static void UpdateAshSprite(struct Sprite *sprite)
 // column keeps the right edge covered.
 #define CLOUD_LEFT_BUFFER   1   // px of extra coverage past the left screen edge
 // Wind drift: per frame we accumulate speed * gSineTable[heading] (Q8) into a sub-pixel accumulator and
-// emit one pixel of scroll per CLOUD_WIND_SUBPX_PER_PX. Kept at the sandstorm's per-level scale: the sand
-// drifts (speed * gust * dir) >> SANDSTORM_WIND_SHIFT(=12) px/frame, i.e. (speed * dir) >> 12 at unit gust,
-// so emitting 1px per 1<<12 accumulated units shares that scale (1<<SANDSTORM_WIND_SHIFT). Clouds then run
-// CLOUD_WIND_SPEED_BONUS levels faster than the sand so they read as a higher, quicker layer.
-#define CLOUD_WIND_SUBPX_PER_PX  4096
+// emit one pixel of scroll per CLOUD_WIND_SUBPX_PER_PX. The sand drifts (speed * gust * dir) >>
+// SANDSTORM_WIND_SHIFT(=12) px/frame; emitting 1px per 2<<12 units puts the cloud drift at half the sand's
+// per-level rate (halved wind speed - clouds were reading far too fast). Clouds still run
+// CLOUD_WIND_SPEED_BONUS levels faster than the sand so they read as a higher layer, now at a calmer pace.
+#define CLOUD_WIND_SUBPX_PER_PX  8192   // 2<<12: half the per-level drift rate (halved wind speed)
 #define CLOUD_WIND_SPEED_BONUS   5   // clouds drift 5 effective wind levels faster than the sandstorm sprites
 
 // Subtle wobble layered on top of the drift to keep the field from looking frozen. Two pieces, both
@@ -1760,7 +1778,7 @@ static void UpdateAshSprite(struct Sprite *sprite)
 // seamless). RIPPLE is a horizontal shimmer whose phase tracks screen-Y, so horizontal neighbours share
 // an offset (seam stays shut) while vertical neighbours differ only ~0.1px at this wavelength - reads as
 // a watery ripple over the fuzzy clouds. Amplitudes are small to keep seams invisible.
-#define CLOUD_SWAY_AMP      4   // px, whole-field circular sway (halved phase rate => ~8.5s/cycle)
+#define CLOUD_SWAY_AMP      4   // px, whole-field circular sway (phase >> 2 => ~17s/cycle, halved with the wind)
 #define CLOUD_RIPPLE_AMP    3   // px, horizontal ripple displacement
 #define CLOUD_RIPPLE_SHIFT  4   // screen-Y -> phase shift; larger = longer vertical wavelength
 
@@ -2101,8 +2119,8 @@ static void UpdateCloudsMovement(void)
     // Integrate the ripple band phases from the wind unit velocity so their travel aims along the wind.
     // Accumulating per frame (rather than multiplying the free-running phase by the heading) keeps the
     // ripple smooth when the direction changes - only the increment shifts, not the whole stored phase.
-    gWeatherPtr->cloudsRipplePhaseX += dirY; // x2 band travels vertically (south component)
-    gWeatherPtr->cloudsRipplePhaseY += dirX; // y2 band travels horizontally (east component)
+    gWeatherPtr->cloudsRipplePhaseX += dirY / 2; // x2 band travels vertically (south); halved with the wind
+    gWeatherPtr->cloudsRipplePhaseY += dirX / 2; // y2 band travels horizontally (east); halved with the wind
     StepCloudOffset(&gWeatherPtr->cloudsXOffset, &gWeatherPtr->cloudsScrollXAccum);
     StepCloudOffset(&gWeatherPtr->cloudsYOffset, &gWeatherPtr->cloudsScrollYAccum);
 
@@ -2552,9 +2570,10 @@ static void DestroyCloudsSprites(void)
 // seamless, scrolling cloud field.
 static void UpdateCloudsSprite(struct Sprite *sprite)
 {
-    // Track the camera at WEATHER_PARALLAX speed so the clouds parallax against the world.
-    s32 baseX = -WeatherParallaxX() - gWeatherPtr->cloudsXOffset;
-    s32 baseY = -WeatherParallaxY() + gWeatherPtr->cloudsYOffset;
+    // Track the camera at CLOUD_PARALLAX speed (same direction as the world, slower) so the clouds parallax
+    // convincingly against the terrain. The wind drift (cloudsX/YOffset) rides on top, independent of camera.
+    s32 baseX = CloudParallaxX() - gWeatherPtr->cloudsXOffset;
+    s32 baseY = CloudParallaxY() + gWeatherPtr->cloudsYOffset;
     s32 col = sprite->tSpriteColumn;
     s32 row = sprite->tSpriteRow;
     // Tile top-left, aligned to the scroll phase so each sprite shows exactly
@@ -2588,8 +2607,8 @@ static void UpdateCloudsSprite(struct Sprite *sprite)
         s32 phase = gWeatherPtr->cloudsWavePhase;
         s32 rippleXPhase = gWeatherPtr->cloudsRipplePhaseX >> 8;
         s32 rippleYPhase = gWeatherPtr->cloudsRipplePhaseY >> 8;
-        s16 swayX = (gSineTable[(phase >> 1) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
-        s16 swayY = (gSineTable[((phase >> 1) + 64) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
+        s16 swayX = (gSineTable[(phase >> 2) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
+        s16 swayY = (gSineTable[((phase >> 2) + 64) & 0xFF] * CLOUD_SWAY_AMP) >> 8;
         s16 rippleX = (gSineTable[((sprite->y >> CLOUD_RIPPLE_SHIFT) - rippleXPhase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
         s16 rippleY = (gSineTable[((sprite->x >> CLOUD_RIPPLE_SHIFT) - rippleYPhase) & 0xFF] * CLOUD_RIPPLE_AMP) >> 8;
         sprite->x2 = swayX + rippleX;
