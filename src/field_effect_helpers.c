@@ -1145,7 +1145,8 @@ u32 FldEff_SurfBlob(void)
     {
         struct Sprite *sprite = &gSprites[spriteId];
         sprite->coordOffsetEnabled = TRUE;
-        sprite->oam.paletteNum = 0;
+        // The blob shares the player's overworld palette; under DOWP that lives in a dynamic slot.
+        sprite->oam.paletteNum = gSprites[gObjectEvents[gFieldEffectArguments[2]].spriteId].oam.paletteNum;
         sprite->sPlayerObjId = gFieldEffectArguments[2];
         sprite->sVelocity = -1;
         sprite->sPrevX = -1;
@@ -1230,6 +1231,8 @@ void UpdateSurfBlobFieldEffect(struct Sprite *sprite)
     SynchronizeSurfPosition(playerObj, sprite);
     UpdateBobbingEffect(playerObj, playerSprite, sprite);
     UpdateSurfBlobClipping(sprite, playerObj);
+    // Keep mirroring the player's palette in case DOWP re-allocated it (graphics change).
+    sprite->oam.paletteNum = playerSprite->oam.paletteNum;
     sprite->oam.priority = playerSprite->oam.priority;
     // Follow the player out of the FRONT band (behind a cliff / drawn on top), tucked just behind them.
     if (GetObjectEventRenderBand(playerObj) == RENDER_BAND_FRONT)
