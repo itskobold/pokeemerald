@@ -85,6 +85,10 @@ const u16 gTilesetAnims_Terrain_Water_Frame4[] = INCGFX_U16("data/tilesets/prima
 const u16 gTilesetAnims_Terrain_Water_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/5.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/6.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water/11.png", ".8bpp", "-palette_mod 16");
 
 const u16 *const gTilesetAnims_Terrain_Water[] = {
     gTilesetAnims_Terrain_Water_Frame0,
@@ -94,7 +98,11 @@ const u16 *const gTilesetAnims_Terrain_Water[] = {
     gTilesetAnims_Terrain_Water_Frame4,
     gTilesetAnims_Terrain_Water_Frame5,
     gTilesetAnims_Terrain_Water_Frame6,
-    gTilesetAnims_Terrain_Water_Frame7
+    gTilesetAnims_Terrain_Water_Frame7,
+    gTilesetAnims_Terrain_Water_Frame8,
+    gTilesetAnims_Terrain_Water_Frame9,
+    gTilesetAnims_Terrain_Water_Frame10,
+    gTilesetAnims_Terrain_Water_Frame11
 };
 
 const u16 gTilesetAnims_General_Flower_Frame1[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/1.png", ".8bpp", "-palette_mod 16");
