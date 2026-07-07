@@ -94,6 +94,8 @@ struct FrameBank
     u8 maskBits;
     u8 period;      // distinct frames in the animation = lcm of the recipe's phased groups' frame counts
     u16 builtMask;  // bit m set once frame m has been flattened into the bank (frames build lazily, see below)
+    u16 rebuildMask; // bit m set when frame m's source changed and needs re-flattening, but its old content
+                     // stays displayable until BankBuildTick replaces it (the live wave-set swap path)
     u16 refcount;   // live slots (across all bands) using this bank; 0 = free for reuse
 };
 
@@ -261,6 +263,7 @@ static void ResetPool(void)
     {
         sBanks[i].refcount = 0;
         sBanks[i].builtMask = 0;
+        sBanks[i].rebuildMask = 0;
     }
     sBankPoolFull = FALSE;
     for (i = 0; i < ARRAY_COUNT(sDirtyBits); i++)
@@ -569,14 +572,22 @@ static void BankBuildTick(void)
     for (i = 0; i < sBankCount && budget != 0; i++)
     {
         struct FrameBank *bk = &sBanks[i];
+        u16 need;
 
-        if (bk->refcount == 0 || bk->builtMask == (u16)((1u << bk->period) - 1))
-            continue; // free, or fully built
+        if (bk->refcount == 0)
+            continue;
+        // Frames to (re)flatten: never-built ones, plus any whose source changed under a live swap. A
+        // rebuild frame keeps showing its old content (a valid copy) until replaced here, so a wave-set
+        // swap never storms live flattens - the whole surface just refreshes over the next few frames.
+        need = (~bk->builtMask | bk->rebuildMask) & (u16)((1u << bk->period) - 1);
+        if (need == 0)
+            continue;
         for (m = 0; m < bk->period && budget != 0; m++)
         {
-            if (!(bk->builtMask & (1u << m)))
+            if (need & (1u << m))
             {
-                BuildBankFrame(bk, i, m);
+                BuildBankFrame(bk, i, m); // sets builtMask bit m
+                bk->rebuildMask &= ~(1u << m);
                 budget--;
             }
         }
@@ -669,6 +680,7 @@ static u8 ResolveBank(const u16 *entries, u32 n, u8 maskBits)
     sBanks[freeBank].maskBits = maskBits;
     sBanks[freeBank].period = period;
     sBanks[freeBank].builtMask = 0; // frames build lazily
+    sBanks[freeBank].rebuildMask = 0;
     sBanks[freeBank].refcount = 1;
     return freeBank;
 }
@@ -971,7 +983,14 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
 // waves overlay on the 12-frame water) can exceed the frames a bank holds. Writing that back would make
 // ComposeSlot/BankBuildTick index past the bank's tile region and corrupt VRAM/heap, so cap the period to
 // what a bank can store (a capped cell re-syncs its overlay a touch early - imperceptible next to the
-// dominant water motion) and clear builtMask so the frames rebuild from the new array.
+// dominant water motion).
+//
+// The old code cleared builtMask (invalidating even the frame on screen) and dirtied every slot, so the
+// same frame's step tick recomposed the whole visible surface with live flattens - the swap spike. Instead
+// we keep the built frames displayable and just set rebuildMask: BankBuildTick re-flattens them from the
+// new array a few per frame, replacing each in place, and the on-screen slots pick up the new content as
+// cheap bank copies on their next step tick. Nothing flattens live and no slot is dirtied, so the swap
+// costs only bounded background work and never spikes.
 void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16, s16))
 {
     u16 lastTileId = firstTileId + tileCount - 1;
@@ -995,13 +1014,13 @@ void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, 
                 if (period > COMPOSITE_BANK_FRAMES)
                     period = COMPOSITE_BANK_FRAMES;
                 bk->period = period;
-                bk->builtMask = 0;
+                // Re-flatten every frame from the new source, but lazily: keep the current content on
+                // screen until BankBuildTick replaces each frame, so no live-flatten storm this frame.
+                bk->rebuildMask = (u16)((1u << period) - 1);
                 break;
             }
         }
     }
-    // Mark every live slot in the range dirty; TickAnim recomposes them over the next frames (no spike).
-    RecomposeSourceRange(firstTileId, lastTileId, TRUE);
 }
 
 // Drop all phased groups. Called before a primary tileset re-registers its own (phased groups live in
