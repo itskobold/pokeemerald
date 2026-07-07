@@ -540,8 +540,11 @@ static void InitMapView(void)
     ResetFieldCamera();
     CopyMapTilesetsToVram(gMapHeader.mapLayout);
     LoadMapTilesetPalettes(gMapHeader.mapLayout);
-    DrawWholeMapView();
+    // Register tileset animations (incl. phased-water groups) BEFORE drawing, so DrawWholeMapView
+    // composites water at its per-position phase. Drawing first would bake the whole screen at phase 0
+    // (unison) until movement re-acquired cells - the "phasing lost on menu close" bug.
     InitTilesetAnimations();
+    DrawWholeMapView();
 }
 
 const struct MapLayout *GetMapLayout(void)
@@ -2128,11 +2131,13 @@ static bool32 LoadMapInStepsLink(u8 *state)
         }
         break;
     case 9:
-        DrawWholeMapView();
+        // Register animations (incl. phased-water groups) before the draw so water composites at its
+        // per-position phase immediately (see InitMapView).
+        InitTilesetAnimations();
         (*state)++;
         break;
     case 10:
-        InitTilesetAnimations();
+        DrawWholeMapView();
         (*state)++;
         break;
     case 11:
@@ -2205,11 +2210,13 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
         }
         break;
     case 9:
-        DrawWholeMapView();
+        // Register animations (incl. phased-water groups) before the draw so water composites at its
+        // per-position phase immediately (see InitMapView).
+        InitTilesetAnimations();
         (*state)++;
         break;
     case 10:
-        InitTilesetAnimations();
+        DrawWholeMapView();
         (*state)++;
         break;
     case 11:
@@ -2306,11 +2313,13 @@ static bool32 ReturnToFieldLink(u8 *state)
         }
         break;
     case 8:
-        DrawWholeMapView();
+        // Register animations (incl. phased-water groups) before the draw so water composites at its
+        // per-position phase immediately (see InitMapView).
+        InitTilesetAnimations();
         (*state)++;
         break;
     case 9:
-        InitTilesetAnimations();
+        DrawWholeMapView();
         (*state)++;
         break;
     case 11:

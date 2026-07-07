@@ -43,7 +43,7 @@ static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
 static void DrawMetatileAtWithId(const struct MapLayout *, u16, int, int, u16 metatileId);
-static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32, const u16 *, u32);
+static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32, const u16 *, u32, s16, s16);
 static bool32 IsCliffPromotedCell(int, int);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
@@ -166,6 +166,7 @@ void FieldUpdateBgTilemapScroll(void)
     SetGpuReg(REG_OFFSET_BG3HOFS, r5);
     SetGpuReg(REG_OFFSET_BG3VOFS, r4);
 }
+
 
 void GetCameraOffsetWithPan(s16 *x, s16 *y)
 {
@@ -342,7 +343,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
         {
             u16 bg = tiles[p];
             u16 fg = tiles[4 + p];
-            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1, NULL, 0);
+            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1, NULL, 0, x, y);
         }
     }
 }
@@ -438,7 +439,7 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
             else
                 bg[bgCount++] = layers[l];
         }
-        DrawCompositeCell(offset + sSubTileCellOffsets[p], bg, bgCount, fg, fgCount, refl, reflCount);
+        DrawCompositeCell(offset + sSubTileCellOffsets[p], bg, bgCount, fg, fgCount, refl, reflCount, x, y);
     }
 }
 
@@ -450,14 +451,14 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
 //   BG3 (refl) = reflection entries (the reflective surface, drawn behind the reflection sprites)
 // The reflection entries drive both BG3 (drawn) and the BG2 mask, so the surface shows through the
 // hole it cuts in the background plane.
-static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount, const u16 *reflEntries, u32 reflCount)
+static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount, const u16 *reflEntries, u32 reflCount, s16 x, s16 y)
 {
     u16 oldFg = gOverworldTilemapBuffer_Bg1[offset] & 0x3FF;
     u16 oldBg = gOverworldTilemapBuffer_Bg2[offset] & 0x3FF;
     u16 oldRefl = gOverworldTilemapBuffer_Bg3[offset] & 0x3FF;
-    u16 newFg = FieldCompositorAcquire(fgEntries, fgCount);
-    u16 newBg = FieldCompositorAcquireMasked(bgEntries, bgCount, reflEntries, reflCount);
-    u16 newRefl = FieldCompositorAcquire(reflEntries, reflCount);
+    u16 newFg = FieldCompositorAcquire(fgEntries, fgCount, x, y);
+    u16 newBg = FieldCompositorAcquireMasked(bgEntries, bgCount, reflEntries, reflCount, x, y);
+    u16 newRefl = FieldCompositorAcquire(reflEntries, reflCount, x, y);
 
     // On pool exhaustion Acquire returns COMPOSITE_SLOT_KEEP: leave the cell's current tile in place
     // (keep its slot, don't write the sentinel) so it shows stale content for a frame instead of

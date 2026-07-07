@@ -37,15 +37,16 @@ void FieldCompositorLoadSecondaryTiles(const struct Tileset *tileset);
 
 // Resolve a composite VRAM slot for an ordered (bottom->top) stack of metatile sub-tile
 // entries. Entries whose tile id is 0 are treated as transparent and skipped; an empty stack
-// resolves to COMPOSITE_BLANK_SLOT. Increments the slot's refcount.
-u16 FieldCompositorAcquire(const u16 *entries, u32 count);
+// resolves to COMPOSITE_BLANK_SLOT. Increments the slot's refcount. (x, y) is the cell's map
+// position, used to pick the animation band when the recipe contains a phased tile (see below).
+u16 FieldCompositorAcquire(const u16 *entries, u32 count, s16 x, s16 y);
 
 // Like FieldCompositorAcquire, but after compositing the `draw` stack it punches holes: every pixel
 // where any `mask` entry is opaque is forced transparent in the result. Used for the BG2 background
 // composite of cells that have a reflection layer, so the reflective (BG3) surface shows through the
 // masked-out region. With maskCount 0 this is identical to FieldCompositorAcquire. An empty draw
 // stack resolves to COMPOSITE_BLANK_SLOT regardless of the mask.
-u16 FieldCompositorAcquireMasked(const u16 *draw, u32 drawCount, const u16 *mask, u32 maskCount);
+u16 FieldCompositorAcquireMasked(const u16 *draw, u32 drawCount, const u16 *mask, u32 maskCount, s16 x, s16 y);
 
 // Release a slot previously returned by FieldCompositorAcquire (no-op for the blank slot). The slot
 // isn't reusable until the next FieldCompositorReclaimFreedSlots (a one-frame hold; see below).
@@ -71,5 +72,26 @@ void FieldCompositorUpdateSourceTilesImmediate(u16 firstTileId, const void *src,
 // updates only mark affected slots dirty (cheap); this spreads the actual recompositing out so a
 // frame where many tiles animate at once doesn't spike.
 void FieldCompositorTickAnim(void);
+
+// Phased tileset animation: a group is a run of `tileCount` animated source tile ids (starting at
+// `firstTileId`) whose displayed frame is chosen per cell from the cell's map position, so the
+// animation travels across the map instead of every cell showing the same frame. `frames` holds
+// `frameCount` pointers, each to `tileCount` 8BPP tiles in ROM; `phaseFn(x, y)` returns a raw band
+// index (taken mod `bandCount`). The chosen band is folded into the composite slot key, so cells in
+// the same band share a slot - on-screen slots (and per-column compose cost while scrolling) stay
+// bounded by `bandCount` per recipe. `bandCount` is the perf/quality knob: fewer bands = cheaper but
+// a coarser wave; pass frameCount for the finest wave, or a divisor of it (e.g. frameCount/2) to
+// halve the cost seamlessly.
+void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16 x, s16 y));
+
+// Drop all phased groups (call when a primary tileset that owns them is being swapped out; the new
+// tileset re-registers its own). Phased groups live in primary-tileset tile-id space.
+void FieldCompositorClearPhasedGroups(void);
+
+// Advance the phased (water) animation to `step` (e.g. timer / 16) and refresh every phased slot to its
+// new frame; call once per frame. Banked slots (pre-composited at slot creation) refresh via a cheap
+// copy, so the whole surface flips together each step without the per-slot re-flatten spike. Only a real
+// step change does work.
+void FieldCompositorTickPhased(u16 step);
 
 #endif // GUARD_FIELD_COMPOSITOR_H
