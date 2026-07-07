@@ -113,10 +113,12 @@ struct PhasedAnimGroup
     u8 tileCount;
     u8 frameCount;
     // bandCount is the perf knob: the number of DISTINCT phases a group can show on screen, so it caps
-    // the composite slots (and the per-column compose cost while scrolling) a group costs. It's
-    // decoupled from frameCount: a cell's stored phase is band * bandStride (bandStride = frameCount /
-    // bandCount), so fewer bands just space the frames further apart along the wave - still seamless as
-    // long as bandCount divides frameCount. bandCount == frameCount is the finest (one band per frame).
+    // the composite slots (and the per-column compose cost while scrolling) a group costs. A cell's stored
+    // phase is band * bandStride. bandCount <= frameCount samples the frame cycle (bandStride = frameCount
+    // / bandCount): fewer bands space the frames further apart - seamless when it divides frameCount;
+    // bandCount == frameCount is the finest. bandCount > frameCount uses stride 1, so the phase is just
+    // band = phaseFn % bandCount and does NOT depend on frameCount - letting a group hot-swap its frame
+    // set (frames/frameCount) while keeping every cell's phase, so no re-phasing redraw is needed.
     u8 bandCount;
     u8 bandStride;
     bool8 active;
@@ -589,6 +591,22 @@ static u32 Gcd(u32 a, u32 b)
     return a;
 }
 
+// A recipe's animation period from current group state: the lcm of its phased groups' frame counts (1 if
+// none). Used to refresh a bank's period when a live group's frameCount changes (see the reload path).
+static u32 ComputeRecipePeriod(const u16 *entries, u32 n)
+{
+    u32 i, period = 1;
+
+    for (i = 0; i < n; i++)
+    {
+        u8 sub;
+        struct PhasedAnimGroup *grp = FindPhasedGroup(entries[i] & SUBTILE_ENTRY_TILE_MASK, &sub);
+        if (grp != NULL)
+            period = period / Gcd(period, grp->frameCount) * grp->frameCount;
+    }
+    return period;
+}
+
 // Resolve the frame bank for a normalized recipe. Returns BANK_NONE if the recipe has no phased tile,
 // BANK_UNBANKED if it's phased but can't be banked (period too long, pool full, or no bank heap) - both
 // flatten live. Otherwise returns the bank index; its frames are NOT built here, they fill in lazily on
@@ -919,9 +937,12 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
 
     if (index >= COMPOSITE_PHASED_GROUP_COUNT)
         return;
-    // Clamp to a sane band count (1..frameCount). bandStride spaces the frames a band apart along the
-    // wave; when bandCount divides frameCount the spacing is uniform so the wave wraps seamlessly.
-    if (bandCount == 0 || bandCount > frameCount)
+    // bandStride spaces the frames a band apart along the wave. bandCount <= frameCount samples the frame
+    // cycle (stride = frameCount/bandCount; uniform, seamless when it divides). bandCount > frameCount is
+    // allowed with stride 1: the stored phase is then band = phaseFn % bandCount, independent of
+    // frameCount, so a group can keep the SAME per-cell phase while its frame set (and frameCount) is
+    // hot-swapped - the terrain waves rely on this to change wind strength without re-phasing the map.
+    if (bandCount == 0)
         bandCount = frameCount;
     grp = &sPhasedGroups[index];
     grp->frames = frames;
@@ -930,12 +951,57 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
     grp->tileCount = tileCount;
     grp->frameCount = frameCount;
     grp->bandCount = bandCount;
-    grp->bandStride = frameCount / bandCount;
+    grp->bandStride = (bandCount <= frameCount) ? (frameCount / bandCount) : 1;
     grp->active = TRUE;
     if (firstTileId < sPhasedMinTile)
         sPhasedMinTile = firstTileId;
     if (firstTileId + tileCount - 1 > sPhasedMaxTile)
         sPhasedMaxTile = firstTileId + tileCount - 1;
+}
+
+// Re-point an already-registered phased group at a new frame set (frames/frameCount may change) while the
+// map is live - e.g. the terrain water waves switching animation strength with the wind. The group must be
+// registered with a fixed bandCount > any set's frameCount (stride 1), so every cell's stored phase is
+// band = phaseFn % bandCount and does NOT change when the frame set swaps: the existing composite slots
+// stay valid, so no cell re-acquire / DrawWholeMapView (a full-screen recompose = a frame-time spike) is
+// needed. Only the frame *content* changes, so we just repair the banks and mark the affected slots dirty;
+// FieldCompositorTickAnim then recomposes them a few per frame, spreading the cost so the swap never spikes.
+//
+// Bank repair: a recipe's period is the lcm of its groups' frame counts, which for a mixed cell (e.g. a
+// waves overlay on the 12-frame water) can exceed the frames a bank holds. Writing that back would make
+// ComposeSlot/BankBuildTick index past the bank's tile region and corrupt VRAM/heap, so cap the period to
+// what a bank can store (a capped cell re-syncs its overlay a touch early - imperceptible next to the
+// dominant water motion) and clear builtMask so the frames rebuild from the new array.
+void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16, s16))
+{
+    u16 lastTileId = firstTileId + tileCount - 1;
+    u32 i, e;
+
+    FieldCompositorRegisterPhasedGroup(index, firstTileId, tileCount, frames, frameCount, bandCount, phaseFn);
+    if (sPool == NULL)
+        return;
+    for (i = 0; i < sBankCount; i++)
+    {
+        struct FrameBank *bk = &sBanks[i];
+
+        if (bk->refcount == 0)
+            continue;
+        for (e = 0; e < COMPOSITE_MAX_LAYERS; e++)
+        {
+            u16 tileId = bk->entries[e] & SUBTILE_ENTRY_TILE_MASK;
+            if (tileId >= firstTileId && tileId <= lastTileId)
+            {
+                u32 period = ComputeRecipePeriod(bk->entries, EntryCount(bk->entries));
+                if (period > COMPOSITE_BANK_FRAMES)
+                    period = COMPOSITE_BANK_FRAMES;
+                bk->period = period;
+                bk->builtMask = 0;
+                break;
+            }
+        }
+    }
+    // Mark every live slot in the range dirty; TickAnim recomposes them over the next frames (no spike).
+    RecomposeSourceRange(firstTileId, lastTileId, TRUE);
 }
 
 // Drop all phased groups. Called before a primary tileset re-registers its own (phased groups live in

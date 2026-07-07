@@ -84,6 +84,12 @@ void FieldCompositorTickAnim(void);
 // halve the cost seamlessly.
 void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16 x, s16 y));
 
+// Swap an already-registered group's frame set at runtime (frames/frameCount may change). Repairs the live
+// banks that reference it and marks the affected slots dirty (recomposed gradually by FieldCompositorTickAnim).
+// Register the group with a fixed bandCount > every set's frameCount so phases are swap-invariant and no
+// re-phasing redraw is needed. See the .c comment. Used by the terrain water waves scaling with the wind.
+void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16 x, s16 y));
+
 // Drop all phased groups (call when a primary tileset that owns them is being swapped out; the new
 // tileset re-registers its own). Phased groups live in primary-tileset tile-id space.
 void FieldCompositorClearPhasedGroups(void);

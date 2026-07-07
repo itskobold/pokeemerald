@@ -168,7 +168,21 @@ const u16 gTilesetAnims_Terrain_Water_Waves_Frame3[] = INCGFX_U16("data/tilesets
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/4.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/5.png", ".8bpp", "-palette_mod 16");
 
-const u16 *const gTilesetAnims_Terrain_Water_Waves[] = {
+const u16 *const gTilesetAnims_Terrain_Water_Waves_Calm[] = {
+    gTilesetAnims_Terrain_Water_Waves_Frame0,
+    gTilesetAnims_Terrain_Water_Waves_Frame3,
+    gTilesetAnims_Terrain_Water_Waves_Frame4,
+    gTilesetAnims_Terrain_Water_Waves_Frame5
+};
+
+const u16 *const gTilesetAnims_Terrain_Water_Waves_Mid[] = {
+    gTilesetAnims_Terrain_Water_Waves_Frame0,
+    gTilesetAnims_Terrain_Water_Waves_Frame2,
+    gTilesetAnims_Terrain_Water_Waves_Frame3,
+    gTilesetAnims_Terrain_Water_Waves_Frame4,
+};
+
+const u16 *const gTilesetAnims_Terrain_Water_Waves_Rough[] = {
     gTilesetAnims_Terrain_Water_Waves_Frame0,
     gTilesetAnims_Terrain_Water_Waves_Frame1,
     gTilesetAnims_Terrain_Water_Waves_Frame2,
@@ -176,6 +190,7 @@ const u16 *const gTilesetAnims_Terrain_Water_Waves[] = {
     gTilesetAnims_Terrain_Water_Waves_Frame4,
     gTilesetAnims_Terrain_Water_Waves_Frame5
 };
+
 
 const u16 gTilesetAnims_General_Flower_Frame1[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/1.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_General_Flower_Frame0[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/0.png", ".8bpp", "-palette_mod 16");
@@ -757,18 +772,72 @@ enum {
     PHASED_GROUP_TERRAIN_WATER_WAVES,
 };
 
-// Distinct wave bands for water (perf/quality knob). 12 (one per frame) is the finest wave. Each band is
-// a distinct on-screen composite slot, but all bands of one recipe share a single pre-composited frame
-// bank (see FieldCompositorTickPhased), so raising this costs bank display slots, not extra flatten work.
-// Keep it a divisor of the frame count so the wave stays seamless.
-#define TERRAIN_WATER_BANDS 12
+// The terrain water-wave overlay scales its animation with wind strength: below WAVES_WIND_CALM it holds
+// a single frame (dead calm), then steps up through the calm, mid and rough loops as it strengthens. A
+// change only takes effect at a loop boundary (see TilesetAnim_Terrain) so the surface finishes its
+// current cycle before switching instead of snapping mid-wave.
+enum {
+    WAVES_SET_LOCKED,
+    WAVES_SET_CALM,
+    WAVES_SET_MID,
+    WAVES_SET_ROUGH,
+};
+
+// Wind-speed cutoffs: 0-5 locked, 6-11 calm, 12-18 mid, 19+ rough.
+#define WAVES_WIND_CALM  6
+#define WAVES_WIND_MID   12
+#define WAVES_WIND_ROUGH 19
+
+// Fixed band count for the waves group, held constant across every set (>= the largest set's frameCount)
+// so a cell's phase (band = (x-y) % WAVES_BAND_COUNT) doesn't change when the frame set swaps - that's what
+// lets the wind-driven swap avoid a re-phasing full redraw. See FieldCompositorReloadPhasedGroup.
+#define WAVES_BAND_COUNT 6
+
+static const struct {
+    const u16 *const *frames;
+    u8 frameCount;
+} sTerrainWavesSets[] = {
+    // Locked reuses the rough array at frameCount 1 (every set starts on frame 0), so it just holds frame 0.
+    [WAVES_SET_LOCKED] = { gTilesetAnims_Terrain_Water_Waves_Rough, 1 },
+    [WAVES_SET_CALM]   = { gTilesetAnims_Terrain_Water_Waves_Calm,  ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves_Calm) },
+    [WAVES_SET_MID]    = { gTilesetAnims_Terrain_Water_Waves_Mid,   ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves_Mid) },
+    [WAVES_SET_ROUGH]  = { gTilesetAnims_Terrain_Water_Waves_Rough, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves_Rough) },
+};
+
+static u8 sTerrainWavesSet;
+
+static u8 TerrainWavesSetForWind(void)
+{
+    u8 speed = gSaveBlock1Ptr->weatherState.windSpeed;
+    if (speed < WAVES_WIND_CALM)
+        return WAVES_SET_LOCKED;
+    if (speed < WAVES_WIND_MID)
+        return WAVES_SET_CALM;
+    if (speed < WAVES_WIND_ROUGH)
+        return WAVES_SET_MID;
+    return WAVES_SET_ROUGH;
+}
+
+// (Re)register the waves phased group for `set`. bandCount is fixed (WAVES_BAND_COUNT), NOT the set's
+// frameCount, so the per-cell phase stays put across a swap. `reload` takes the live-swap path (repairs
+// banks + marks slots dirty, no redraw); a fresh map load registers cold.
+static void RegisterTerrainWavesGroup(u8 set, bool32 reload)
+{
+    const u16 *const *frames = sTerrainWavesSets[set].frames;
+    u8 count = sTerrainWavesSets[set].frameCount;
+
+    if (reload)
+        FieldCompositorReloadPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, 0x184, 4, frames, count, WAVES_BAND_COUNT, PhaseFn_Terrain_Water);
+    else
+        FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, 0x184, 4, frames, count, WAVES_BAND_COUNT, PhaseFn_Terrain_Water);
+}
 
 void InitTilesetAnim_Terrain(void)
 {
     sPrimaryTilesetAnimCounter = 0;
-    // 768 = 48 steps of 16 frames: divisible by 12 (the water/deep/deep-edge frame count) and 6
-    // (waves) so every water group loops cleanly, and a multiple of 256 so inheriting secondaries
-    // don't regress.
+    // 768 = 48 steps of 16 frames: divisible by 12 (water/deep/deep-edge) and by every waves loop length
+    // (4/6, and 1 when locked) so each water group wraps cleanly, and a multiple of 256 so inheriting
+    // secondaries don't regress.
     sPrimaryTilesetAnimCounterMax = 768;
     sPrimaryTilesetAnimCallback = TilesetAnim_Terrain;
 
@@ -776,13 +845,14 @@ void InitTilesetAnim_Terrain(void)
     // (PhaseFn_Terrain_Water) so the surface ripples across the map instead of moving in unison. The
     // compositor reads frames straight from ROM; TilesetAnim_Terrain only advances the step counter.
     FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER, 0x170, 4,
-        gTilesetAnims_Terrain_Water, ARRAY_COUNT(gTilesetAnims_Terrain_Water), TERRAIN_WATER_BANDS, PhaseFn_Terrain_Water);
+        gTilesetAnims_Terrain_Water, ARRAY_COUNT(gTilesetAnims_Terrain_Water), 12, PhaseFn_Terrain_Water);
     FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_DEEP, 0x17B, 4,
-        gTilesetAnims_Terrain_Water_Deep, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep), TERRAIN_WATER_BANDS, PhaseFn_Terrain_Water);
+        gTilesetAnims_Terrain_Water_Deep, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep), 12, PhaseFn_Terrain_Water);
     FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_DEEP_EDGE, 0x180, 4,
-        gTilesetAnims_Terrain_Water_Deep_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep_Edge), TERRAIN_WATER_BANDS, PhaseFn_Terrain_Water);
-    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, 0x184, 4,
-        gTilesetAnims_Terrain_Water_Waves, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves), TERRAIN_WATER_BANDS, PhaseFn_Terrain_Water);
+        gTilesetAnims_Terrain_Water_Deep_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep_Edge), 12, PhaseFn_Terrain_Water);
+    // Waves start at whatever set the current wind calls for, then swap at loop boundaries as it changes.
+    sTerrainWavesSet = TerrainWavesSetForWind();
+    RegisterTerrainWavesGroup(sTerrainWavesSet, FALSE);
 }
 
 void InitTilesetAnim_Building(void)
@@ -808,10 +878,25 @@ static void TilesetAnim_General(u16 timer)
 
 static void TilesetAnim_Terrain(u16 timer)
 {
+    u16 step = timer / 16;
+    u8 desired = TerrainWavesSetForWind();
+
+    // Wind changed the wave strength: swap the waves frame set, but only at a loop boundary of the set
+    // currently playing (step wraps every frameCount), so the surface finishes its cycle before the
+    // shorter / longer / locked loop takes over instead of snapping mid-wave. The reload keeps every
+    // cell's phase (fixed band count) and just repairs banks + marks the water slots dirty, which the
+    // per-frame dirty drain recomposes gradually - no full redraw, so the swap doesn't spike.
+    if (IsFieldCompositorActive() && desired != sTerrainWavesSet
+        && step % sTerrainWavesSets[sTerrainWavesSet].frameCount == 0)
+    {
+        sTerrainWavesSet = desired;
+        RegisterTerrainWavesGroup(desired, TRUE);
+    }
+
     // Water's animation frame advances every 16 timer ticks. All four water groups share one step and
     // flip together; each on-screen slot's new frame is a cheap copy from its pre-composited bank (see
     // FieldCompositorTickPhased), so the whole surface can update on one frame without a recompose spike.
-    FieldCompositorTickPhased(timer / 16);
+    FieldCompositorTickPhased(step);
 }
 
 // Position -> animation band for the water surfaces. A diagonal traveling wave: adjacent tiles along
