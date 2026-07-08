@@ -25,7 +25,12 @@ Init::
 	b Init
 
 	.align 2, 0
-sp_sys: .word IWRAM_END - 0x1c0
+@ sp_sys was IWRAM_END - 0x1c0 (Nintendo's layout), reserving 0x160 for the IRQ-mode stack. IRQ mode
+@ only ever holds the BIOS dispatch frame plus IntrMain's 5 registers (~44 B) before IntrMain switches
+@ to SYS mode, so even nested interrupts fit comfortably in 0xA0 (the stock hardware layout: the BIOS
+@ itself boots with sp_usr = 0x3007F00). Reclaiming the excess gives the shared system stack +0x0C0,
+@ which the field frame needs (see ProbeStackWatermark in overworld.c).
+sp_sys: .word IWRAM_END - 0x100
 sp_irq: .word IWRAM_END - 0x60
 
 	.pool

@@ -82,7 +82,7 @@ struct CompositeSlot
 // distinct water recipes are on screen than fit, and the overflow flattens live each step (the update
 // spike) - raise this (costs COMPOSITE_BANK_FRAMES * 64 = 768 B of heap each). Add-more-animations grows
 // the recipe count, so bump it alongside new terrain animations.
-#define COMPOSITE_BANK_MAX    48
+#define COMPOSITE_BANK_MAX    64 // raised from 48: the pool-full diagnostic fired on the big water maps
 #define COMPOSITE_BANK_FRAMES 12 // frames stored per bank; a recipe's period (lcm of its groups' frame counts) must fit
 #define BANK_BUILD_BUDGET     8  // bank frames flattened per frame in the background, to spread build cost off the entry frame
 #define BANK_NONE     0xFF       // slot has no phased tile
@@ -153,6 +153,14 @@ static struct PhasedAnimGroup sPhasedGroups[COMPOSITE_PHASED_GROUP_COUNT];
 // (min > max, so every tile is rejected) by FieldCompositorClearPhasedGroups at init.
 static u16 sPhasedMinTile;
 static u16 sPhasedMaxTile;
+// Direct map from (tileId - sPhasedMinTile) to owning group index (0xFF = none), so the per-layer
+// lookup in FlattenRecipe is one load instead of a scan of all groups. Rebuilt on (re)register; if the
+// active groups ever span more tile ids than this, the map is disabled and lookups fall back to the scan.
+// EWRAM to spare the IWRAM stack headroom; the flatten it serves reads its 64+ source bytes from
+// ROM/EWRAM anyway, so the slower load is noise.
+#define PHASED_TILE_SPAN 64
+static EWRAM_DATA u8 sPhasedGroupMap[PHASED_TILE_SPAN] = {0};
+static bool8 sPhasedMapValid;
 // Current animation step shared by all phased groups (advances every 16 frames). The displayed frame of
 // a phased slot is (sPhasedStep + slot.phase) % period; folded here rather than per-group so a bank's
 // single frame index is unambiguous.
@@ -162,6 +170,13 @@ static u16 sPhasedStep;
 static EWRAM_DATA struct FrameBank sBanks[COMPOSITE_BANK_MAX] = {0};
 static u8 sBankCount;  // banks actually backed by sBankTiles (<= COMPOSITE_BANK_MAX; may be trimmed to fit the heap)
 static bool8 sBankPoolFull; // latched when the pool overflows, so the diagnostic prints once per episode
+// Diagnostics raised at the deepest stack of the frame (ResolveBank/AcquireHashedSlot run under the
+// full acquire chain). Printing there pushed the system stack over its budget - MgbaPrintf adds ~150 B
+// of frames - so they only set a bit here and FieldCompositorReclaimFreedSlots (the shallow frame top)
+// prints them.
+#define DIAG_BANK_POOL_FULL   (1 << 0)
+#define DIAG_SLOT_POOL_EMPTY  (1 << 1)
+static u8 sPendingDiagnostics;
 static u8 *sBankTiles; // [sBankCount * COMPOSITE_BANK_FRAMES * TILE_SIZE_8BPP], heap; NULL disables banking
 // ComposeSlot's flatten scratch. In EWRAM, not on the stack: ComposeSlot runs both from the main loop and
 // from the field VBlank (FieldCompositorPhasedFlipRefreshTick). The interrupt dispatcher runs the VBlank
@@ -194,6 +209,30 @@ static u16 sFlipRefreshCursor;
 static u32 sDirtyBits[(COMPOSITE_SLOT_COUNT + 31) / 32];
 static u16 sDirtyCount;
 static u16 sDirtyCursor;
+
+// Live phased slots (bank != BANK_NONE), so the whole-pool refresh scans can stop as soon as they've
+// visited them all (and skip entirely on step ticks with no water on screen).
+static u16 sPhasedSlotCount;
+// TRUE while some bank may have unbuilt/rebuild frames, so the idle-frame BankBuildTick can skip its scan.
+static bool8 sBankBuildPending;
+
+// Deferred source-range recomposites accumulated this frame. Each deferred RecomposeSourceRange used
+// to walk the whole slot pool; a frame with several queued animations repeated that walk per range.
+// Instead the ranges collect here (adjacent/overlapping ones merge) and FieldCompositorTickAnim marks
+// the affected slots in ONE pool scan per frame.
+#define PENDING_RECOMPOSE_MAX 8
+static EWRAM_DATA u16 sPendingRecompose[PENDING_RECOMPOSE_MAX][2] = {0}; // [i] = {firstTileId, lastTileId}; EWRAM (cold)
+static u8 sPendingRecomposeCount;
+
+// Modulo for the small operands the phased paths produce (dividend < ~64 + max band, modulus a frame
+// count of 6/12): a subtract loop beats the software-division call the % operator emits (the GBA has
+// no divide instruction), and these run per slot / per layer on the animation hot paths.
+static inline u32 FastMod(u32 v, u32 m)
+{
+    while (v >= m)
+        v -= m;
+    return v;
+}
 
 static void MarkSlotDirty(u16 slot)
 {
@@ -278,6 +317,10 @@ static void ResetPool(void)
         sBanks[i].rebuildMask = 0;
     }
     sBankPoolFull = FALSE;
+    sBankBuildPending = FALSE;
+    sPhasedSlotCount = 0;
+    sPendingRecomposeCount = 0;
+    sPendingDiagnostics = 0;
     for (i = 0; i < ARRAY_COUNT(sDirtyBits); i++)
         sDirtyBits[i] = 0;
     sDirtyCount = 0;
@@ -397,13 +440,23 @@ void FieldCompositorLoadSecondaryTiles(const struct Tileset *tileset)
 // 16) this is identical to the old (palBank << 4) | pix. Zero stays transparent so upper layers
 // show the layers below.
 // If tileId belongs to an active phased group, return it and the tile's sub-index within a frame;
-// else NULL. Cheap range reject first, since the overwhelming majority of tiles aren't phased.
+// else NULL. Cheap range reject first, since the overwhelming majority of tiles aren't phased; tiles
+// in range resolve through the direct map (one load) rather than a scan of all groups - this runs per
+// layer on every flatten.
 static struct PhasedAnimGroup *FindPhasedGroup(u16 tileId, u8 *subOut)
 {
     u32 g;
 
     if (tileId < sPhasedMinTile || tileId > sPhasedMaxTile)
         return NULL;
+    if (sPhasedMapValid)
+    {
+        g = sPhasedGroupMap[tileId - sPhasedMinTile];
+        if (g == 0xFF)
+            return NULL;
+        *subOut = tileId - sPhasedGroups[g].firstTileId;
+        return &sPhasedGroups[g];
+    }
     for (g = 0; g < COMPOSITE_PHASED_GROUP_COUNT; g++)
     {
         struct PhasedAnimGroup *grp = &sPhasedGroups[g];
@@ -415,6 +468,41 @@ static struct PhasedAnimGroup *FindPhasedGroup(u16 tileId, u8 *subOut)
         }
     }
     return NULL;
+}
+
+// Recompute the tile-id range and direct map from the active groups. Called on every (re)register and
+// clear - both rare - so registration order and removals never leave stale entries.
+static void RebuildPhasedTileMap(void)
+{
+    u32 g, t;
+
+    sPhasedMinTile = 0xFFFF;
+    sPhasedMaxTile = 0;
+    for (g = 0; g < COMPOSITE_PHASED_GROUP_COUNT; g++)
+    {
+        struct PhasedAnimGroup *grp = &sPhasedGroups[g];
+
+        if (!grp->active)
+            continue;
+        if (grp->firstTileId < sPhasedMinTile)
+            sPhasedMinTile = grp->firstTileId;
+        if (grp->firstTileId + grp->tileCount - 1 > sPhasedMaxTile)
+            sPhasedMaxTile = grp->firstTileId + grp->tileCount - 1;
+    }
+    sPhasedMapValid = sPhasedMinTile <= sPhasedMaxTile
+                   && sPhasedMaxTile - sPhasedMinTile < PHASED_TILE_SPAN;
+    if (!sPhasedMapValid)
+        return;
+    for (t = 0; t < PHASED_TILE_SPAN; t++)
+        sPhasedGroupMap[t] = 0xFF;
+    for (g = 0; g < COMPOSITE_PHASED_GROUP_COUNT; g++)
+    {
+        struct PhasedAnimGroup *grp = &sPhasedGroups[g];
+
+        if (grp->active)
+            for (t = 0; t < grp->tileCount; t++)
+                sPhasedGroupMap[grp->firstTileId + t - sPhasedMinTile] = g;
+    }
 }
 
 // The animation band a recipe falls in: the phaseFn of its first phased tile evaluated at the cell's
@@ -471,9 +559,10 @@ static inline u32 ReadTileWord(const u8 *p)
 static void FlattenRecipe(const u16 *entries, u32 n, u8 maskBits, u16 frameSel, u8 *out)
 {
     u32 layer, row, b;
-
-    for (row = 0; row < TILE_SIZE_8BPP / 4; row++)
-        ((u32 *)out)[row] = 0;
+    // The first drawn layer writes every output pixel (transparent source pixels write 0), so the
+    // buffer needs no pre-zero and that layer skips the read-modify-write against pixels below -
+    // the bulk of the work for the common 1-layer recipe. Later layers blend against `out` as usual.
+    bool32 outValid = FALSE;
 
     // Draw entries are packed before mask entries, so a single in-order pass composites all draws
     // first, then lets the mask entries punch holes in the finished pixels.
@@ -487,7 +576,7 @@ static void FlattenRecipe(const u16 *entries, u32 n, u8 maskBits, u16 frameSel, 
         u8 sub;
         struct PhasedAnimGroup *grp = FindPhasedGroup(tileId, &sub);
         const u8 *src = grp != NULL
-            ? (const u8 *)grp->frames[frameSel % grp->frameCount] + sub * TILE_SIZE_8BPP
+            ? (const u8 *)grp->frames[FastMod(frameSel, grp->frameCount)] + sub * TILE_SIZE_8BPP
             : GetSourceTilePtr(tileId);
         u32 palBase = sBankOffset[(e >> SUBTILE_ENTRY_PAL_SHIFT) & 0xF];
         u32 palW = palBase * 0x01010101u; // palBase broadcast to all four bytes of a word
@@ -496,6 +585,12 @@ static void FlattenRecipe(const u16 *entries, u32 n, u8 maskBits, u16 frameSel, 
 
         if (src == NULL)
             continue;
+        if (!outValid && isMask)
+        {
+            // Mask with nothing drawn beneath (the acquire paths never build this): the output is
+            // all-transparent either way.
+            break;
+        }
         // Each source byte is one 8BPP pixel. vflip just picks the source row. A mask entry clears
         // (holes) every pixel it covers instead of drawing it, so the layers below show through on the
         // plane above. The common (no-hflip) path composites four pixels per word, branchless (see
@@ -510,7 +605,8 @@ static void FlattenRecipe(const u16 *entries, u32 n, u8 maskBits, u16 frameSel, 
                 for (b = 0; b < 8; b++)
                 {
                     u8 pix = srcRow[7 - b];
-                    if (isMask) { if (pix) o[b] = 0; }
+                    if (!outValid) o[b] = pix ? pix + palBase : 0;
+                    else if (isMask) { if (pix) o[b] = 0; }
                     else if (pix) o[b] = pix + palBase;
                 }
             }
@@ -522,14 +618,21 @@ static void FlattenRecipe(const u16 *entries, u32 n, u8 maskBits, u16 frameSel, 
                 {
                     u32 sw = ReadTileWord(srcRow + b * 4);
                     u32 nz = NonzeroByteMask(sw);
-                    if (isMask)
+                    if (!outValid)
+                        o[b] = (sw + palW) & nz;
+                    else if (isMask)
                         o[b] &= ~nz;
                     else
                         o[b] = (o[b] & ~nz) | ((sw + palW) & nz);
                 }
             }
         }
+        outValid = TRUE;
     }
+
+    if (!outValid)
+        for (row = 0; row < TILE_SIZE_8BPP / 4; row++)
+            ((u32 *)out)[row] = 0;
 }
 
 // Flatten bank frame `idx` into its tile region and mark it built.
@@ -556,7 +659,7 @@ static void ComposeSlot(u16 slot, u8 *scratch)
     if (s->bank < sBankCount)
     {
         struct FrameBank *bk = &sBanks[s->bank];
-        u32 idx = (sPhasedStep + s->phase) % bk->period;
+        u32 idx = FastMod(sPhasedStep + s->phase, bk->period);
 
         if (bk->builtMask & (1u << idx))
             src = sBankTiles + (s->bank * COMPOSITE_BANK_FRAMES + idx) * TILE_SIZE_8BPP;
@@ -589,10 +692,13 @@ static void BankBuildTick(void)
 {
     u32 budget = BANK_BUILD_BUDGET;
     u32 i, m;
+    bool32 remaining = FALSE;
 
-    if (sBankTiles == NULL)
+    // sBankBuildPending is set wherever unbuilt/rebuild frames can appear (a new bank in ResolveBank, a
+    // frame-set swap in FieldCompositorReloadPhasedGroup), so idle frames skip the bank scan entirely.
+    if (sBankTiles == NULL || !sBankBuildPending)
         return;
-    for (i = 0; i < sBankCount && budget != 0; i++)
+    for (i = 0; i < sBankCount; i++)
     {
         struct FrameBank *bk = &sBanks[i];
         u16 need;
@@ -611,10 +717,17 @@ static void BankBuildTick(void)
             {
                 BuildBankFrame(bk, i, m); // sets builtMask bit m
                 bk->rebuildMask &= ~(1u << m);
+                need &= ~(1u << m);
                 budget--;
             }
         }
+        if (need != 0)
+            remaining = TRUE;
+        if (budget == 0)
+            break;
     }
+    // Only a full clean pass clears the flag; running out of budget mid-scan keeps it set.
+    sBankBuildPending = remaining || budget == 0;
 }
 
 // Greatest common divisor / least common multiple, for a bank's animation period (the lcm of its phased
@@ -689,11 +802,11 @@ static u8 ResolveBank(const u16 *entries, u32 n, u8 maskBits)
     {
         // Pool full this scene: this recipe (and any others over the cap) flatten live each step - the
         // step-update spike. If this fires, raise COMPOSITE_BANK_MAX (heap permitting). Latched so it
-        // reports once per full episode rather than every acquire.
+        // reports once per full episode rather than every acquire; deferred print (see sPendingDiagnostics).
         if (!sBankPoolFull)
         {
             sBankPoolFull = TRUE;
-            DebugPrintfLevel(MGBA_LOG_WARN, "FieldCompositor: bank pool full (%d); extra water recipes flatten live", sBankCount);
+            sPendingDiagnostics |= DIAG_BANK_POOL_FULL;
         }
         return BANK_UNBANKED;
     }
@@ -705,6 +818,7 @@ static u8 ResolveBank(const u16 *entries, u32 n, u8 maskBits)
     sBanks[freeBank].builtMask = 0; // frames build lazily
     sBanks[freeBank].rebuildMask = 0;
     sBanks[freeBank].refcount = 1;
+    sBankBuildPending = TRUE; // the new bank's frames need building (see BankBuildTick)
     return freeBank;
 }
 
@@ -762,8 +876,8 @@ static u16 AcquireHashedSlot(const u16 *norm, u32 n, u8 maskBits, u8 phase)
         // Pool exhausted (scene needs >COMPOSITE_SLOT_COUNT unique tiles this frame). Tell the
         // caller to keep whatever tile the cell already shows rather than blanking it - a brief
         // stale tile reads far better than the flash a blank cell produces, and the cell is retried
-        // every redraw so it self-corrects as soon as a slot frees.
-        DebugPrintf("FieldCompositor: slot pool exhausted");
+        // every redraw so it self-corrects as soon as a slot frees. Deferred print (see sPendingDiagnostics).
+        sPendingDiagnostics |= DIAG_SLOT_POOL_EMPTY;
         return COMPOSITE_SLOT_KEEP;
     }
 
@@ -777,6 +891,8 @@ static u16 AcquireHashedSlot(const u16 *norm, u32 n, u8 maskBits, u8 phase)
     // flattens live (BANK_NONE/BANK_UNBANKED). Only new slots resolve a bank; a hash hit above keeps the
     // existing slot's bank and its single ref, so refcounts stay balanced.
     sPool[slot].bank = ResolveBank(norm, n, maskBits);
+    if (sPool[slot].bank != BANK_NONE)
+        sPhasedSlotCount++;
     sPool[slot].refcount = 1;
     sPool[slot].nextInBucket = sHashHead[bucket];
     sHashHead[bucket] = slot;
@@ -848,6 +964,8 @@ static void FreeSlot(u16 slot)
     sPool[slot].maskBits = 0;
     sPool[slot].phase = 0;
     ReleaseBank(sPool[slot].bank);
+    if (sPool[slot].bank != BANK_NONE)
+        sPhasedSlotCount--;
     sPool[slot].bank = BANK_NONE;
     sPool[slot].refcount = 0;
     ClearSlotDirty(slot);
@@ -894,6 +1012,16 @@ void FieldCompositorReclaimFreedSlots(void)
         return;
     while (sPendingFreeCount != 0)
         sFreeList[sFreeCount++] = sPendingFree[--sPendingFreeCount];
+    // Diagnostics raised at deep stack during the previous frame print here, at the frame's
+    // shallowest point, so MgbaPrintf's frames can't contribute to a stack overflow.
+    if (sPendingDiagnostics)
+    {
+        if (sPendingDiagnostics & DIAG_BANK_POOL_FULL)
+            DebugPrintfLevel(MGBA_LOG_WARN, "FieldCompositor: bank pool full (%d); extra water recipes flatten live", sBankCount);
+        if (sPendingDiagnostics & DIAG_SLOT_POOL_EMPTY)
+            DebugPrintf("FieldCompositor: slot pool exhausted");
+        sPendingDiagnostics = 0;
+    }
 }
 
 // Assign (or reuse) an override slot for an animated tile id and return a pointer to it, or NULL if
@@ -988,10 +1116,7 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
     grp->bandCount = bandCount;
     grp->bandStride = (bandCount <= frameCount) ? (frameCount / bandCount) : 1;
     grp->active = TRUE;
-    if (firstTileId < sPhasedMinTile)
-        sPhasedMinTile = firstTileId;
-    if (firstTileId + tileCount - 1 > sPhasedMaxTile)
-        sPhasedMaxTile = firstTileId + tileCount - 1;
+    RebuildPhasedTileMap();
 }
 
 // Re-point an already-registered phased group at a new frame set (frames/frameCount may change) while the
@@ -1040,6 +1165,7 @@ void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, 
                 // Re-flatten every frame from the new source, but lazily: keep the current content on
                 // screen until BankBuildTick replaces each frame, so no live-flatten storm this frame.
                 bk->rebuildMask = (u16)((1u << period) - 1);
+                sBankBuildPending = TRUE;
                 break;
             }
         }
@@ -1108,12 +1234,20 @@ bool32 FieldCompositorProcessBankRebuild(u16 firstTileId, u16 lastTileId, u32 bu
 void FieldCompositorRefreshPhasedSlots(void)
 {
     u16 slot;
+    u32 remaining = sPhasedSlotCount;
 
     if (!sActive || sPool == NULL)
         return;
-    for (slot = 1; slot < COMPOSITE_SLOT_COUNT; slot++)
+    // Stop once every live phased slot has been visited (and skip outright when there are none, e.g.
+    // a step tick with no water on screen).
+    for (slot = 1; slot < COMPOSITE_SLOT_COUNT && remaining != 0; slot++)
+    {
         if (sPool[slot].bank != BANK_NONE && sPool[slot].refcount != 0)
+        {
             ComposeSlot(slot, sComposeScratch);
+            remaining--;
+        }
+    }
 }
 
 // VBlank-driven full-surface refresh (see FieldCompositorPhasedFlipRefreshTick). Set after a heading flip
@@ -1171,8 +1305,7 @@ void FieldCompositorClearPhasedGroups(void)
 
     for (g = 0; g < COMPOSITE_PHASED_GROUP_COUNT; g++)
         sPhasedGroups[g].active = FALSE;
-    sPhasedMinTile = 0xFFFF;
-    sPhasedMaxTile = 0;
+    RebuildPhasedTileMap(); // resets to the empty range (min > max), so every lookup rejects
     sPhasedStep = 0;
 }
 
@@ -1190,8 +1323,11 @@ void FieldCompositorTickPhased(u16 step)
     FieldCompositorRefreshPhasedSlots();
 }
 
-// Recomposite (or, when deferred, mark dirty) every live slot whose recipe references a source tile
-// in [firstTileId, lastTileId].
+// Recomposite (immediately) or queue for dirty-marking (deferred) every live slot whose recipe
+// references a source tile in [firstTileId, lastTileId]. The immediate path walks the pool now (doors
+// need same-frame updates); deferred ranges just collect in sPendingRecompose - several animations
+// updating in one frame used to walk the whole pool once per range, now FlushPendingRecompose marks
+// them all in a single walk.
 static void RecomposeSourceRange(u16 firstTileId, u16 lastTileId, bool32 deferred)
 {
     u16 slot;
@@ -1199,6 +1335,49 @@ static void RecomposeSourceRange(u16 firstTileId, u16 lastTileId, bool32 deferre
 
     if (sPool == NULL)
         return;
+    if (deferred)
+    {
+        u32 r, best;
+        u32 bestCost = ~0u;
+
+        // Merge with an adjacent/overlapping pending range if one exists.
+        for (r = 0; r < sPendingRecomposeCount; r++)
+        {
+            if (firstTileId <= sPendingRecompose[r][1] + 1 && lastTileId + 1 >= sPendingRecompose[r][0])
+            {
+                if (firstTileId < sPendingRecompose[r][0])
+                    sPendingRecompose[r][0] = firstTileId;
+                if (lastTileId > sPendingRecompose[r][1])
+                    sPendingRecompose[r][1] = lastTileId;
+                return;
+            }
+        }
+        if (sPendingRecomposeCount < PENDING_RECOMPOSE_MAX)
+        {
+            sPendingRecompose[sPendingRecomposeCount][0] = firstTileId;
+            sPendingRecompose[sPendingRecomposeCount][1] = lastTileId;
+            sPendingRecomposeCount++;
+            return;
+        }
+        // Table full: widen the nearest range instead. Over-marking just costs some extra deferred
+        // recomposes; correctness is unaffected.
+        best = 0;
+        for (r = 0; r < PENDING_RECOMPOSE_MAX; r++)
+        {
+            u32 cost = (firstTileId > sPendingRecompose[r][1] ? firstTileId - sPendingRecompose[r][1] : 0)
+                     + (lastTileId < sPendingRecompose[r][0] ? sPendingRecompose[r][0] - lastTileId : 0);
+            if (cost < bestCost)
+            {
+                bestCost = cost;
+                best = r;
+            }
+        }
+        if (firstTileId < sPendingRecompose[best][0])
+            sPendingRecompose[best][0] = firstTileId;
+        if (lastTileId > sPendingRecompose[best][1])
+            sPendingRecompose[best][1] = lastTileId;
+        return;
+    }
     for (slot = 1; slot < COMPOSITE_SLOT_COUNT; slot++)
     {
         if (sPool[slot].refcount == 0)
@@ -1208,14 +1387,42 @@ static void RecomposeSourceRange(u16 firstTileId, u16 lastTileId, bool32 deferre
             u16 tileId = sPool[slot].entries[i] & SUBTILE_ENTRY_TILE_MASK;
             if (tileId >= firstTileId && tileId <= lastTileId)
             {
-                if (deferred)
-                    MarkSlotDirty(slot);
-                else
-                    ComposeSlot(slot, sComposeScratch);
+                ComposeSlot(slot, sComposeScratch);
                 break;
             }
         }
     }
+}
+
+// One pool walk marking every live slot that references any pending deferred range, then the ranges
+// are dropped. Runs at most once per frame, from FieldCompositorTickAnim.
+static void FlushPendingRecompose(void)
+{
+    u16 slot;
+    u32 i, r;
+
+    if (sPendingRecomposeCount == 0 || sPool == NULL)
+        return;
+    for (slot = 1; slot < COMPOSITE_SLOT_COUNT; slot++)
+    {
+        if (sPool[slot].refcount == 0)
+            continue;
+        for (i = 0; i < SlotCount(&sPool[slot]); i++)
+        {
+            u16 tileId = sPool[slot].entries[i] & SUBTILE_ENTRY_TILE_MASK;
+
+            for (r = 0; r < sPendingRecomposeCount; r++)
+            {
+                if (tileId >= sPendingRecompose[r][0] && tileId <= sPendingRecompose[r][1])
+                {
+                    MarkSlotDirty(slot);
+                    goto nextSlot;
+                }
+            }
+        }
+nextSlot:;
+    }
+    sPendingRecomposeCount = 0;
 }
 
 // Drains a bounded number of animation-dirtied slots per frame (call once per frame). The cursor
@@ -1226,7 +1433,10 @@ void FieldCompositorTickAnim(void)
     u32 budget = COMPOSITE_ANIM_RECOMPOSE_BUDGET;
     u32 scanned = 0;
 
-    if (!sActive || sDirtyCount == 0)
+    if (!sActive)
+        return;
+    FlushPendingRecompose(); // convert this frame's deferred source updates into dirty marks (one pool walk)
+    if (sDirtyCount == 0)
         return;
     while (budget != 0 && sDirtyCount != 0 && scanned < COMPOSITE_SLOT_COUNT)
     {

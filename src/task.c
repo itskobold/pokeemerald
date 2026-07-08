@@ -41,6 +41,10 @@ u8 CreateTask(TaskFunc func, u8 priority)
         }
     }
 
+    // All NUM_TASKS slots busy. Returning 0 silently hands the caller task 0's id: it will stomp that
+    // task's data and later destroy it - subtle corruption. Scream so a full pool is never mistaken
+    // for something else (e.g. the debug boxes add several tasks: menu + input + scroll-arrow pairs).
+    DebugPrintfLevel(MGBA_LOG_ERROR, "CreateTask: pool full, hijacking task 0 (func %p)", func);
     return 0;
 }
 

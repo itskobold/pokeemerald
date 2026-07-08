@@ -1899,6 +1899,11 @@ static void TrySpawnObjectEventTemplatesInView(const struct ObjectEventTemplate 
 static struct ViewMap sMapsInView[MAX_MAPS_IN_VIEW];
 static u8 sMapsInViewCount;
 
+// BuildMapsInView's BFS queue / visited set. EWRAM static, not a local: at ~200 B it was the biggest
+// single stack frame on the camera-update path, and the system-stack budget is tight (see
+// ProbeStackWatermark in overworld.c). Main-loop only (TrySpawnObjectEvents), so a static is safe.
+static EWRAM_DATA struct ViewMap sViewTraversal[MAX_VIEW_TRAVERSAL] = {0};
+
 // The map currently under the camera, with its home-frame offset, advanced incrementally so the view
 // walk only has to explore 1-2 hops from here instead of all the way from home.
 static struct ViewMap sCameraAnchor;
@@ -2066,7 +2071,6 @@ static void UpdateCameraFrameAnchor(void)
 // cone toward the window so it stays local.
 static void BuildMapsInView(void)
 {
-    struct ViewMap traversal[MAX_VIEW_TRAVERSAL]; // doubles as the BFS queue and the visited set
     u8 traversedCount;
     u8 head;
     s16 winLeft, winTop, winRight, winBottom;
@@ -2082,13 +2086,13 @@ static void BuildMapsInView(void)
     winBottom = gCameraPos.y + (MAP_OFFSET_H - MAP_OFFSET) + VIEW_MARGIN;
 
     sMapsInViewCount = 0;
-    traversal[0] = sCameraAnchor;
+    sViewTraversal[0] = sCameraAnchor;
     traversedCount = 1;
     head = 0;
 
     while (head < traversedCount)
     {
-        struct ViewMap node = traversal[head++];
+        struct ViewMap node = sViewTraversal[head++];
         const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(node.mapGroup, node.mapNum);
         const struct MapConnection *connection;
         s32 i, count, nodeGap;
@@ -2129,7 +2133,7 @@ static void BuildMapsInView(void)
             // A connection graph can loop, and a corner is reachable two ways; first path wins.
             for (j = 0; j < traversedCount; j++)
             {
-                if (traversal[j].mapGroup == child.mapGroup && traversal[j].mapNum == child.mapNum)
+                if (sViewTraversal[j].mapGroup == child.mapGroup && sViewTraversal[j].mapNum == child.mapNum)
                 {
                     seen = TRUE;
                     break;
@@ -2146,7 +2150,7 @@ static void BuildMapsInView(void)
                 continue;
 
             if (traversedCount < MAX_VIEW_TRAVERSAL)
-                traversal[traversedCount++] = child;
+                sViewTraversal[traversedCount++] = child;
         }
     }
 }

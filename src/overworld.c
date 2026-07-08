@@ -1692,35 +1692,68 @@ static void ProbeTTN(const char *where)
     }
 }
 #define PROBE_TTN(where) ProbeTTN(where)
-#else
-#define PROBE_TTN(where)
-#endif
 
-static void OverworldBasic(void)
+// System-stack watermark probe, for the top-of-IWRAM corruption (statics from ~gTasks[9] up through
+// gTransparentTileNumber getting scribbled). The main loop and every interrupt share one system stack
+// growing down from STACK_TOP toward the statics, whose end the linker exports as __iwram_statics_end;
+// a stack dip past that boundary produces exactly that corruption pattern. On first call this paints
+// the free gap with a canary; each frame it scans for the deepest excursion so far and logs every new
+// record (and screams when the headroom hits zero = the statics were overwritten by stack frames).
+// If the corruption happens WITHOUT this ever reporting low headroom, the cause is a stray write, not
+// the stack - then trap it with an mGBA watchpoint instead.
+extern u32 __iwram_statics_end[]; // linker symbol: first word past the IWRAM statics
+#define STACK_CANARY 0x5AC0FFEE
+#define STACK_TOP    0x03007F00 // sp_sys (crt0.s: IWRAM_END - 0x100); IRQ handlers run here too after IntrMain's mode switch
+
+// No initializers: an explicit one (even zero, under agbcc) lands these in .data, which the ld
+// scripts discard - link error. Implicit zero puts them in .bss; sStackLowWater is set at paint time.
+static bool8 sStackCanaryPainted;
+static u32 sStackLowWater;
+
+static void ProbeStackWatermark(const char *where)
 {
-    // Return last frame's freed composite slots to the pool before any redraws this frame (their
-    // tilemap cells have reached VRAM by now). Reusing a slot the same frame it was freed would tear.
-    FieldCompositorReclaimFreedSlots();
-    ScriptContext_RunScript();
-    RunTasks();
-    AnimateSprites();
-    CameraUpdate();
-    UpdateCliffFacePromotion();
-    UpdateObjectEventsRender();
-    UpdateGrassFieldEffectsFrontSplit();
-    UpdateCameraPanning();
-    BuildOamBuffer();
-    UpdatePaletteFade();
-    UpdateTilesetAnimations();
-    DoScheduledBgTilemapCopiesToVram();
+    const u32 *p = __iwram_statics_end;
+    u32 low;
 
-#ifndef NDEBUG
-    // DMA3 queue instrumentation: report the prior VBlank's transfer when it couldn't drain the
-    // queue (work slips to the next frame -> the "BG one frame behind the sprites" lag), or whenever
-    // the queue runs hot. Values are in bytes; 40 KiB is the per-VBlank cap in ProcessDma3Requests.
-    // Identify the dominant "other" (non-object-event) visible sprites by callback address: tally up to
-    // 6 distinct callbacks and report the busiest. Map the printed address against pokeemerald.elf to
-    // name the sprite type that's flooding OAM.
+    if (!sStackCanaryPainted)
+    {
+        // Paint the currently-free region (everything below SP is dead). An IRQ landing mid-paint just
+        // leaves dead frames that read as a (real) excursion on a later scan.
+        u32 sp;
+        u32 *q = __iwram_statics_end;
+
+        asm volatile ("mov %0, sp" : "=r" (sp));
+        while ((u32)q < sp - 64)
+            *q++ = STACK_CANARY;
+        sStackCanaryPainted = TRUE;
+        sStackLowWater = STACK_TOP;
+        return;
+    }
+
+    while (*p == STACK_CANARY && (u32)p < STACK_TOP)
+        p++;
+    low = (u32)p;
+    if (low < sStackLowWater)
+    {
+        sStackLowWater = low;
+        DebugPrintfLevel(low - (u32)__iwram_statics_end < 128 ? MGBA_LOG_ERROR : MGBA_LOG_WARN,
+                         "stack watermark: %d B headroom left (deepest use %d B) at %s",
+                         low - (u32)__iwram_statics_end, STACK_TOP - low, where);
+    }
+}
+#define PROBE_STACK(where) ProbeStackWatermark(where)
+
+// DMA3 queue instrumentation: report the prior VBlank's transfer when it couldn't drain the
+// queue (work slips to the next frame -> the "BG one frame behind the sprites" lag), or whenever
+// the queue runs hot. Values are in bytes; 40 KiB is the per-VBlank cap in ProcessDma3Requests.
+// Identify the dominant "other" (non-object-event) visible sprites by callback address: tally up to
+// 6 distinct callbacks and report the busiest. Map the printed address against pokeemerald.elf to
+// name the sprite type that's flooding OAM.
+// NOINLINE and out of OverworldBasic: its ~60 B of locals would live in OverworldBasic's frame for
+// the WHOLE frame, under every deep call path - the system-stack budget can't spare that (see
+// ProbeStackWatermark). As its own function the cost exists only during this call.
+static NOINLINE void ProbeOamReport(void)
+{
     if (gOamPeakUsed > 90 || gOamOverflowDropped != 0)
     {
         u32 i, j, visObj = 0;
@@ -1750,7 +1783,34 @@ static void OverworldBasic(void)
             gOamPeakUsed, visObj,
             cbAddr[0], cbCount[0], cbAddr[1], cbCount[1], cbAddr[2], cbCount[2], cbAddr[3], cbCount[3]);
     }
+}
+#define PROBE_OAM_REPORT() ProbeOamReport()
+#else
+#define PROBE_TTN(where)
+#define PROBE_STACK(where)
+#define PROBE_OAM_REPORT()
 #endif
+
+static void OverworldBasic(void)
+{
+    PROBE_STACK("frame");
+    // Return last frame's freed composite slots to the pool before any redraws this frame (their
+    // tilemap cells have reached VRAM by now). Reusing a slot the same frame it was freed would tear.
+    FieldCompositorReclaimFreedSlots();
+    ScriptContext_RunScript();
+    RunTasks();
+    AnimateSprites();
+    CameraUpdate();
+    UpdateCliffFacePromotion();
+    UpdateObjectEventsRender();
+    UpdateGrassFieldEffectsFrontSplit();
+    UpdateCameraPanning();
+    BuildOamBuffer();
+    UpdatePaletteFade();
+    UpdateTilesetAnimations();
+    DoScheduledBgTilemapCopiesToVram();
+
+    PROBE_OAM_REPORT();
 }
 
 // This CB2 is used when starting

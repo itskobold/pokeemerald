@@ -663,10 +663,11 @@ static const u16 *const sTilesetAnims_BattleDomeFloorLightPals[] = {
     gTilesetAnims_BattleDomePals0_3,
 };
 
+// Only entries below the size counter are ever read, so resetting the counter is enough; zeroing the
+// whole buffer every frame (as vanilla did) was wasted work.
 static void ResetTilesetAnimBuffer(void)
 {
     sTilesetDMA3TransferBufferSize = 0;
-    CpuFill32(0, sTilesetDMA3TransferBuffer, sizeof sTilesetDMA3TransferBuffer);
 }
 
 static void AppendTilesetAnimToBuffer(const u16 *src, u16 *dest, u16 size)
@@ -831,6 +832,8 @@ static u8 TerrainWavesSetForWind(void)
 
 static u16 sWavesPhasedStep;   // persistent shared water step (0..WAVES_STEP_WRAP-1)
 static u8 sWavesStepAccum;     // ticks accumulated toward the next step
+static u8 sWavesLoopPhase;     // step % WAVES_FRAME_COUNT, tracked instead of divided per frame
+                               // (exact because WAVES_STEP_WRAP is a multiple of WAVES_FRAME_COUNT)
 
 static u16 WavesFrameTicks(void)
 {
@@ -896,10 +899,26 @@ static u8 sWavesFlipDir;                            // the heading being flipped
 #define WAVES_FLIP_REBUILD_BUDGET 32               // bank frames reflattened per frozen frame (no step refresh, so headroom)
 
 // Byte offset of pixel (px,py) in a 16x16 metatile stored as 4 8bpp tiles in gbagfx order (TL,TR,BL,BR).
-static u32 WavePixelOffset(u32 px, u32 py)
+static inline u32 WavePixelOffset(u32 px, u32 py)
 {
     return ((py >> 3) * 2 + (px >> 3)) * TILE_SIZE_8BPP + (py & 7) * 8 + (px & 7);
 }
+
+// Each transform as an affine basis: source pixel (sx,sy) lands at dest (originX,originY) plus sx steps
+// of (stepXX,stepXY) and sy steps of (stepYX,stepYY). Lets BuildWaveDirFrames walk the pixels with two
+// adds instead of re-deriving the mapping per pixel.
+static const struct {
+    s8 originX, originY;
+    s8 stepXX, stepXY; // dest delta per source +x
+    s8 stepYX, stepYY; // dest delta per source +y
+} sWaveXforms[] = {
+    [XFORM_ID]      = { 0,  0,   1,  0,   0,  1 },
+    [XFORM_FLIPX]   = {15,  0,  -1,  0,   0,  1 },
+    [XFORM_FLIPY]   = { 0, 15,   1,  0,   0, -1 },
+    [XFORM_FLIPXY]  = {15, 15,  -1,  0,   0, -1 },
+    [XFORM_ROT_CW]  = {15,  0,   0,  1,  -1,  0 }, // (sx,sy) -> (15-sy, sx)
+    [XFORM_ROT_CCW] = { 0, 15,   0, -1,   1,  0 }, // (sx,sy) -> (sy, 15-sx)
+};
 
 // Rebuild the 6 per-direction wave frames from the base set, oriented for `dir`. Cheap (6 * 256 byte moves).
 // Does NOT touch the phase gradient - that switches only at the flip (SetWavePhaseForDir), so a flip in
@@ -914,24 +933,24 @@ static void BuildWaveDirFrames(u8 dir)
     {
         const u8 *src = (const u8 *)base[f];
         u8 *dst = sWaveDirBuf[f];
+        s32 rowDx = sWaveXforms[xform].originX;
+        s32 rowDy = sWaveXforms[xform].originY;
 
         for (sy = 0; sy < 16; sy++)
         {
+            // Source pixels of one 16-wide row: sequential within each 8-wide tile half.
+            const u8 *srcL = src + WavePixelOffset(0, sy);
+            const u8 *srcR = src + WavePixelOffset(8, sy);
+            s32 dx = rowDx, dy = rowDy;
+
             for (sx = 0; sx < 16; sx++)
             {
-                u32 dx, dy;
-
-                switch (xform)
-                {
-                case XFORM_FLIPX:   dx = 15 - sx; dy = sy;      break;
-                case XFORM_FLIPY:   dx = sx;      dy = 15 - sy; break;
-                case XFORM_FLIPXY:  dx = 15 - sx; dy = 15 - sy; break;
-                case XFORM_ROT_CW:  dx = 15 - sy; dy = sx;      break;
-                case XFORM_ROT_CCW: dx = sy;      dy = 15 - sx; break;
-                default:            dx = sx;      dy = sy;      break;
-                }
-                dst[WavePixelOffset(dx, dy)] = src[WavePixelOffset(sx, sy)];
+                dst[WavePixelOffset(dx, dy)] = (sx < 8) ? srcL[sx] : srcR[sx - 8];
+                dx += sWaveXforms[xform].stepXX;
+                dy += sWaveXforms[xform].stepXY;
             }
+            rowDx += sWaveXforms[xform].stepYX;
+            rowDy += sWaveXforms[xform].stepYY;
         }
         sWaveDirFrames[f] = (const u16 *)dst;
     }
@@ -992,6 +1011,7 @@ void InitTilesetAnim_Terrain(void)
     sWavesFlipLanding = FALSE;
     sWavesPhasedStep = 0;
     sWavesStepAccum = 0;
+    sWavesLoopPhase = 0;
     sWavesTravelDir = WaveDirForWind();
     BuildWaveDirFrames(sWavesTravelDir);
     SetWavePhaseForDir(sWavesTravelDir);
@@ -1031,12 +1051,84 @@ static void TilesetAnim_General(u16 timer)
         QueueAnimTiles_General_LandWaterEdge(timer / 16);
 }
 
-static void TilesetAnim_Terrain(u16 timer)
+// Drive an in-progress heading flip; TRUE while the surface is frozen (the caller must not advance the
+// phased step, so the display holds its last frame throughout).
+//
+// A heading flip changes both the crest orientation (bank content) and the phase gradient across the
+// WHOLE surface. Doing that in one frame either tears (live-flatten storm to VRAM) or spikes (rebuild
+// every wave bank at once), so instead it's staged: while frozen, the new crest banks reflatten a
+// bounded slice per frame into heap - no VRAM writes, no spike. When they're all rebuilt, the flip
+// lands atomically: switch the phase gradient, re-acquire the surface for it (DrawWholeMapView;
+// tilemap lands in VBlank), and copy the rebuilt banks into VRAM as cheap 64-byte writes via the
+// VBlank refresh. The freeze lasts only a handful of frames.
+static bool32 UpdateTerrainWavesFlip(void)
+{
+    if (!sWavesFlipPending)
+        return FALSE;
+
+    if (!sWavesFlipLanding)
+    {
+        // Staging: reflatten the new crest banks into heap (safe even while a textbox is up - no VRAM),
+        // then land once banks are ready AND field controls are free. HOLD the land under an open
+        // message box: its DrawWholeMapView redraws the whole map and would corrupt the BG0 text plane
+        // (e.g. the surf prompt, opened by pressing A on water mid-freeze). Once controls unlock, land:
+        // switch the phase gradient, re-phase the map (DrawWholeMapView; tilemap flushes in VBlank), and
+        // kick off the VBlank surface refresh - the recompose runs in VBlank so a full screen of
+        // large-delta writes lands during blanking instead of tearing mid-scanout.
+        if (FieldCompositorProcessBankRebuild(WAVES_FIRST_TILE, WAVES_FIRST_TILE + WAVES_TILE_COUNT - 1, WAVES_FLIP_REBUILD_BUDGET)
+         && !ArePlayerFieldControlsLocked())
+        {
+            SetWavePhaseForDir(sWavesFlipDir);
+            DrawWholeMapView();
+            FieldCompositorBeginPhasedFlipRefresh();
+            sWavesFlipLanding = TRUE;
+        }
+    }
+    else if (!FieldCompositorPhasedFlipRefreshActive())
+    {
+        // The VBlank refresh has recomposed the whole surface: the new heading is fully on screen. Resume.
+        sWavesFlipLanding = FALSE;
+        sWavesFlipPending = FALSE;
+    }
+    return TRUE;
+}
+
+// React to the current wind at a wave loop boundary, so the surface finishes its cycle before snapping.
+// A strength swap keeps every cell's phase (fixed band count) and lazily retires the old frames - no
+// redraw, safe any time. A heading change starts the staged flip (see UpdateTerrainWavesFlip); it's held
+// off while field controls are locked (an open message box - e.g. the surf prompt - or a running script)
+// so the redraw can't disturb a textbox. The wind holds steady while locked (see UpdateWindDirection),
+// so no heading change is even pending until controls free up. Returns TRUE when a flip was staged (the
+// freeze begins this frame).
+static bool32 UpdateTerrainWavesWind(void)
 {
     u8 desiredSet = TerrainWavesSetForWind();
     u8 desiredDir = WaveDirForWind();
-    u16 step;
+    bool32 dirChanged = (desiredDir != sWavesTravelDir) && !ArePlayerFieldControlsLocked();
 
+    if (desiredSet != sTerrainWavesSet && !dirChanged)
+    {
+        sTerrainWavesSet = desiredSet;
+        RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
+    }
+    if (dirChanged)
+    {
+        // Stage the flip: orient the new crest frames and (re)register the group (also applies any
+        // strength change) with rebuildMask set, so ProcessBankRebuild drains the reflattens over the
+        // next few frozen frames. The phase gradient stays on the old heading until the flip lands.
+        sWavesTravelDir = desiredDir;
+        sWavesFlipDir = desiredDir;
+        sTerrainWavesSet = desiredSet;
+        BuildWaveDirFrames(desiredDir);
+        RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
+        sWavesFlipPending = TRUE;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void TilesetAnim_Terrain(u16 timer)
+{
     // Advance the shared water step from a persistent accumulator rather than timer/16: the per-frame
     // cadence (WavesFrameTicks) grows as the wind drops, and a changing divisor would snap the phase.
     // Wraps at WAVES_STEP_WRAP like the old timer/16 so the water loops still close cleanly.
@@ -1046,85 +1138,22 @@ static void TilesetAnim_Terrain(u16 timer)
         sWavesStepAccum = 0;
         if (++sWavesPhasedStep >= WAVES_STEP_WRAP)
             sWavesPhasedStep = 0;
+        if (++sWavesLoopPhase >= WAVES_FRAME_COUNT)
+            sWavesLoopPhase = 0;
     }
-    step = sWavesPhasedStep;
 
     if (IsFieldCompositorActive())
     {
-        // A heading flip changes both the crest orientation (bank content) and the phase gradient across the
-        // WHOLE surface. Doing that in one frame either tears (live-flatten storm to VRAM) or spikes (rebuild
-        // every wave bank at once), so instead it's staged: the surface freezes (we skip the phased step, so
-        // the display holds its last frame) while the new crest banks reflatten a bounded slice per frame into
-        // heap - no VRAM writes, no spike. When they're all rebuilt, the flip lands atomically: switch the
-        // phase gradient, re-acquire the surface for it (DrawWholeMapView; tilemap lands in VBlank), and copy
-        // the rebuilt banks into VRAM as cheap 64-byte writes (FieldCompositorRefreshPhasedSlots, the same path
-        // a normal step tick uses - never tears). The freeze lasts only a handful of frames.
-        if (sWavesFlipPending)
-        {
-            if (!sWavesFlipLanding)
-            {
-                // Staging: reflatten the new crest banks into heap (safe even while a textbox is up - no VRAM),
-                // then land once banks are ready AND field controls are free. HOLD the land under an open
-                // message box: its DrawWholeMapView redraws the whole map and would corrupt the BG0 text plane
-                // (e.g. the surf prompt, opened by pressing A on water mid-freeze). Once controls unlock, land:
-                // switch the phase gradient, re-phase the map (DrawWholeMapView; tilemap flushes in VBlank), and
-                // kick off the VBlank surface refresh - the recompose runs in VBlank so a full screen of
-                // large-delta writes lands during blanking instead of tearing mid-scanout.
-                bool32 rebuilt = FieldCompositorProcessBankRebuild(WAVES_FIRST_TILE, WAVES_FIRST_TILE + WAVES_TILE_COUNT - 1, WAVES_FLIP_REBUILD_BUDGET);
-
-                if (rebuilt && !ArePlayerFieldControlsLocked())
-                {
-                    SetWavePhaseForDir(sWavesFlipDir);
-                    DrawWholeMapView();
-                    FieldCompositorBeginPhasedFlipRefresh();
-                    sWavesFlipLanding = TRUE;
-                }
-            }
-            else if (!FieldCompositorPhasedFlipRefreshActive())
-            {
-                // The VBlank refresh has recomposed the whole surface: the new heading is fully on screen. Resume.
-                sWavesFlipLanding = FALSE;
-                sWavesFlipPending = FALSE;
-            }
-            return; // frozen throughout (staging + landing): don't advance the phased step until done
-        }
-
-        // Switch only at a loop boundary (step wraps every WAVES_FRAME_COUNT), so the
-        // surface finishes its cycle before snapping. A strength swap keeps every cell's phase (fixed band
-        // count) and lazily retires the old frames - no redraw, safe any time. A heading change starts the
-        // staged flip above; it's held off while field controls are locked (an open message box - e.g. the
-        // surf prompt - or a running script) so the redraw can't disturb a textbox. The wind holds steady
-        // while locked (see UpdateWindDirection), so no heading change is even pending until controls free up.
-        if (step % WAVES_FRAME_COUNT == 0)
-        {
-            bool32 dirChanged = (desiredDir != sWavesTravelDir) && !ArePlayerFieldControlsLocked();
-            bool32 setChanged = (desiredSet != sTerrainWavesSet);
-
-            if (setChanged && !dirChanged)
-            {
-                sTerrainWavesSet = desiredSet;
-                RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
-            }
-            if (dirChanged)
-            {
-                // Stage the flip: orient the new crest frames and (re)register the group (also applies any
-                // strength change) with rebuildMask set, so ProcessBankRebuild drains the reflattens over the
-                // next few frozen frames. The phase gradient stays on the old heading until the flip lands.
-                sWavesTravelDir = desiredDir;
-                sWavesFlipDir = desiredDir;
-                sTerrainWavesSet = desiredSet;
-                BuildWaveDirFrames(desiredDir);
-                RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
-                sWavesFlipPending = TRUE;
-                return; // begin the freeze this frame
-            }
-        }
+        if (UpdateTerrainWavesFlip())
+            return; // frozen throughout the flip (staging + landing): hold the phased step until done
+        if (sWavesLoopPhase == 0 && UpdateTerrainWavesWind())
+            return; // a flip was just staged: begin the freeze this frame
     }
 
     // Water's animation frame advances every 16 timer ticks. All four water groups share one step and
     // flip together; each on-screen slot's new frame is a cheap copy from its pre-composited bank (see
     // FieldCompositorTickPhased), so the whole surface can update on one frame without a recompose spike.
-    FieldCompositorTickPhased(step);
+    FieldCompositorTickPhased(sWavesPhasedStep);
 }
 
 // Position -> raw signed phase for the water surfaces. A traveling wave toward the current wind heading:

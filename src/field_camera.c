@@ -353,6 +353,15 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
     DrawMetatileAtWithId(mapLayout, offset, x, y, MapGridGetMetatileIdAt(x, y));
 }
 
+// Per-subtile layer-routing scratch for DrawMetatileAtWithId. EWRAM statics, not locals: that
+// function sits under every deep redraw path (DrawWholeMapView during a wave heading flip, the
+// scroll-edge redraws) and the system-stack budget is tight (see ProbeStackWatermark in overworld.c).
+// Main-loop only, so statics are safe.
+static EWRAM_DATA u16 sLayers[3] = {0};
+static EWRAM_DATA u16 sBg[3] = {0};
+static EWRAM_DATA u16 sFg[3] = {0};
+static EWRAM_DATA u16 sRefl[3] = {0};
+
 // As DrawMetatileAt, but with the metatile id already resolved (lets callers that have fetched it —
 // e.g. the secondary-only redraw's id filter — skip a redundant map-grid lookup).
 static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, int x, int y, u16 metatileId)
@@ -421,25 +430,23 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     // bgMaterial swaps the ground layer for the material metatile's ground.
     for (p = 0; p < 4; p++)
     {
-        u16 layers[3];
-        u16 bg[3], fg[3], refl[3];
         u32 bgCount = 0, fgCount = 0, reflCount = 0;
         u32 l;
 
-        layers[0] = materialTiles ? materialTiles[p] : tiles[p];
-        layers[1] = tiles[4 + p];
-        layers[2] = tiles[8 + p];
+        sLayers[0] = materialTiles ? materialTiles[p] : tiles[p];
+        sLayers[1] = tiles[4 + p];
+        sLayers[2] = tiles[8 + p];
 
         for (l = 0; l < 3; l++)
         {
             if (fgMask & (1 << l))
-                fg[fgCount++] = layers[l];
+                sFg[fgCount++] = sLayers[l];
             else if (reflMask & (1 << l))
-                refl[reflCount++] = layers[l];
+                sRefl[reflCount++] = sLayers[l];
             else
-                bg[bgCount++] = layers[l];
+                sBg[bgCount++] = sLayers[l];
         }
-        DrawCompositeCell(offset + sSubTileCellOffsets[p], bg, bgCount, fg, fgCount, refl, reflCount, x, y);
+        DrawCompositeCell(offset + sSubTileCellOffsets[p], sBg, bgCount, sFg, fgCount, sRefl, reflCount, x, y);
     }
 }
 

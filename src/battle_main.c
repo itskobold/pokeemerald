@@ -248,7 +248,9 @@ EWRAM_DATA u8 gBattleMonForms[MAX_BATTLERS_COUNT] = {0};
 
 COMMON_DATA MainCallback gPreBattleCallback1 = NULL;
 COMMON_DATA void (*gBattleMainFunc)(void) = NULL;
-COMMON_DATA struct BattleResults gBattleResults = {0};
+// EWRAM, not IWRAM COMMON: battle bookkeeping, not perf-critical, and every byte of IWRAM statics
+// comes straight out of the system-stack budget (see ProbeStackWatermark in overworld.c).
+EWRAM_DATA struct BattleResults gBattleResults = {0};
 COMMON_DATA u8 gLeveledUpInBattle = 0;
 COMMON_DATA void (*gBattlerControllerFuncs[MAX_BATTLERS_COUNT])(void) = {0};
 COMMON_DATA u8 gHealthboxSpriteIds[MAX_BATTLERS_COUNT] = {0};

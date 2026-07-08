@@ -47,6 +47,8 @@ SECTIONS {
         INCLUDE "sym_common.ld"
         src/*.o(COMMON);
         *libc.a:sbrkr.o(COMMON);
+        . = ALIGN(4);
+        __iwram_statics_end = .; /* end of IWRAM statics; the gap from here to the stack top is the system-stack budget */
     } > IWRAM
 
     /* BEGIN ROM DATA */

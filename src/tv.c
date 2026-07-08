@@ -64,9 +64,11 @@ enum {
 };
 
 COMMON_DATA s8 sCurTVShowSlot = 0;
-COMMON_DATA u16 sTV_SecretBaseVisitMovesTemp[8] = {0};
-COMMON_DATA u8 sTV_DecorationsBuffer[DECOR_MAX_SECRET_BASE] = {0};
-COMMON_DATA struct {
+// EWRAM, not IWRAM COMMON: cold TV-show scratch, and every byte of IWRAM statics comes straight out
+// of the system-stack budget (see ProbeStackWatermark in overworld.c).
+EWRAM_DATA u16 sTV_SecretBaseVisitMovesTemp[8] = {0};
+EWRAM_DATA u8 sTV_DecorationsBuffer[DECOR_MAX_SECRET_BASE] = {0};
+EWRAM_DATA struct {
     u8 level;
     u16 species;
     u16 move;

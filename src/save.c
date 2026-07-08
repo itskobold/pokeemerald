@@ -88,7 +88,9 @@ COMMON_DATA u16 gIncrementalSectorId = 0;
 COMMON_DATA u16 gSaveUnusedVar = 0;
 COMMON_DATA u16 gSaveFileStatus = 0;
 COMMON_DATA MainCallback gGameContinueCallback = NULL;
-COMMON_DATA struct SaveSectorLocation gRamSaveSectorLocations[NUM_SECTORS_PER_SLOT] = {0};
+// EWRAM, not IWRAM COMMON: only touched during save/load, and every byte of IWRAM statics comes
+// straight out of the system-stack budget (see ProbeStackWatermark in overworld.c).
+EWRAM_DATA struct SaveSectorLocation gRamSaveSectorLocations[NUM_SECTORS_PER_SLOT] = {0};
 COMMON_DATA u16 gSaveUnusedVar2 = 0;
 COMMON_DATA u16 gSaveAttemptStatus = 0;
 
