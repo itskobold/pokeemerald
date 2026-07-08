@@ -1678,6 +1678,24 @@ void CB1_Overworld(void)
         DoCB1_Overworld(gMain.newKeys, gMain.heldKeys);
 }
 
+#ifndef NDEBUG
+extern u8 gTransparentTileNumber;
+// Poor-man's watchpoint for the gTransparentTileNumber corruption (a stray write sets it to 63, so window
+// clears fill their tilemaps with tile 63 instead of the blank tile 0). Log the frame phase that flips it,
+// then reset to 0 so the next occurrence is caught cleanly and the visible glitch is masked while testing.
+static void ProbeTTN(const char *where)
+{
+    if (gTransparentTileNumber != 0)
+    {
+        DebugPrintfLevel(MGBA_LOG_WARN, "TTN corrupted to %d after %s", gTransparentTileNumber, where);
+        gTransparentTileNumber = 0;
+    }
+}
+#define PROBE_TTN(where) ProbeTTN(where)
+#else
+#define PROBE_TTN(where)
+#endif
+
 static void OverworldBasic(void)
 {
     // Return last frame's freed composite slots to the pool before any redraws this frame (their
@@ -2048,9 +2066,16 @@ static void VBlankCB_Field(void)
     LoadOam();
     ProcessSpriteCopyRequests();
     ScanlineEffect_InitHBlankDmaTransfer();
+    //PROBE_TTN("vb_scanline");
     FieldUpdateBgTilemapScroll();
     TransferPlttBuffer();
     TransferTilesetAnimsBuffer();
+    // After a wind-heading flip re-phases the water, the whole surface is recomposed here in VBlank (bounded
+    // per frame) rather than in the main loop, so the full-screen large-delta writes land during blanking and
+    // don't tear. No-op unless a flip is landing. Held while field controls are locked (a menu/message box is
+    // up); the flip stays frozen and the refresh resumes once controls unlock (see TilesetAnim_Terrain).
+    if (!ArePlayerFieldControlsLocked())
+        FieldCompositorPhasedFlipRefreshTick(192);
 }
 
 // True while VBlankCB_Field is the active VBlank handler, i.e. FieldUpdateBgTilemapScroll's

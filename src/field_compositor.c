@@ -163,6 +163,14 @@ static EWRAM_DATA struct FrameBank sBanks[COMPOSITE_BANK_MAX] = {0};
 static u8 sBankCount;  // banks actually backed by sBankTiles (<= COMPOSITE_BANK_MAX; may be trimmed to fit the heap)
 static bool8 sBankPoolFull; // latched when the pool overflows, so the diagnostic prints once per episode
 static u8 *sBankTiles; // [sBankCount * COMPOSITE_BANK_FRAMES * TILE_SIZE_8BPP], heap; NULL disables banking
+// ComposeSlot's flatten scratch. In EWRAM, not on the stack: ComposeSlot runs both from the main loop and
+// from the field VBlank (FieldCompositorPhasedFlipRefreshTick). The interrupt dispatcher runs the VBlank
+// handler in system mode, i.e. on the SAME stack as the main loop, continuing from wherever it was - so a
+// 64-byte on-stack tile buffer here, on top of an already-deep main-loop frame, overran the top of IWRAM
+// (corrupting gTransparentTileNumber / gWindowBgTilemapBuffers just past the .bss end). Two buffers, one per
+// context, so a VBlank compose landing inside a main-loop compose can't clobber its half-built tile.
+static EWRAM_DATA ALIGNED(4) u8 sComposeScratch[TILE_SIZE_8BPP] = {0};
+static EWRAM_DATA ALIGNED(4) u8 sComposeScratchVBlank[TILE_SIZE_8BPP] = {0};
 static struct CompositeSlot *sPool; // [COMPOSITE_SLOT_COUNT]
 static u16 *sHashHead; // [COMPOSITE_HASH_SIZE]
 static u16 *sFreeList; // [COMPOSITE_SLOT_COUNT]
@@ -175,6 +183,10 @@ static u16 sFreeCount;
 static u16 *sPendingFree; // [COMPOSITE_SLOT_COUNT]
 static u16 sPendingFreeCount;
 static bool8 sActive;
+
+// VBlank-driven full-surface refresh after a heading flip (see FieldCompositorPhasedFlipRefreshTick).
+static bool8 sFlipRefreshActive;
+static u16 sFlipRefreshCursor;
 
 // Slots awaiting an animation recomposite (see COMPOSITE_ANIM_RECOMPOSE_BUDGET). A bitset keyed by
 // slot index, drained a few per frame by FieldCompositorTickAnim. sDirtyCursor rings through the
@@ -317,6 +329,7 @@ void FieldCompositorInit(void)
         sBankOffset[i] = i * 16;
     sAnimPrimaryCount = 0;
     sAnimSecondaryCount = 0;
+    sFlipRefreshActive = FALSE;
     FieldCompositorClearPhasedGroups();
     ResetPool();
     // Zero the blank composite tile in VRAM so empty foreground cells (slot 0) are transparent.
@@ -524,11 +537,13 @@ static void BuildBankFrame(struct FrameBank *bk, u32 bank, u32 idx)
 // the last frame or two, before BankBuildTick finished it) this one slot flattens live - the same cost a
 // non-banked cell always pays - so revealing water never triggers a burst of bank builds, just the
 // inherent per-cell composite. Non-phased slots always flatten live.
-static void ComposeSlot(u16 slot)
+// `scratch` is a TILE_SIZE_8BPP flatten buffer supplied by the caller (main loop vs VBlank use separate
+// EWRAM buffers, see sComposeScratch) instead of a stack local - this runs in the VBlank handler on the
+// shared system stack and a 64-byte frame here overflowed the top of IWRAM.
+static void ComposeSlot(u16 slot, u8 *scratch)
 {
     struct CompositeSlot *s = &sPool[slot];
     const void *src;
-    ALIGNED(4) u8 out[TILE_SIZE_8BPP];
 
     if (s->bank < sBankCount)
     {
@@ -539,14 +554,14 @@ static void ComposeSlot(u16 slot)
             src = sBankTiles + (s->bank * COMPOSITE_BANK_FRAMES + idx) * TILE_SIZE_8BPP;
         else
         {
-            FlattenRecipe(bk->entries, EntryCount(bk->entries), bk->maskBits, idx, out);
-            src = out;
+            FlattenRecipe(bk->entries, EntryCount(bk->entries), bk->maskBits, idx, scratch);
+            src = scratch;
         }
     }
     else
     {
-        FlattenRecipe(s->entries, SlotCount(s), s->maskBits, sPhasedStep + s->phase, out);
-        src = out;
+        FlattenRecipe(s->entries, SlotCount(s), s->maskBits, sPhasedStep + s->phase, scratch);
+        src = scratch;
     }
 
     // CPU copy, not DmaCopy32: this runs in the main loop during active display, and the field VBlank
@@ -757,7 +772,7 @@ static u16 AcquireHashedSlot(const u16 *norm, u32 n, u8 maskBits, u8 phase)
     sPool[slot].refcount = 1;
     sPool[slot].nextInBucket = sHashHead[bucket];
     sHashHead[bucket] = slot;
-    ComposeSlot(slot);
+    ComposeSlot(slot, sComposeScratch);
     return slot;
 }
 
@@ -1023,6 +1038,122 @@ void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, 
     }
 }
 
+// Re-flatten the live banks referencing [firstTileId, lastTileId] from the current source into the HEAP bank
+// tiles, but SPREAD over frames: reflatten up to `budget` frames per call and return TRUE once none remain.
+// The affected banks must have been marked (FieldCompositorReloadPhasedGroup sets rebuildMask); each call
+// drains a bounded slice, so a full-screen content swap costs no single-frame flatten spike. Writes only heap
+// (sBankTiles), never VRAM, so it never tears and never shows a partial frame - the caller keeps the surface
+// frozen (skips the phased step) until this returns TRUE, then re-phases + FieldCompositorRefreshPhasedSlots
+// to land the new content atomically. Used by the wind-heading wave swap over a full screen of water.
+bool32 FieldCompositorProcessBankRebuild(u16 firstTileId, u16 lastTileId, u32 budget)
+{
+    u32 i, e, m;
+    bool32 remaining = FALSE;
+
+    if (sBankTiles == NULL)
+        return TRUE;
+    for (i = 0; i < sBankCount; i++)
+    {
+        struct FrameBank *bk = &sBanks[i];
+        bool32 inRange = FALSE;
+        u16 need;
+
+        if (bk->refcount == 0)
+            continue;
+        for (e = 0; e < COMPOSITE_MAX_LAYERS; e++)
+        {
+            u16 tileId = bk->entries[e] & SUBTILE_ENTRY_TILE_MASK;
+            if (tileId >= firstTileId && tileId <= lastTileId)
+            {
+                inRange = TRUE;
+                break;
+            }
+        }
+        if (!inRange)
+            continue;
+
+        need = bk->rebuildMask & (u16)((1u << bk->period) - 1);
+        for (m = 0; m < bk->period; m++)
+        {
+            if (!(need & (1u << m)))
+                continue;
+            if (budget == 0)
+            {
+                remaining = TRUE;
+                break;
+            }
+            BuildBankFrame(bk, i, m); // heap write, sets builtMask bit m
+            bk->rebuildMask &= ~(1u << m);
+            budget--;
+        }
+        if (bk->rebuildMask & (u16)((1u << bk->period) - 1))
+            remaining = TRUE;
+    }
+    return !remaining;
+}
+
+// Recompose every live phased slot into its VRAM tile now, regardless of a step change. A built bank is a
+// cheap 64-byte copy; only a not-yet-built/unbanked slot flattens live. Called from the main-loop step tick
+// (FieldCompositorTickPhased), where the per-frame delta is tiny so the mid-scanout writes don't visibly
+// tear. NOT for a heading flip - a full screen of large-delta writes mid-scanout DOES tear; that path uses
+// the VBlank-driven refresh below instead.
+void FieldCompositorRefreshPhasedSlots(void)
+{
+    u16 slot;
+
+    if (!sActive || sPool == NULL)
+        return;
+    for (slot = 1; slot < COMPOSITE_SLOT_COUNT; slot++)
+        if (sPool[slot].bank != BANK_NONE && sPool[slot].refcount != 0)
+            ComposeSlot(slot, sComposeScratch);
+}
+
+// VBlank-driven full-surface refresh (see FieldCompositorPhasedFlipRefreshTick). Set after a heading flip
+// re-phases the map: the slots must be recomposed to their new content, but doing that in the main loop
+// writes a full screen of large-delta tiles during active scanout = tearing. Instead the tick below runs
+// from the field VBlank, bounded per frame, so every write lands during blanking - tear-free. State declared
+// with the pool statics up top (sFlipRefreshActive/Cursor) so FieldCompositorInit can clear it.
+void FieldCompositorBeginPhasedFlipRefresh(void)
+{
+    sFlipRefreshActive = TRUE;
+    sFlipRefreshCursor = 1;
+}
+
+bool32 FieldCompositorPhasedFlipRefreshActive(void)
+{
+    return sFlipRefreshActive;
+}
+
+// Recompose up to `budget` live phased slots into VRAM, resuming from the last cursor. Returns TRUE once the
+// whole slot range is done (and clears the active flag). MUST be called from the field VBlank so the VRAM
+// writes don't tear; bounded so a full screen spreads over a couple of VBlanks without overrunning one.
+bool32 FieldCompositorPhasedFlipRefreshTick(u32 budget)
+{
+    if (!sFlipRefreshActive)
+        return TRUE;
+    if (!sActive || sPool == NULL)
+    {
+        sFlipRefreshActive = FALSE;
+        return TRUE;
+    }
+    while (budget != 0 && sFlipRefreshCursor < COMPOSITE_SLOT_COUNT)
+    {
+        u16 slot = sFlipRefreshCursor++;
+
+        if (sPool[slot].bank != BANK_NONE && sPool[slot].refcount != 0)
+        {
+            ComposeSlot(slot, sComposeScratchVBlank);
+            budget--;
+        }
+    }
+    if (sFlipRefreshCursor >= COMPOSITE_SLOT_COUNT)
+    {
+        sFlipRefreshActive = FALSE;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 // Drop all phased groups. Called before a primary tileset re-registers its own (phased groups live in
 // primary-tileset tile-id space, so a map load resets them); the map's full redraw reacquires cells at
 // fresh phases afterward.
@@ -1042,17 +1173,13 @@ void FieldCompositorClearPhasedGroups(void)
 // bank; only unbanked-phased slots re-flatten. Call once per frame; only a real step change does work.
 void FieldCompositorTickPhased(u16 step)
 {
-    u16 slot;
-
     if (!sActive)
         return;
     BankBuildTick(); // spread new recipes' frame builds across frames (runs every frame, not just on step change)
     if (step == sPhasedStep)
         return;
     sPhasedStep = step;
-    for (slot = 1; slot < COMPOSITE_SLOT_COUNT; slot++)
-        if (sPool[slot].bank != BANK_NONE && sPool[slot].refcount != 0)
-            ComposeSlot(slot);
+    FieldCompositorRefreshPhasedSlots();
 }
 
 // Recomposite (or, when deferred, mark dirty) every live slot whose recipe references a source tile
@@ -1076,7 +1203,7 @@ static void RecomposeSourceRange(u16 firstTileId, u16 lastTileId, bool32 deferre
                 if (deferred)
                     MarkSlotDirty(slot);
                 else
-                    ComposeSlot(slot);
+                    ComposeSlot(slot, sComposeScratch);
                 break;
             }
         }
@@ -1103,7 +1230,7 @@ void FieldCompositorTickAnim(void)
         if (sDirtyBits[slot >> 5] & (1u << (slot & 31)))
         {
             if (sPool[slot].refcount != 0)
-                ComposeSlot(slot);
+                ComposeSlot(slot, sComposeScratch);
             ClearSlotDirty(slot);
             budget--;
         }

@@ -90,6 +90,27 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
 // re-phasing redraw is needed. See the .c comment. Used by the terrain water waves scaling with the wind.
 void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16 x, s16 y));
 
+// Drain, up to `budget` frames per call, the pending bank rebuilds (rebuildMask, set by
+// FieldCompositorReloadPhasedGroup) for banks referencing [firstTileId, lastTileId]; returns TRUE when none
+// remain. Reflattens into heap only (no VRAM writes, no tearing), spread across frames so a full-screen
+// content swap never spikes. Keep the surface frozen (skip the phased step) until it returns TRUE, then
+// re-phase + FieldCompositorRefreshPhasedSlots to land the new content atomically. Used by the wind-heading
+// wave swap.
+bool32 FieldCompositorProcessBankRebuild(u16 firstTileId, u16 lastTileId, u32 budget);
+
+// Recompose every live phased slot into VRAM now (cheap bank copies), from the main-loop step tick where the
+// per-frame delta is tiny. For a heading flip's full-screen large-delta refresh use the VBlank path below.
+void FieldCompositorRefreshPhasedSlots(void);
+
+// Start a VBlank-driven refresh of the whole phased surface (after a heading flip re-phases the map). Doing
+// the recompose in the main loop tears (a screen of large-delta writes mid-scanout); FieldCompositorPhased-
+// FlipRefreshTick, called bounded from the field VBlank, lands every write during blanking instead.
+void FieldCompositorBeginPhasedFlipRefresh(void);
+bool32 FieldCompositorPhasedFlipRefreshActive(void);
+// Recompose up to `budget` phased slots, resuming from the cursor; TRUE when the surface is fully refreshed.
+// Call ONLY from the field VBlank.
+bool32 FieldCompositorPhasedFlipRefreshTick(u32 budget);
+
 // Drop all phased groups (call when a primary tileset that owns them is being swapped out; the new
 // tileset re-registers its own). Phased groups live in primary-tileset tile-id space.
 void FieldCompositorClearPhasedGroups(void);

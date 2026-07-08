@@ -2054,8 +2054,15 @@ void UpdateClouds(void)
 
     if (cloudsActive)
     {
-        UpdateWindDirection();
-        UpdateWindSpeed();
+        // Hold the wind (heading and speed) steady while field controls are locked - an open message box (e.g.
+        // the surf prompt) or a running script. This keeps the wind-driven wave surface from wanting to swap
+        // heading mid-textbox, where the re-phasing redraw would disturb the box. The clouds still drift on the
+        // current wind; only the target-tracking steps are paused.
+        if (!ArePlayerFieldControlsLocked())
+        {
+            UpdateWindDirection();
+            UpdateWindSpeed();
+        }
         UpdateCloudsMovement();
     }
 

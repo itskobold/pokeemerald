@@ -7,6 +7,8 @@
 #include "battle_transition.h"
 #include "fieldmap.h"
 #include "field_compositor.h"
+#include "field_camera.h"
+#include "script.h"
 
 static EWRAM_DATA struct {
     const u16 *src;
@@ -161,6 +163,8 @@ const u16 *const gTilesetAnims_Terrain_Water_Deep_Edge[] = {
     gTilesetAnims_Terrain_Water_Deep_Edge_Frame11
 };
 
+// Two source wave sets: the cardinal crest flows N->S (down), the diagonal crest flows NE->SW (down-left).
+// Every wind heading reuses one of these, mirrored/rotated to point the right way (see BuildWaveDirFrames).
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/0.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/1.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/2.png", ".8bpp", "-palette_mod 16");
@@ -168,27 +172,23 @@ const u16 gTilesetAnims_Terrain_Water_Waves_Frame3[] = INCGFX_U16("data/tilesets
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/4.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/5.png", ".8bpp", "-palette_mod 16");
 
-const u16 *const gTilesetAnims_Terrain_Water_Waves_Calm[] = {
-    gTilesetAnims_Terrain_Water_Waves_Frame0,
-    gTilesetAnims_Terrain_Water_Waves_Frame3,
-    gTilesetAnims_Terrain_Water_Waves_Frame4,
-    gTilesetAnims_Terrain_Water_Waves_Frame5
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/5.png", ".8bpp", "-palette_mod 16");
+
+static const u16 *const sWaveBaseCardinal[6] = {
+    gTilesetAnims_Terrain_Water_Waves_Frame0, gTilesetAnims_Terrain_Water_Waves_Frame1,
+    gTilesetAnims_Terrain_Water_Waves_Frame2, gTilesetAnims_Terrain_Water_Waves_Frame3,
+    gTilesetAnims_Terrain_Water_Waves_Frame4, gTilesetAnims_Terrain_Water_Waves_Frame5,
 };
 
-const u16 *const gTilesetAnims_Terrain_Water_Waves_Mid[] = {
-    gTilesetAnims_Terrain_Water_Waves_Frame0,
-    gTilesetAnims_Terrain_Water_Waves_Frame2,
-    gTilesetAnims_Terrain_Water_Waves_Frame3,
-    gTilesetAnims_Terrain_Water_Waves_Frame4,
-};
-
-const u16 *const gTilesetAnims_Terrain_Water_Waves_Rough[] = {
-    gTilesetAnims_Terrain_Water_Waves_Frame0,
-    gTilesetAnims_Terrain_Water_Waves_Frame1,
-    gTilesetAnims_Terrain_Water_Waves_Frame2,
-    gTilesetAnims_Terrain_Water_Waves_Frame3,
-    gTilesetAnims_Terrain_Water_Waves_Frame4,
-    gTilesetAnims_Terrain_Water_Waves_Frame5
+static const u16 *const sWaveBaseDiag[6] = {
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame0, gTilesetAnims_Terrain_Water_Waves_Diag_Frame1,
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame2, gTilesetAnims_Terrain_Water_Waves_Diag_Frame3,
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame4, gTilesetAnims_Terrain_Water_Waves_Diag_Frame5,
 };
 
 
@@ -788,20 +788,24 @@ enum {
 #define WAVES_WIND_MID   12
 #define WAVES_WIND_ROUGH 19
 
-// Fixed band count for the waves group, held constant across every set (>= the largest set's frameCount)
-// so a cell's phase (band = (x-y) % WAVES_BAND_COUNT) doesn't change when the frame set swaps - that's what
-// lets the wind-driven swap avoid a re-phasing full redraw. See FieldCompositorReloadPhasedGroup.
-#define WAVES_BAND_COUNT 6
+// Every wave set is WAVES_FRAME_COUNT frames, so a cell's phase (band = PhaseFn_Terrain_Water %
+// WAVES_FRAME_COUNT) doesn't change when the frame set swaps - that's what lets a wind-strength swap avoid a
+// re-phasing full redraw. See FieldCompositorReloadPhasedGroup. (A wind-heading change does alter the phase
+// and redraws; see below.)
+#define WAVES_FRAME_COUNT 6
 
-static const struct {
-    const u16 *const *frames;
-    u8 frameCount;
-} sTerrainWavesSets[] = {
-    // Locked reuses the rough array at frameCount 1 (every set starts on frame 0), so it just holds frame 0.
-    [WAVES_SET_LOCKED] = { gTilesetAnims_Terrain_Water_Waves_Rough, 1 },
-    [WAVES_SET_CALM]   = { gTilesetAnims_Terrain_Water_Waves_Calm,  ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves_Calm) },
-    [WAVES_SET_MID]    = { gTilesetAnims_Terrain_Water_Waves_Mid,   ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves_Mid) },
-    [WAVES_SET_ROUGH]  = { gTilesetAnims_Terrain_Water_Waves_Rough, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Waves_Rough) },
+// Each set is a selection of the 6 direction frames (built by BuildWaveDirFrames), in play order. Locked
+// (dead calm) just repeats frame 0, so it animates uniformly like the rest but holds a single image.
+static const u8 sWaveSetLocked[] = {0, 0, 0, 0, 0, 0};
+static const u8 sWaveSetCalm[]   = {0, 0, 0, 3, 4, 5};
+static const u8 sWaveSetMid[]    = {0, 0, 2, 3, 4, 5};
+static const u8 sWaveSetRough[]  = {0, 1, 2, 3, 4, 5};
+
+static const u8 *const sTerrainWavesSets[] = {
+    [WAVES_SET_LOCKED] = sWaveSetLocked,
+    [WAVES_SET_CALM]   = sWaveSetCalm,
+    [WAVES_SET_MID]    = sWaveSetMid,
+    [WAVES_SET_ROUGH]  = sWaveSetRough,
 };
 
 static u8 sTerrainWavesSet;
@@ -818,28 +822,161 @@ static u8 TerrainWavesSetForWind(void)
     return WAVES_SET_ROUGH;
 }
 
-// (Re)register the waves phased group for `set`. bandCount is fixed (WAVES_BAND_COUNT), NOT the set's
-// frameCount, so the per-cell phase stays put across a swap. `reload` takes the live-swap path (repairs
-// banks + marks slots dirty, no redraw); a fresh map load registers cold.
-static void RegisterTerrainWavesGroup(u8 set, bool32 reload)
-{
-    const u16 *const *frames = sTerrainWavesSets[set].frames;
-    u8 count = sTerrainWavesSets[set].frameCount;
+// ---- Wind-direction-driven wave travel -------------------------------------------------------------
+// The waves flow toward the wind heading, quantised to 8 directions. Each direction reuses one of the two
+// base wave sets (cardinal / diagonal), mirrored or rotated so the crest points the right way, plus a phase
+// gradient (PhaseFn_Terrain_Water) so the traveling wave crosses the map in the same direction. Direction is
+// handled like wind strength: it only switches at a wave loop boundary, and only when the quantised heading
+// actually changes.
+enum {
+    WAVE_BASE_CARDINAL,
+    WAVE_BASE_DIAG,
+};
 
-    if (reload)
-        FieldCompositorReloadPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, 0x184, 4, frames, count, WAVES_BAND_COUNT, PhaseFn_Terrain_Water);
-    else
-        FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, 0x184, 4, frames, count, WAVES_BAND_COUNT, PhaseFn_Terrain_Water);
+// Frame transform applied to a 16x16 base frame to orient it. The cardinal base flows S, the diagonal base
+// flows SW; the rest are those mirrored/rotated (see the numerically verified mapping in sWaveDirs).
+enum {
+    XFORM_ID,
+    XFORM_FLIPX,   // mirror across y axis (left<->right)
+    XFORM_FLIPY,   // mirror across x axis (up<->down)
+    XFORM_FLIPXY,  // 180 deg
+    XFORM_ROT_CW,  // 90 deg clockwise
+    XFORM_ROT_CCW, // 90 deg counter-clockwise
+};
+
+enum {
+    WAVE_DIR_N, WAVE_DIR_NE, WAVE_DIR_E,  WAVE_DIR_SE,
+    WAVE_DIR_S, WAVE_DIR_SW, WAVE_DIR_W,  WAVE_DIR_NW,
+};
+
+static const struct {
+    u8 base;
+    u8 xform;
+    s8 travelX; // screen travel vector (x right, y down); the phase gradient is -travel (see PhaseFn).
+    s8 travelY;
+} sWaveDirs[8] = {
+    [WAVE_DIR_N]  = { WAVE_BASE_CARDINAL, XFORM_FLIPY,    0, -1 },
+    [WAVE_DIR_NE] = { WAVE_BASE_DIAG,     XFORM_FLIPXY,   1, -1 },
+    [WAVE_DIR_E]  = { WAVE_BASE_CARDINAL, XFORM_ROT_CCW,  1,  0 },
+    [WAVE_DIR_SE] = { WAVE_BASE_DIAG,     XFORM_FLIPX,    1,  1 },
+    [WAVE_DIR_S]  = { WAVE_BASE_CARDINAL, XFORM_ID,       0,  1 },
+    [WAVE_DIR_SW] = { WAVE_BASE_DIAG,     XFORM_ID,      -1,  1 }, // the original NE->SW flow
+    [WAVE_DIR_W]  = { WAVE_BASE_CARDINAL, XFORM_ROT_CW,  -1,  0 },
+    [WAVE_DIR_NW] = { WAVE_BASE_DIAG,     XFORM_FLIPY,   -1, -1 },
+};
+
+static u8 sWavesTravelDir;                        // current WAVE_DIR_*
+static s8 sWavePhaseX, sWavePhaseY;               // phase gradient = -travel, read by PhaseFn_Terrain_Water
+static EWRAM_DATA ALIGNED(4) u8 sWaveDirBuf[6][TILE_SIZE_8BPP * 4] = {0}; // 6 frames of 4 8bpp tiles, oriented for the current dir
+static const u16 *sWaveDirFrames[6];              // -> each sWaveDirBuf frame
+static const u16 *sActiveWaveFrames[6];           // current set's selection into sWaveDirFrames
+
+// Heading-flip staging (see TilesetAnim_Terrain): while a flip is in progress the surface is frozen. First the
+// new crest banks reflatten a bounded slice per frame (staging); then the map re-phases and the surface is
+// recomposed in VBlank, bounded, over a frame or two (landing). Frozen throughout so nothing tears/spikes.
+static bool8 sWavesFlipPending;
+static bool8 sWavesFlipLanding;                    // staging done; VBlank surface refresh in progress
+static u8 sWavesFlipDir;                            // the heading being flipped to
+#define WAVES_FLIP_REBUILD_BUDGET 32               // bank frames reflattened per frozen frame (no step refresh, so headroom)
+
+// Byte offset of pixel (px,py) in a 16x16 metatile stored as 4 8bpp tiles in gbagfx order (TL,TR,BL,BR).
+static u32 WavePixelOffset(u32 px, u32 py)
+{
+    return ((py >> 3) * 2 + (px >> 3)) * TILE_SIZE_8BPP + (py & 7) * 8 + (px & 7);
+}
+
+// Rebuild the 6 per-direction wave frames from the base set, oriented for `dir`. Cheap (6 * 256 byte moves).
+// Does NOT touch the phase gradient - that switches only at the flip (SetWavePhaseForDir), so a flip in
+// progress keeps the frozen surface on its old phase until the new crest banks are ready.
+static void BuildWaveDirFrames(u8 dir)
+{
+    const u16 *const *base = (sWaveDirs[dir].base == WAVE_BASE_DIAG) ? sWaveBaseDiag : sWaveBaseCardinal;
+    u8 xform = sWaveDirs[dir].xform;
+    u32 f, sx, sy;
+
+    for (f = 0; f < 6; f++)
+    {
+        const u8 *src = (const u8 *)base[f];
+        u8 *dst = sWaveDirBuf[f];
+
+        for (sy = 0; sy < 16; sy++)
+        {
+            for (sx = 0; sx < 16; sx++)
+            {
+                u32 dx, dy;
+
+                switch (xform)
+                {
+                case XFORM_FLIPX:   dx = 15 - sx; dy = sy;      break;
+                case XFORM_FLIPY:   dx = sx;      dy = 15 - sy; break;
+                case XFORM_FLIPXY:  dx = 15 - sx; dy = 15 - sy; break;
+                case XFORM_ROT_CW:  dx = 15 - sy; dy = sx;      break;
+                case XFORM_ROT_CCW: dx = sy;      dy = 15 - sx; break;
+                default:            dx = sx;      dy = sy;      break;
+                }
+                dst[WavePixelOffset(dx, dy)] = src[WavePixelOffset(sx, sy)];
+            }
+        }
+        sWaveDirFrames[f] = (const u16 *)dst;
+    }
+}
+
+// Point the shared water phase gradient at `dir` (all four water groups travel this way). -travel so the SW
+// default reduces to the original x - y.
+static void SetWavePhaseForDir(u8 dir)
+{
+    sWavePhaseX = -sWaveDirs[dir].travelX;
+    sWavePhaseY = -sWaveDirs[dir].travelY;
+}
+
+// Quantise the wind heading (BAM angle, 0=N clockwise) to one of the 8 travel directions.
+static u8 WaveDirForWind(void)
+{
+    return ((gSaveBlock1Ptr->weatherState.windDirection + 16) >> 5) & 7;
+}
+
+// Tile range the waves phased group occupies (0x184, 4 tiles); the direction swap rebuilds its banks by range.
+#define WAVES_FIRST_TILE 0x184
+#define WAVES_TILE_COUNT 4
+
+// How RegisterTerrainWavesGroup (re)registers the waves group:
+enum {
+    WAVES_REG_COLD, // fresh map load: cold register
+    WAVES_REG_LAZY, // strength / heading swap: re-point frames + mark banks for rebuild (rebuildMask), no redraw
+};
+
+// (Re)register the waves phased group for `set`, pulling the set's frames from the current direction buffer.
+// Every set is WAVES_FRAME_COUNT frames, so band count == frame count and the per-cell phase stays put across
+// a strength swap.
+static void RegisterTerrainWavesGroup(u8 set, u8 mode)
+{
+    const u8 *idx = sTerrainWavesSets[set];
+    u8 i;
+
+    for (i = 0; i < WAVES_FRAME_COUNT; i++)
+        sActiveWaveFrames[i] = sWaveDirFrames[idx[i]];
+
+    if (mode == WAVES_REG_LAZY)
+        FieldCompositorReloadPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, WAVES_FIRST_TILE, WAVES_TILE_COUNT, sActiveWaveFrames, WAVES_FRAME_COUNT, WAVES_FRAME_COUNT, PhaseFn_Terrain_Water);
+    else // WAVES_REG_COLD: cold register
+        FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_WAVES, WAVES_FIRST_TILE, WAVES_TILE_COUNT, sActiveWaveFrames, WAVES_FRAME_COUNT, WAVES_FRAME_COUNT, PhaseFn_Terrain_Water);
 }
 
 void InitTilesetAnim_Terrain(void)
 {
     sPrimaryTilesetAnimCounter = 0;
-    // 768 = 48 steps of 16 frames: divisible by 12 (water/deep/deep-edge) and by every waves loop length
-    // (4/6, and 1 when locked) so each water group wraps cleanly, and a multiple of 256 so inheriting
-    // secondaries don't regress.
+    // 768 = 48 steps of 16 frames: divisible by 12 (water/deep/deep-edge) and by 6 (the waves loop length)
+    // so each water group wraps cleanly, and a multiple of 256 so inheriting secondaries don't regress.
     sPrimaryTilesetAnimCounterMax = 768;
     sPrimaryTilesetAnimCallback = TilesetAnim_Terrain;
+
+    // All four water groups travel toward the wind heading: orient the wave frames and set the shared phase
+    // gradient before registering, so PhaseFn_Terrain_Water reads the right direction from the first draw.
+    sWavesFlipPending = FALSE;
+    sWavesFlipLanding = FALSE;
+    sWavesTravelDir = WaveDirForWind();
+    BuildWaveDirFrames(sWavesTravelDir);
+    SetWavePhaseForDir(sWavesTravelDir);
 
     // Water animates per position: the displayed frame is picked from each cell's map location
     // (PhaseFn_Terrain_Water) so the surface ripples across the map instead of moving in unison. The
@@ -852,7 +989,7 @@ void InitTilesetAnim_Terrain(void)
         gTilesetAnims_Terrain_Water_Deep_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep_Edge), 12, PhaseFn_Terrain_Water);
     // Waves start at whatever set the current wind calls for, then swap at loop boundaries as it changes.
     sTerrainWavesSet = TerrainWavesSetForWind();
-    RegisterTerrainWavesGroup(sTerrainWavesSet, FALSE);
+    RegisterTerrainWavesGroup(sTerrainWavesSet, WAVES_REG_COLD);
 }
 
 void InitTilesetAnim_Building(void)
@@ -879,18 +1016,79 @@ static void TilesetAnim_General(u16 timer)
 static void TilesetAnim_Terrain(u16 timer)
 {
     u16 step = timer / 16;
-    u8 desired = TerrainWavesSetForWind();
+    u8 desiredSet = TerrainWavesSetForWind();
+    u8 desiredDir = WaveDirForWind();
 
-    // Wind changed the wave strength: swap the waves frame set, but only at a loop boundary of the set
-    // currently playing (step wraps every frameCount), so the surface finishes its cycle before the
-    // shorter / longer / locked loop takes over instead of snapping mid-wave. The reload keeps every
-    // cell's phase (fixed band count) and just repairs banks + marks the water slots dirty, which the
-    // per-frame dirty drain recomposes gradually - no full redraw, so the swap doesn't spike.
-    if (IsFieldCompositorActive() && desired != sTerrainWavesSet
-        && step % sTerrainWavesSets[sTerrainWavesSet].frameCount == 0)
+    if (IsFieldCompositorActive())
     {
-        sTerrainWavesSet = desired;
-        RegisterTerrainWavesGroup(desired, TRUE);
+        // A heading flip changes both the crest orientation (bank content) and the phase gradient across the
+        // WHOLE surface. Doing that in one frame either tears (live-flatten storm to VRAM) or spikes (rebuild
+        // every wave bank at once), so instead it's staged: the surface freezes (we skip the phased step, so
+        // the display holds its last frame) while the new crest banks reflatten a bounded slice per frame into
+        // heap - no VRAM writes, no spike. When they're all rebuilt, the flip lands atomically: switch the
+        // phase gradient, re-acquire the surface for it (DrawWholeMapView; tilemap lands in VBlank), and copy
+        // the rebuilt banks into VRAM as cheap 64-byte writes (FieldCompositorRefreshPhasedSlots, the same path
+        // a normal step tick uses - never tears). The freeze lasts only a handful of frames.
+        if (sWavesFlipPending)
+        {
+            if (!sWavesFlipLanding)
+            {
+                // Staging: reflatten the new crest banks into heap (safe even while a textbox is up - no VRAM),
+                // then land once banks are ready AND field controls are free. HOLD the land under an open
+                // message box: its DrawWholeMapView redraws the whole map and would corrupt the BG0 text plane
+                // (e.g. the surf prompt, opened by pressing A on water mid-freeze). Once controls unlock, land:
+                // switch the phase gradient, re-phase the map (DrawWholeMapView; tilemap flushes in VBlank), and
+                // kick off the VBlank surface refresh - the recompose runs in VBlank so a full screen of
+                // large-delta writes lands during blanking instead of tearing mid-scanout.
+                bool32 rebuilt = FieldCompositorProcessBankRebuild(WAVES_FIRST_TILE, WAVES_FIRST_TILE + WAVES_TILE_COUNT - 1, WAVES_FLIP_REBUILD_BUDGET);
+
+                if (rebuilt && !ArePlayerFieldControlsLocked())
+                {
+                    SetWavePhaseForDir(sWavesFlipDir);
+                    DrawWholeMapView();
+                    FieldCompositorBeginPhasedFlipRefresh();
+                    sWavesFlipLanding = TRUE;
+                }
+            }
+            else if (!FieldCompositorPhasedFlipRefreshActive())
+            {
+                // The VBlank refresh has recomposed the whole surface: the new heading is fully on screen. Resume.
+                sWavesFlipLanding = FALSE;
+                sWavesFlipPending = FALSE;
+            }
+            return; // frozen throughout (staging + landing): don't advance the phased step until done
+        }
+
+        // Switch only at a loop boundary (step wraps every WAVES_FRAME_COUNT), so the
+        // surface finishes its cycle before snapping. A strength swap keeps every cell's phase (fixed band
+        // count) and lazily retires the old frames - no redraw, safe any time. A heading change starts the
+        // staged flip above; it's held off while field controls are locked (an open message box - e.g. the
+        // surf prompt - or a running script) so the redraw can't disturb a textbox. The wind holds steady
+        // while locked (see UpdateWindDirection), so no heading change is even pending until controls free up.
+        if (step % WAVES_FRAME_COUNT == 0)
+        {
+            bool32 dirChanged = (desiredDir != sWavesTravelDir) && !ArePlayerFieldControlsLocked();
+            bool32 setChanged = (desiredSet != sTerrainWavesSet);
+
+            if (setChanged && !dirChanged)
+            {
+                sTerrainWavesSet = desiredSet;
+                RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
+            }
+            if (dirChanged)
+            {
+                // Stage the flip: orient the new crest frames and (re)register the group (also applies any
+                // strength change) with rebuildMask set, so ProcessBankRebuild drains the reflattens over the
+                // next few frozen frames. The phase gradient stays on the old heading until the flip lands.
+                sWavesTravelDir = desiredDir;
+                sWavesFlipDir = desiredDir;
+                sTerrainWavesSet = desiredSet;
+                BuildWaveDirFrames(desiredDir);
+                RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
+                sWavesFlipPending = TRUE;
+                return; // begin the freeze this frame
+            }
+        }
     }
 
     // Water's animation frame advances every 16 timer ticks. All four water groups share one step and
@@ -899,12 +1097,13 @@ static void TilesetAnim_Terrain(u16 timer)
     FieldCompositorTickPhased(step);
 }
 
-// Position -> animation band for the water surfaces. A diagonal traveling wave: adjacent tiles along
-// the x+y diagonal are one frame apart. The compositor takes this mod the group's frame count, so only
-// that many distinct bands ever composite (keeps large water areas off the slot pool).
+// Position -> animation band for the water surfaces. A traveling wave toward the current wind heading:
+// the phase gradient (-travel vector, set by BuildWaveDirFrames) advances one band per tile along the
+// flow. The compositor takes this mod the group's frame count, so only that many distinct bands ever
+// composite (keeps large water areas off the slot pool). The default SW flow reduces to the old x - y.
 static u8 PhaseFn_Terrain_Water(s16 x, s16 y)
 {
-    return x - y;
+    return sWavePhaseX * x + sWavePhaseY * y;
 }
 
 static void TilesetAnim_Building(u16 timer)
