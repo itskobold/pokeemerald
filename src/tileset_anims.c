@@ -49,7 +49,6 @@ static void TilesetAnim_BikeShop(u16);
 static void TilesetAnim_BattlePyramid(u16);
 static void TilesetAnim_BattleDome(u16);
 static s16 PhaseFn_Terrain_Water(s16, s16);
-static s16 PhaseFn_Zero(s16, s16);
 static void QueueAnimTiles_General_Flower(u16);
 static void QueueAnimTiles_General_Water(u16);
 static void QueueAnimTiles_General_SandWaterEdge(u16);
@@ -1184,10 +1183,11 @@ void InitTilesetAnim_Terrain(void)
     // Border must be phased too, not an override anim: its tiles share subtiles with the phased water
     // (metatiles blend water + border), so those slots get banked - and a banked slot copies its
     // pre-built frame, ignoring override writes, which froze the old QueueAnimTiles approach. As a phased
-    // group the ping-pong (4-frame {0,1,2,1}) bakes into the banks. Uniform phase (PhaseFn_Zero, 1 band)
-    // so the whole border animates in unison; it shares the water step, so it advances at the water rate.
+    // group the ping-pong (4-frame {0,1,2,1}) bakes into the banks. Position-dependent phase
+    // (PhaseFn_Terrain_Water, bandCount 12 as the water surfaces) so the border ripples across the map with
+    // the wind in step with the water it edges, rather than animating in unison.
     FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_LAND_BORDER, 0x190, 10,
-        gTilesetAnims_Terrain_Water_Land_Border, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Land_Border), 1, PhaseFn_Zero);
+        gTilesetAnims_Terrain_Water_Land_Border, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Land_Border), 12, PhaseFn_Terrain_Water);
     // Currents: phased for the same reason as the border (they blend with the phased waves, so their slots
     // bank). Position-dependent phase (PhaseFn_Terrain_Water, bandCount = frameCount) so they ripple across
     // the map with the wind like the water surfaces, rather than cycling in unison.
@@ -1338,14 +1338,6 @@ static void TilesetAnim_Terrain(u16 timer)
 static s16 PhaseFn_Terrain_Water(s16 x, s16 y)
 {
     return sWavePhaseX * x + sWavePhaseY * y;
-}
-
-// Uniform phase: every cell shows the same frame in unison (no traveling wave). Used by the water/land
-// border, which ping-pongs as one rather than rippling across the map.
-static s16 PhaseFn_Zero(s16 x, s16 y)
-{
-    (void)x; (void)y;
-    return 0;
 }
 
 static void TilesetAnim_Building(u16 timer)

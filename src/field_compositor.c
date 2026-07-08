@@ -129,7 +129,7 @@ struct PhasedAnimGroup
 // Layer count of a left-packed (transparent entries dropped) recipe; derivable, so it isn't stored.
 static inline u32 EntryCount(const u16 *e)
 {
-    return e[2] ? 3 : (e[1] ? 2 : (e[0] ? 1 : 0));
+    return e[3] ? 4 : (e[2] ? 3 : (e[1] ? 2 : (e[0] ? 1 : 0)));
 }
 
 static inline u32 SlotCount(const struct CompositeSlot *s)
@@ -792,7 +792,8 @@ static u8 ResolveBank(const u16 *entries, u32 n, u8 maskBits)
         if (sBanks[i].maskBits == maskBits
          && sBanks[i].entries[0] == (n > 0 ? entries[0] : 0)
          && sBanks[i].entries[1] == (n > 1 ? entries[1] : 0)
-         && sBanks[i].entries[2] == (n > 2 ? entries[2] : 0))
+         && sBanks[i].entries[2] == (n > 2 ? entries[2] : 0)
+         && sBanks[i].entries[3] == (n > 3 ? entries[3] : 0))
         {
             sBanks[i].refcount++;
             return i;
@@ -940,7 +941,7 @@ u16 FieldCompositorAcquireMasked(const u16 *draw, u32 drawCount, const u16 *mask
     if (n == 0)
         return COMPOSITE_BLANK_SLOT;
 
-    // Mask entries fill the remaining slots (draw + mask never exceeds the 3 metatile layers).
+    // Mask entries fill the remaining slots (draw + mask never exceeds COMPOSITE_MAX_LAYERS).
     for (i = 0; i < maskCount; i++)
     {
         if ((mask[i] & SUBTILE_ENTRY_TILE_MASK) != 0 && n < COMPOSITE_MAX_LAYERS)

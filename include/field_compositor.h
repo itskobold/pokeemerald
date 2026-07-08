@@ -23,8 +23,9 @@
 
 // Maximum metatile sub-tile entries composited into one output tile. A metatile has three layers
 // (ground/middle/top) and the per-metatile compositing flags can route all three into the same
-// plane (see METATILE_COMPOSITE_*), so a single plane's cell can need all three.
-#define COMPOSITE_MAX_LAYERS 3
+// plane (see METATILE_COMPOSITE_*). A bgMaterial tile adds a 4th, background-only layer (the ground
+// material composites beneath the tile's own three layers), so the background plane can need four.
+#define COMPOSITE_MAX_LAYERS 4
 
 void FieldCompositorInit(void);
 void FieldCompositorFree(void);

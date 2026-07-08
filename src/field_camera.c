@@ -43,7 +43,7 @@ static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
 static void DrawMetatileAtWithId(const struct MapLayout *, u16, int, int, u16 metatileId);
-static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32, const u16 *, u32, s16, s16);
+static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32, const u16 *, u32, bool32, s16, s16);
 static bool32 IsCliffPromotedCell(int, int);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
@@ -343,7 +343,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
         {
             u16 bg = tiles[p];
             u16 fg = tiles[4 + p];
-            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1, NULL, 0, x, y);
+            DrawCompositeCell(offset + sSubTileCellOffsets[p], &bg, 1, &fg, 1, NULL, 0, FALSE, x, y);
         }
     }
 }
@@ -358,18 +358,35 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
 // scroll-edge redraws) and the system-stack budget is tight (see ProbeStackWatermark in overworld.c).
 // Main-loop only, so statics are safe.
 static EWRAM_DATA u16 sLayers[3] = {0};
-static EWRAM_DATA u16 sBg[3] = {0};
-static EWRAM_DATA u16 sFg[3] = {0};
-static EWRAM_DATA u16 sRefl[3] = {0};
+// Each holds up to 4: the bgMaterial background layer plus all three of the tile's own layers. The
+// material routes with the bottom layer's plane flags, so it can land in any of the three planes.
+static EWRAM_DATA u16 sBg[4] = {0};
+static EWRAM_DATA u16 sFg[4] = {0};
+static EWRAM_DATA u16 sRefl[4] = {0};
+
+// Layer content at a subtile, for the cliff-promotion scan. Layer 0 also counts the bgMaterial ground
+// that fills an empty ground cell: the material stands in for the bottom layer, so it must promote
+// with it to occlude a behind-cliff object under material-backed ground. NULL materialTiles = tile only.
+static inline bool32 LayerSubtileHasContent(const u16 *tiles, const u16 *materialTiles, u32 layer, u32 sub)
+{
+    if ((tiles[layer * 4 + sub] & 0x3FF) != 0)
+        return TRUE;
+    return layer == 0 && materialTiles != NULL && (materialTiles[sub] & 0x3FF) != 0;
+}
 
 // As DrawMetatileAt, but with the metatile id already resolved (lets callers that have fetched it —
 // e.g. the secondary-only redraw's id filter — skip a redundant map-grid lookup).
 static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, int x, int y, u16 metatileId)
 {
     const u16 *tiles;
-    // Set for flagged metatiles: the tile's bottom layer is replaced by primary metatile
-    // #bgMaterial (0-15)'s bottom layer. NULL = normal render.
+    // Set for flagged metatiles: primary metatile #bgMaterial (0-15)'s ground composites beneath the
+    // tile's own layers in the empty bottom-layer cells. NULL = normal render.
     const u16 *materialTiles = NULL;
+    // The bgMaterial metatile id (valid when materialTiles != NULL) and whether ITS OWN layer-0
+    // reflection flags mark it reflective — the material routes to BG3/BG2 per its own setup, not the
+    // overlay tile's, so an overlay whose layer 0 reflects can't drag a plain material onto BG3.
+    u16 materialId = 0;
+    bool32 materialReflects = FALSE;
     // True when an object stands behind a cliff at this tile: the cell composites using the
     // metatile's "behind cliff" layer flags instead of its "in front of cliff" flags.
     bool32 promote = IsCliffPromotedCell(x, y);
@@ -381,6 +398,8 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     // behind the reflection sprites and punch a hole through the BG2 background composite. Resolved
     // from the compositing byte's reflection-layer selector below, after fgMask is finalised.
     u32 reflMask;
+    // When set, reflection layers hole-punch the bg plane; when clear they only draw to BG3.
+    bool32 punchHole;
     u32 p;
 
     if (metatileId > NUM_METATILES_TOTAL)
@@ -389,7 +408,10 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     // Only metatiles flagged "use bg material" take the bgMaterial render path — fetch the material
     // (a second map-grid read) only then, since the vast majority of metatiles don't use it.
     if (UNPACK_USES_BGMATERIAL(attributes))
-        materialTiles = mapLayout->primaryTileset->metatiles + MapGridGetBgMaterialAt(x, y) * NUM_TILES_PER_METATILE;
+    {
+        materialId = MapGridGetBgMaterialAt(x, y);
+        materialTiles = mapLayout->primaryTileset->metatiles + materialId * NUM_TILES_PER_METATILE;
+    }
     if (metatileId < NUM_METATILES_IN_PRIMARY)
         tiles = mapLayout->primaryTileset->metatiles + metatileId * NUM_TILES_PER_METATILE;
     else
@@ -411,29 +433,60 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
         for (l = 0; l < 3 && fgEmpty; l++)
             if (fgMask & (1 << l))
                 for (sub = 0; sub < 4; sub++)
-                    if ((tiles[l * 4 + sub] & 0x3FF) != 0) { fgEmpty = FALSE; break; }
+                    if (LayerSubtileHasContent(tiles, materialTiles, l, sub)) { fgEmpty = FALSE; break; }
         if (fgEmpty)
             for (l = 0; l < 3; l++)
                 for (sub = 0; sub < 4; sub++)
-                    if ((tiles[l * 4 + sub] & 0x3FF) != 0) { fgMask |= (1 << l); break; }
+                    if (LayerSubtileHasContent(tiles, materialTiles, l, sub)) { fgMask |= (1 << l); break; }
     }
 
-    // Reflection layers: the explicit per-layer selector wins; a background layer it names goes to
-    // BG3. As a fallback, a metatile with a reflection type but no selector routes ALL its background
-    // layers to BG3 (the simple "whole-tile reflective" case). Foreground layers never reflect.
-    reflMask = METATILE_COMPOSITE_REFLECTION_LAYERMASK(GetMetatileCompositingById(metatileId)) & ~fgMask;
+    // Reflection layers: the explicit per-layer flag mask wins; each background layer it names goes
+    // to BG3 (multiple layers may be flagged). As a fallback, a metatile with a reflection type but
+    // no flags routes ALL its background layers to BG3 (the "whole-tile reflective" case). Foreground
+    // layers never reflect.
+    reflMask = METATILE_COMPOSITE_REFLECTION(GetMetatileCompositingById(metatileId)) & ~fgMask;
     if (reflMask == 0 && UNPACK_REFLECTION(attributes) != METATILE_REFLECTION_NONE)
         reflMask = METATILE_COMPOSITE_LAYER_MASK & ~fgMask;
+    // With the punch flag set, reflection layers hole-punch the BG2 composite so the surface shows
+    // through opaque bg (the original behaviour). Without it they only draw to BG3, visible solely
+    // where BG2 is transparent (BG3 sits behind BG2).
+    punchHole = UNPACK_REFLECTION_PUNCH(attributes);
+
+    // The material composites per its OWN reflection flags: its layer 0 reflects if the material
+    // metatile flags that layer reflective, or (whole-tile-reflective fallback) it has a reflection
+    // type with no explicit per-layer flags. Otherwise it draws to the bg plane, which sits above BG3.
+    if (materialTiles)
+    {
+        u32 mRefl = METATILE_COMPOSITE_REFLECTION(GetMetatileCompositingById(materialId));
+        materialReflects = (mRefl & (1 << 0))
+                        || (mRefl == 0 && UNPACK_REFLECTION(GetMetatileAttributesById(materialId)) != METATILE_REFLECTION_NONE);
+    }
 
     // For each of the metatile's four sub-tiles, route its three layers (ground/middle/top) into the
     // foreground, background, or reflection plane, preserving bottom->top order within each plane.
-    // bgMaterial swaps the ground layer for the material metatile's ground.
+    // bgMaterial composites the material metatile's ground as an extra bottom layer (see below).
     for (p = 0; p < 4; p++)
     {
         u32 bgCount = 0, fgCount = 0, reflCount = 0;
         u32 l;
 
-        sLayers[0] = materialTiles ? materialTiles[p] : tiles[p];
+        // bgMaterial: the material metatile's ground layer composites beneath the tile's own three
+        // layers (a 4th layer). Gated per-subtile: only EMPTY bottom-layer cells (id 0) get it — a
+        // non-empty ground subtile fully occupies the cell. Foreground routing tracks the overlay's
+        // BOTTOM layer (so behind a cliff the material promotes with the ground it stands in for);
+        // reflection uses the MATERIAL's own flags, so a non-reflective material stays on the bg
+        // plane even when the overlay's layer 0 reflects.
+        if (materialTiles && (tiles[p] & 0x3FF) == 0)
+        {
+            if (fgMask & (1 << 0))
+                sFg[fgCount++] = materialTiles[p];
+            else if (materialReflects)
+                sRefl[reflCount++] = materialTiles[p];
+            else
+                sBg[bgCount++] = materialTiles[p];
+        }
+
+        sLayers[0] = tiles[p];
         sLayers[1] = tiles[4 + p];
         sLayers[2] = tiles[8 + p];
 
@@ -446,7 +499,7 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
             else
                 sBg[bgCount++] = sLayers[l];
         }
-        DrawCompositeCell(offset + sSubTileCellOffsets[p], sBg, bgCount, sFg, fgCount, sRefl, reflCount, x, y);
+        DrawCompositeCell(offset + sSubTileCellOffsets[p], sBg, bgCount, sFg, fgCount, sRefl, reflCount, punchHole, x, y);
     }
 }
 
@@ -456,15 +509,17 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
 //   BG1 (fg)   = foreground entries
 //   BG2 (bg)   = background entries, with holes punched wherever a reflection entry is opaque
 //   BG3 (refl) = reflection entries (the reflective surface, drawn behind the reflection sprites)
-// The reflection entries drive both BG3 (drawn) and the BG2 mask, so the surface shows through the
-// hole it cuts in the background plane.
-static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount, const u16 *reflEntries, u32 reflCount, s16 x, s16 y)
+// With punchHole set the reflection entries drive both BG3 (drawn) and the BG2 mask, so the surface
+// shows through the hole it cuts in the background plane. With it clear the reflection only draws to
+// BG3, visible solely where BG2 happens to be transparent (BG3 sits behind BG2).
+static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, const u16 *fgEntries, u32 fgCount, const u16 *reflEntries, u32 reflCount, bool32 punchHole, s16 x, s16 y)
 {
     u16 oldFg = gOverworldTilemapBuffer_Bg1[offset] & 0x3FF;
     u16 oldBg = gOverworldTilemapBuffer_Bg2[offset] & 0x3FF;
     u16 oldRefl = gOverworldTilemapBuffer_Bg3[offset] & 0x3FF;
     u16 newFg = FieldCompositorAcquire(fgEntries, fgCount, x, y);
-    u16 newBg = FieldCompositorAcquireMasked(bgEntries, bgCount, reflEntries, reflCount, x, y);
+    u16 newBg = punchHole ? FieldCompositorAcquireMasked(bgEntries, bgCount, reflEntries, reflCount, x, y)
+                          : FieldCompositorAcquire(bgEntries, bgCount, x, y);
     u16 newRefl = FieldCompositorAcquire(reflEntries, reflCount, x, y);
 
     // On pool exhaustion Acquire returns COMPOSITE_SLOT_KEEP: leave the cell's current tile in place

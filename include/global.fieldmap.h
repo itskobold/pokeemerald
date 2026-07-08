@@ -81,12 +81,13 @@ enum
 
 // Masks/shifts for metatile attributes
 // Metatile attributes consist of an 8 bit behavior value, a "use bg material" flag,
-// a 2 bit reflection type, 1 unused bit, and a 4 bit layer type value.
+// a 2 bit reflection type, a "reflection punch" flag, and a 4 bit layer type value.
 // This is the data stored in each data/tilesets/*/*/metatile_attributes.bin file
 #define METATILE_ATTR_BEHAVIOR_MASK 0x00FF // Bits 0-7
 #define METATILE_ATTR_BGMATERIAL    0x0100 // Bit 8, gate the bgMaterial render path
 #define METATILE_ATTR_REFLECTION_MASK  0x0600 // Bits 9-10, reflection type (see MetatileReflectionType)
 #define METATILE_ATTR_REFLECTION_SHIFT 9
+#define METATILE_ATTR_REFLECTION_PUNCH 0x0800 // Bit 11, punch a hole in the bg plane so the reflection shows through
 #define METATILE_ATTR_LAYER_MASK    0xF000 // Bits 12-15
 #define METATILE_ATTR_BEHAVIOR_SHIFT 0
 #define METATILE_ATTR_LAYER_SHIFT   12
@@ -97,6 +98,7 @@ enum
 #define UNPACK_LAYER_TYPE(data) UNPACK(data, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
 #define UNPACK_USES_BGMATERIAL(data) (((data) & METATILE_ATTR_BGMATERIAL) != 0)
 #define UNPACK_REFLECTION(data) UNPACK(data, METATILE_ATTR_REFLECTION_SHIFT, METATILE_ATTR_REFLECTION_MASK)
+#define UNPACK_REFLECTION_PUNCH(data) (((data) & METATILE_ATTR_REFLECTION_PUNCH) != 0)
 
 // Per-metatile reflection type. Drives which objects cast a reflection over the tile and how the
 // tile's background layer composites (reflective tiles go to BG3, behind the reflection sprites).
@@ -109,26 +111,22 @@ enum MetatileReflectionType
     METATILE_REFLECTION_WAVY,  // Wavy reflection (formerly MB_PUDDLE / water)
 };
 
-// Per-metatile foreground/background compositing flags. One u8 per metatile, stored in each
-// data/tilesets/*/*/metatile_compositing.bin (loaded parallel to metatile_attributes). The two
-// cliff states each get 3 bits, one per metatile layer (0=ground, 1=middle, 2=top): a set bit
-// composites that layer into the foreground plane for that state, a clear bit into the background.
-//   bits 0-2  in front of cliff: layer 0/1/2 -> foreground
-//   bits 3-5  behind cliff:      layer 0/1/2 -> foreground
-//   bits 6-7  reflection layer selector: 0 = none, else layer (value-1) is a reflection layer
-// A reflection layer renders to the BG3 reflective plane and punches a transparent hole through the
-// BG2 background composite wherever it is opaque, so the reflection surface shows through it.
+// Per-metatile foreground/background compositing flags. One u16 per metatile, stored in each
+// data/tilesets/*/*/metatile_compositing.bin (loaded parallel to metatile_attributes). Three 3-bit
+// fields, one bit per metatile layer (0=ground, 1=middle, 2=top):
+//   bits 0-2  in front of cliff: layer 0/1/2 -> foreground (else background)
+//   bits 3-5  behind cliff:      layer 0/1/2 -> foreground (else background)
+//   bits 6-8  reflection:        layer 0/1/2 is a reflection layer (bitmask; multiple may be set)
+// A reflection layer renders to the BG3 reflective plane and (with the attribute punch flag) punches
+// a transparent hole through the BG2 background composite wherever it is opaque.
 #define METATILE_COMPOSITE_FRONT_SHIFT  0
 #define METATILE_COMPOSITE_BEHIND_SHIFT 3
-#define METATILE_COMPOSITE_LAYER_MASK   0x7
 #define METATILE_COMPOSITE_REFLECTION_SHIFT 6
-#define METATILE_COMPOSITE_REFLECTION_MASK  0x3
+#define METATILE_COMPOSITE_LAYER_MASK   0x7
 #define METATILE_COMPOSITE_FRONT(flags)  (((flags) >> METATILE_COMPOSITE_FRONT_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
 #define METATILE_COMPOSITE_BEHIND(flags) (((flags) >> METATILE_COMPOSITE_BEHIND_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
-// Reflection layer index+1 (0 = no reflection layer); as a layer bitmask via METATILE_COMPOSITE_REFLECTION_LAYERMASK.
-#define METATILE_COMPOSITE_REFLECTION(flags) (((flags) >> METATILE_COMPOSITE_REFLECTION_SHIFT) & METATILE_COMPOSITE_REFLECTION_MASK)
-#define METATILE_COMPOSITE_REFLECTION_LAYERMASK(flags) \
-    (METATILE_COMPOSITE_REFLECTION(flags) ? (1u << (METATILE_COMPOSITE_REFLECTION(flags) - 1)) : 0u)
+// Reflection layer bitmask (bit per layer, 0 = no reflection layer).
+#define METATILE_COMPOSITE_REFLECTION(flags) (((flags) >> METATILE_COMPOSITE_REFLECTION_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
 
 enum {
     METATILE_LAYER_TYPE_NORMAL,  // Metatile uses middle and top bg layers
@@ -153,7 +151,7 @@ struct Tileset
     /*0x08*/ const u16 *palettes; // flat: primary banks 0-5, secondary banks 6-12 (16 colours each)
     /*0x0C*/ const u16 *metatiles;
     /*0x10*/ const u16 *metatileAttributes;
-    /*0x14*/ const u8 *metatileCompositing; // per-metatile fg/bg layer flags, see METATILE_COMPOSITE_*
+    /*0x14*/ const u16 *metatileCompositing; // per-metatile fg/bg layer flags, see METATILE_COMPOSITE_*
     /*0x18*/ TilesetCB callback;
     // Optional 16-byte bank->base-offset table for the 8bpp compositor. The compositor adds
     // base[palField] to each non-zero source pixel (see field_compositor.c). NULL = default

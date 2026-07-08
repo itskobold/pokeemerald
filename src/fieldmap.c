@@ -873,8 +873,14 @@ u32 MapGridGetMetatileIdAt(int x, int y)
 
 u32 MapGridGetMetatileBehaviorAt(int x, int y)
 {
-    u16 metatile = MapGridGetMetatileIdAt(x, y);
-    return UNPACK_BEHAVIOR(GetMetatileAttributesById(metatile));
+    u16 attributes = GetMetatileAttributesById(MapGridGetMetatileIdAt(x, y));
+    u32 behavior = UNPACK_BEHAVIOR(attributes);
+
+    // bgMaterial overlays keep their own behavior — but a plain (MB_NORMAL) overlay inherits the
+    // ground material's behavior, so its terrain feel (grass, sand, ...) comes from the material.
+    if (UNPACK_USES_BGMATERIAL(attributes) && behavior == MB_NORMAL)
+        behavior = UNPACK_BEHAVIOR(GetMetatileAttributesById(MapGridGetBgMaterialAt(x, y)));
+    return behavior;
 }
 
 u8 MapGridGetMetatileLayerTypeAt(int x, int y)
@@ -941,7 +947,7 @@ u16 GetMetatileAttributesById(u16 metatile)
 }
 
 // Per-metatile compositing flags (METATILE_COMPOSITE_*), 0 for out-of-range ids.
-u8 GetMetatileCompositingById(u16 metatile)
+u16 GetMetatileCompositingById(u16 metatile)
 {
     if (metatile < NUM_METATILES_IN_PRIMARY)
         return gMapHeader.mapLayout->primaryTileset->metatileCompositing[metatile];
