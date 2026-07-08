@@ -105,7 +105,7 @@ struct FrameBank
 // copy. The chosen phase (0..frameCount-1) is folded into the slot recipe key, so cells in the same
 // band still share a slot; distinct on-screen slots stay bounded by frameCount per recipe, not by the
 // number of animated cells - that bound is what keeps large water areas off the 512-slot pool.
-#define COMPOSITE_PHASED_GROUP_COUNT 8
+#define COMPOSITE_PHASED_GROUP_COUNT 12
 
 struct PhasedAnimGroup
 {

@@ -233,6 +233,68 @@ const u16 *const gTilesetAnims_Terrain_Water_Land_Border[] = {
     gTilesetAnims_Terrain_Water_Land_Border_Frame1
 };
 
+// Water currents: 12-frame cycle, 2x2 tiles each. Phased (not override): the currents share subtiles with
+// the phased waves, so their slots get banked - a banked slot copies its pre-built frame and ignores
+// override writes, which would freeze a QueueAnimTiles approach. As a phased group the frames bake into
+// the banks. Position-dependent phase (PhaseFn_Terrain_Water) so they ripple across the map with the wind
+// like the water surfaces.
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents/11.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water_Currents[] = {
+    gTilesetAnims_Terrain_Water_Currents_Frame0,
+    gTilesetAnims_Terrain_Water_Currents_Frame1,
+    gTilesetAnims_Terrain_Water_Currents_Frame2,
+    gTilesetAnims_Terrain_Water_Currents_Frame3,
+    gTilesetAnims_Terrain_Water_Currents_Frame4,
+    gTilesetAnims_Terrain_Water_Currents_Frame5,
+    gTilesetAnims_Terrain_Water_Currents_Frame6,
+    gTilesetAnims_Terrain_Water_Currents_Frame7,
+    gTilesetAnims_Terrain_Water_Currents_Frame8,
+    gTilesetAnims_Terrain_Water_Currents_Frame9,
+    gTilesetAnims_Terrain_Water_Currents_Frame10,
+    gTilesetAnims_Terrain_Water_Currents_Frame11
+};
+
+// Water currents (side): same format/handling as water_currents (see above), a separate 12-frame 2x2 set.
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Currents_Side_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_currents_side/11.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water_Currents_Side[] = {
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame0,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame1,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame2,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame3,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame4,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame5,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame6,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame7,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame8,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame9,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame10,
+    gTilesetAnims_Terrain_Water_Currents_Side_Frame11
+};
+
 // Two source wave sets: the cardinal crest flows N->S (down), the diagonal crest flows NE->SW (down-left).
 // Every wind heading reuses one of these, mirrored/rotated to point the right way (see BuildWaveDirFrames).
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/0.png", ".8bpp", "-palette_mod 16");
@@ -856,6 +918,8 @@ enum {
     PHASED_GROUP_TERRAIN_WATER_SHALLOW,
     PHASED_GROUP_TERRAIN_WATER_SHALLOW_EDGE,
     PHASED_GROUP_TERRAIN_WATER_LAND_BORDER,
+    PHASED_GROUP_TERRAIN_WATER_CURRENTS,
+    PHASED_GROUP_TERRAIN_WATER_CURRENTS_SIDE,
     PHASED_GROUP_TERRAIN_WATER_WAVES,
 };
 
@@ -1124,6 +1188,13 @@ void InitTilesetAnim_Terrain(void)
     // so the whole border animates in unison; it shares the water step, so it advances at the water rate.
     FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_LAND_BORDER, 0x190, 10,
         gTilesetAnims_Terrain_Water_Land_Border, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Land_Border), 1, PhaseFn_Zero);
+    // Currents: phased for the same reason as the border (they blend with the phased waves, so their slots
+    // bank). Position-dependent phase (PhaseFn_Terrain_Water, bandCount = frameCount) so they ripple across
+    // the map with the wind like the water surfaces, rather than cycling in unison.
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_CURRENTS, 0x19A, 4,
+        gTilesetAnims_Terrain_Water_Currents, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Currents), 12, PhaseFn_Terrain_Water);
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_CURRENTS_SIDE, 0x19E, 4,
+        gTilesetAnims_Terrain_Water_Currents_Side, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Currents_Side), 12, PhaseFn_Terrain_Water);
     // Waves start at whatever set the current wind calls for, then swap at loop boundaries as it changes.
     sTerrainWavesSet = TerrainWavesSetForWind();
     RegisterTerrainWavesGroup(sTerrainWavesSet, WAVES_REG_COLD);
