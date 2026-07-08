@@ -9,6 +9,7 @@
 #include "field_compositor.h"
 #include "field_camera.h"
 #include "script.h"
+#include "constants/field_weather.h"
 
 static EWRAM_DATA struct {
     const u16 *src;
@@ -47,7 +48,7 @@ static void TilesetAnim_MauvilleGym(u16);
 static void TilesetAnim_BikeShop(u16);
 static void TilesetAnim_BattlePyramid(u16);
 static void TilesetAnim_BattleDome(u16);
-static u8 PhaseFn_Terrain_Water(s16, s16);
+static s16 PhaseFn_Terrain_Water(s16, s16);
 static void QueueAnimTiles_General_Flower(u16);
 static void QueueAnimTiles_General_Water(u16);
 static void QueueAnimTiles_General_SandWaterEdge(u16);
@@ -822,6 +823,21 @@ static u8 TerrainWavesSetForWind(void)
     return WAVES_SET_ROUGH;
 }
 
+// Terrain water frames advance every WavesFrameTicks() frames (the shared water step; see TilesetAnim_Terrain).
+// The top wind level (WIND_SPEED_MAX) animates at WAVES_FRAME_TICKS; each point of wind below adds one tick, so
+// the surface animates progressively slower as the wind drops.
+#define WAVES_FRAME_TICKS 16
+#define WAVES_STEP_WRAP   48   // steps before wrap (768/16); keeps the 12- and 6-frame water loops closing clean
+
+static u16 sWavesPhasedStep;   // persistent shared water step (0..WAVES_STEP_WRAP-1)
+static u8 sWavesStepAccum;     // ticks accumulated toward the next step
+
+static u16 WavesFrameTicks(void)
+{
+    u8 speed = gSaveBlock1Ptr->weatherState.windSpeed;
+    return (speed >= WIND_SPEED_MAX) ? WAVES_FRAME_TICKS : WAVES_FRAME_TICKS + (WIND_SPEED_MAX - speed);
+}
+
 // ---- Wind-direction-driven wave travel -------------------------------------------------------------
 // The waves flow toward the wind heading, quantised to 8 directions. Each direction reuses one of the two
 // base wave sets (cardinal / diagonal), mirrored or rotated so the crest points the right way, plus a phase
@@ -974,6 +990,8 @@ void InitTilesetAnim_Terrain(void)
     // gradient before registering, so PhaseFn_Terrain_Water reads the right direction from the first draw.
     sWavesFlipPending = FALSE;
     sWavesFlipLanding = FALSE;
+    sWavesPhasedStep = 0;
+    sWavesStepAccum = 0;
     sWavesTravelDir = WaveDirForWind();
     BuildWaveDirFrames(sWavesTravelDir);
     SetWavePhaseForDir(sWavesTravelDir);
@@ -1015,9 +1033,21 @@ static void TilesetAnim_General(u16 timer)
 
 static void TilesetAnim_Terrain(u16 timer)
 {
-    u16 step = timer / 16;
     u8 desiredSet = TerrainWavesSetForWind();
     u8 desiredDir = WaveDirForWind();
+    u16 step;
+
+    // Advance the shared water step from a persistent accumulator rather than timer/16: the per-frame
+    // cadence (WavesFrameTicks) grows as the wind drops, and a changing divisor would snap the phase.
+    // Wraps at WAVES_STEP_WRAP like the old timer/16 so the water loops still close cleanly.
+    (void)timer;
+    if (++sWavesStepAccum >= WavesFrameTicks())
+    {
+        sWavesStepAccum = 0;
+        if (++sWavesPhasedStep >= WAVES_STEP_WRAP)
+            sWavesPhasedStep = 0;
+    }
+    step = sWavesPhasedStep;
 
     if (IsFieldCompositorActive())
     {
@@ -1097,11 +1127,12 @@ static void TilesetAnim_Terrain(u16 timer)
     FieldCompositorTickPhased(step);
 }
 
-// Position -> animation band for the water surfaces. A traveling wave toward the current wind heading:
+// Position -> raw signed phase for the water surfaces. A traveling wave toward the current wind heading:
 // the phase gradient (-travel vector, set by BuildWaveDirFrames) advances one band per tile along the
-// flow. The compositor takes this mod the group's frame count, so only that many distinct bands ever
-// composite (keeps large water areas off the slot pool). The default SW flow reduces to the old x - y.
-static u8 PhaseFn_Terrain_Water(s16 x, s16 y)
+// flow. The compositor floor-mods this by the group's band count, so only that many distinct bands ever
+// composite (keeps large water areas off the slot pool). The result is SIGNED - a negative phase (the y>x
+// half of the map) must survive to the floor mod, so returning it as u8 here would seam. Default SW = x - y.
+static s16 PhaseFn_Terrain_Water(s16 x, s16 y)
 {
     return sWavePhaseX * x + sWavePhaseY * y;
 }

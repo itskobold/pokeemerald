@@ -76,19 +76,19 @@ void FieldCompositorTickAnim(void);
 // Phased tileset animation: a group is a run of `tileCount` animated source tile ids (starting at
 // `firstTileId`) whose displayed frame is chosen per cell from the cell's map position, so the
 // animation travels across the map instead of every cell showing the same frame. `frames` holds
-// `frameCount` pointers, each to `tileCount` 8BPP tiles in ROM; `phaseFn(x, y)` returns a raw band
-// index (taken mod `bandCount`). The chosen band is folded into the composite slot key, so cells in
+// `frameCount` pointers, each to `tileCount` 8BPP tiles in ROM; `phaseFn(x, y)` returns a raw SIGNED
+// phase (floor-modded by `bandCount`). The chosen band is folded into the composite slot key, so cells in
 // the same band share a slot - on-screen slots (and per-column compose cost while scrolling) stay
 // bounded by `bandCount` per recipe. `bandCount` is the perf/quality knob: fewer bands = cheaper but
 // a coarser wave; pass frameCount for the finest wave, or a divisor of it (e.g. frameCount/2) to
 // halve the cost seamlessly.
-void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16 x, s16 y));
+void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, s16 (*phaseFn)(s16 x, s16 y));
 
 // Swap an already-registered group's frame set at runtime (frames/frameCount may change). Repairs the live
 // banks that reference it and marks the affected slots dirty (recomposed gradually by FieldCompositorTickAnim).
 // Register the group with a fixed bandCount > every set's frameCount so phases are swap-invariant and no
 // re-phasing redraw is needed. See the .c comment. Used by the terrain water waves scaling with the wind.
-void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16 x, s16 y));
+void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, s16 (*phaseFn)(s16 x, s16 y));
 
 // Drain, up to `budget` frames per call, the pending bank rebuilds (rebuildMask, set by
 // FieldCompositorReloadPhasedGroup) for banks referencing [firstTileId, lastTileId]; returns TRUE when none

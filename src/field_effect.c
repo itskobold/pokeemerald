@@ -3079,6 +3079,11 @@ static void SurfFieldEffect_End(struct Task *task)
         UnfreezeObjectEvents();
         UnlockPlayerFieldControls();
         FieldEffectActiveListRemove(FLDEFF_USE_SURF);
+        // The mount leaves a ring of water around the player composited at a stale wave phase (a slot's
+        // phase is baked at acquire time and never re-evaluated, so the band stays offset until something
+        // re-acquires it - walking scrolls it, a menu full-redraws it). Re-acquire the whole view now, on
+        // arrival, so the surface is uniform the instant control returns. One-time, like a location swap.
+        DrawWholeMapView();
         DestroyTask(FindTaskIdByFunc(Task_SurfFieldEffect));
     }
 }

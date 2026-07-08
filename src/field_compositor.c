@@ -109,8 +109,8 @@ struct FrameBank
 
 struct PhasedAnimGroup
 {
-    const u16 *const *frames;    // [frameCount]; each entry -> tileCount 8BPP tiles in ROM
-    u8 (*phaseFn)(s16 x, s16 y); // maps a cell's map position to a raw band index (taken mod bandCount)
+    const u16 *const *frames;     // [frameCount]; each entry -> tileCount 8BPP tiles in ROM
+    s16 (*phaseFn)(s16 x, s16 y); // maps a cell's map position to a raw SIGNED phase (floor-modded by bandCount)
     u16 firstTileId;
     u8 tileCount;
     u8 frameCount;
@@ -418,8 +418,11 @@ static struct PhasedAnimGroup *FindPhasedGroup(u16 tileId, u8 *subOut)
 }
 
 // The animation band a recipe falls in: the phaseFn of its first phased tile evaluated at the cell's
-// map position, taken mod that group's frameCount so only frameCount distinct bands ever exist. 0 when
+// map position, floor-modded by that group's bandCount so only bandCount distinct bands ever exist. 0 when
 // the recipe has no phased tile (the common case), which keeps ordinary recipes deduping as before.
+// The phase is SIGNED and reduced on its true value (not truncated to u8 first): a floor mod is seamless
+// for negative phases (the y>x half of the map) and across every 256-tile step, where (raw & 0xFF) % band
+// would seam because 256 is not a multiple of bandCount.
 static u8 PhaseForRecipe(const u16 *norm, u32 n, s16 x, s16 y)
 {
     u32 i;
@@ -430,7 +433,12 @@ static u8 PhaseForRecipe(const u16 *norm, u32 n, s16 x, s16 y)
         struct PhasedAnimGroup *grp = FindPhasedGroup(norm[i] & SUBTILE_ENTRY_TILE_MASK, &sub);
 
         if (grp != NULL)
-            return (grp->phaseFn(x, y) % grp->bandCount) * grp->bandStride;
+        {
+            s32 band = grp->phaseFn(x, y) % grp->bandCount;
+            if (band < 0)
+                band += grp->bandCount;
+            return band * grp->bandStride;
+        }
     }
     return 0;
 }
@@ -958,7 +966,7 @@ void FieldCompositorUpdateSourceTilesImmediate(u16 firstTileId, const void *src,
 // Register a phased animation group at `index` (0..COMPOSITE_PHASED_GROUP_COUNT-1). The frames array
 // and phaseFn must outlive the group (they're ROM/const in practice). Overwrites any prior group at
 // that index. See FieldCompositorClearPhasedGroups for the lifecycle.
-void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16, s16))
+void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, s16 (*phaseFn)(s16, s16))
 {
     struct PhasedAnimGroup *grp;
 
@@ -1006,7 +1014,7 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
 // new array a few per frame, replacing each in place, and the on-screen slots pick up the new content as
 // cheap bank copies on their next step tick. Nothing flattens live and no slot is dirtied, so the swap
 // costs only bounded background work and never spikes.
-void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, u8 (*phaseFn)(s16, s16))
+void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, s16 (*phaseFn)(s16, s16))
 {
     u16 lastTileId = firstTileId + tileCount - 1;
     u32 i, e;
