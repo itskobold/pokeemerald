@@ -49,6 +49,7 @@ static void TilesetAnim_BikeShop(u16);
 static void TilesetAnim_BattlePyramid(u16);
 static void TilesetAnim_BattleDome(u16);
 static s16 PhaseFn_Terrain_Water(s16, s16);
+static s16 PhaseFn_Zero(s16, s16);
 static void QueueAnimTiles_General_Flower(u16);
 static void QueueAnimTiles_General_Water(u16);
 static void QueueAnimTiles_General_SandWaterEdge(u16);
@@ -164,6 +165,74 @@ const u16 *const gTilesetAnims_Terrain_Water_Deep_Edge[] = {
     gTilesetAnims_Terrain_Water_Deep_Edge_Frame11
 };
 
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow/11.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water_Shallow[] = {
+    gTilesetAnims_Terrain_Water_Shallow_Frame0,
+    gTilesetAnims_Terrain_Water_Shallow_Frame1,
+    gTilesetAnims_Terrain_Water_Shallow_Frame2,
+    gTilesetAnims_Terrain_Water_Shallow_Frame3,
+    gTilesetAnims_Terrain_Water_Shallow_Frame4,
+    gTilesetAnims_Terrain_Water_Shallow_Frame5,
+    gTilesetAnims_Terrain_Water_Shallow_Frame6,
+    gTilesetAnims_Terrain_Water_Shallow_Frame7,
+    gTilesetAnims_Terrain_Water_Shallow_Frame8,
+    gTilesetAnims_Terrain_Water_Shallow_Frame9,
+    gTilesetAnims_Terrain_Water_Shallow_Frame10,
+    gTilesetAnims_Terrain_Water_Shallow_Frame11
+};
+
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Shallow_Edge_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_shallow_edge/11.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water_Shallow_Edge[] = {
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame0,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame1,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame2,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame3,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame4,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame5,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame6,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame7,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame8,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame9,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame10,
+    gTilesetAnims_Terrain_Water_Shallow_Edge_Frame11
+};
+
+const u16 gTilesetAnims_Terrain_Water_Land_Border_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_land_border/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Land_Border_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_land_border/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Land_Border_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_land_border/2.png", ".8bpp", "-palette_mod 16");
+
+// Ping-pong: 0 -> 1 -> 2 -> 1 -> (0) ...
+const u16 *const gTilesetAnims_Terrain_Water_Land_Border[] = {
+    gTilesetAnims_Terrain_Water_Land_Border_Frame0,
+    gTilesetAnims_Terrain_Water_Land_Border_Frame1,
+    gTilesetAnims_Terrain_Water_Land_Border_Frame2,
+    gTilesetAnims_Terrain_Water_Land_Border_Frame1
+};
+
 // Two source wave sets: the cardinal crest flows N->S (down), the diagonal crest flows NE->SW (down-left).
 // Every wind heading reuses one of these, mirrored/rotated to point the right way (see BuildWaveDirFrames).
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/0.png", ".8bpp", "-palette_mod 16");
@@ -172,6 +241,7 @@ const u16 gTilesetAnims_Terrain_Water_Waves_Frame2[] = INCGFX_U16("data/tilesets
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/3.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/4.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/6.png", ".8bpp", "-palette_mod 16");
 
 const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/0.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/1.png", ".8bpp", "-palette_mod 16");
@@ -179,19 +249,31 @@ const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame2[] = INCGFX_U16("data/til
 const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/3.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/4.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Waves_Diag_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves_diag/6.png", ".8bpp", "-palette_mod 16");
 
 static const u16 *const sWaveBaseCardinal[6] = {
     gTilesetAnims_Terrain_Water_Waves_Frame0, gTilesetAnims_Terrain_Water_Waves_Frame1,
-    gTilesetAnims_Terrain_Water_Waves_Frame2, gTilesetAnims_Terrain_Water_Waves_Frame3,
-    gTilesetAnims_Terrain_Water_Waves_Frame4, gTilesetAnims_Terrain_Water_Waves_Frame5,
+    gTilesetAnims_Terrain_Water_Waves_Frame3, gTilesetAnims_Terrain_Water_Waves_Frame4,
+    gTilesetAnims_Terrain_Water_Waves_Frame5, gTilesetAnims_Terrain_Water_Waves_Frame6,
+};
+
+static const u16 *const sWaveBaseCardinalRough[6] = {
+    gTilesetAnims_Terrain_Water_Waves_Frame0, gTilesetAnims_Terrain_Water_Waves_Frame1,
+    gTilesetAnims_Terrain_Water_Waves_Frame2, gTilesetAnims_Terrain_Water_Waves_Frame4,
+    gTilesetAnims_Terrain_Water_Waves_Frame5, gTilesetAnims_Terrain_Water_Waves_Frame6,
 };
 
 static const u16 *const sWaveBaseDiag[6] = {
     gTilesetAnims_Terrain_Water_Waves_Diag_Frame0, gTilesetAnims_Terrain_Water_Waves_Diag_Frame1,
-    gTilesetAnims_Terrain_Water_Waves_Diag_Frame2, gTilesetAnims_Terrain_Water_Waves_Diag_Frame3,
-    gTilesetAnims_Terrain_Water_Waves_Diag_Frame4, gTilesetAnims_Terrain_Water_Waves_Diag_Frame5,
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame3, gTilesetAnims_Terrain_Water_Waves_Diag_Frame4,
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame5, gTilesetAnims_Terrain_Water_Waves_Diag_Frame6,
 };
 
+static const u16 *const sWaveBaseDiagRough[6] = {
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame0, gTilesetAnims_Terrain_Water_Waves_Diag_Frame1,
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame2, gTilesetAnims_Terrain_Water_Waves_Diag_Frame4,
+    gTilesetAnims_Terrain_Water_Waves_Diag_Frame5, gTilesetAnims_Terrain_Water_Waves_Diag_Frame6,
+};
 
 const u16 gTilesetAnims_General_Flower_Frame1[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/1.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_General_Flower_Frame0[] = INCGFX_U16("data/tilesets/primary/general/anim/flower/0.png", ".8bpp", "-palette_mod 16");
@@ -771,6 +853,9 @@ enum {
     PHASED_GROUP_TERRAIN_WATER,
     PHASED_GROUP_TERRAIN_WATER_DEEP,
     PHASED_GROUP_TERRAIN_WATER_DEEP_EDGE,
+    PHASED_GROUP_TERRAIN_WATER_SHALLOW,
+    PHASED_GROUP_TERRAIN_WATER_SHALLOW_EDGE,
+    PHASED_GROUP_TERRAIN_WATER_LAND_BORDER,
     PHASED_GROUP_TERRAIN_WATER_WAVES,
 };
 
@@ -925,7 +1010,10 @@ static const struct {
 // progress keeps the frozen surface on its old phase until the new crest banks are ready.
 static void BuildWaveDirFrames(u8 dir)
 {
-    const u16 *const *base = (sWaveDirs[dir].base == WAVE_BASE_DIAG) ? sWaveBaseDiag : sWaveBaseCardinal;
+    bool32 rough = TerrainWavesSetForWind() == WAVES_SET_ROUGH;
+    const u16 *const *base = (sWaveDirs[dir].base == WAVE_BASE_DIAG)
+        ? (rough ? sWaveBaseDiagRough : sWaveBaseDiag)
+        : (rough ? sWaveBaseCardinalRough : sWaveBaseCardinal);
     u8 xform = sWaveDirs[dir].xform;
     u32 f, sx, sy;
 
@@ -1025,6 +1113,17 @@ void InitTilesetAnim_Terrain(void)
         gTilesetAnims_Terrain_Water_Deep, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep), 12, PhaseFn_Terrain_Water);
     FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_DEEP_EDGE, 0x180, 4,
         gTilesetAnims_Terrain_Water_Deep_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Deep_Edge), 12, PhaseFn_Terrain_Water);
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_SHALLOW, 0x188, 4,
+        gTilesetAnims_Terrain_Water_Shallow, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Shallow), 12, PhaseFn_Terrain_Water);
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_SHALLOW_EDGE, 0x18C, 4,
+        gTilesetAnims_Terrain_Water_Shallow_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Shallow_Edge), 12, PhaseFn_Terrain_Water);
+    // Border must be phased too, not an override anim: its tiles share subtiles with the phased water
+    // (metatiles blend water + border), so those slots get banked - and a banked slot copies its
+    // pre-built frame, ignoring override writes, which froze the old QueueAnimTiles approach. As a phased
+    // group the ping-pong (4-frame {0,1,2,1}) bakes into the banks. Uniform phase (PhaseFn_Zero, 1 band)
+    // so the whole border animates in unison; it shares the water step, so it advances at the water rate.
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_LAND_BORDER, 0x190, 10,
+        gTilesetAnims_Terrain_Water_Land_Border, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Land_Border), 1, PhaseFn_Zero);
     // Waves start at whatever set the current wind calls for, then swap at loop boundaries as it changes.
     sTerrainWavesSet = TerrainWavesSetForWind();
     RegisterTerrainWavesGroup(sTerrainWavesSet, WAVES_REG_COLD);
@@ -1108,6 +1207,10 @@ static bool32 UpdateTerrainWavesWind(void)
 
     if (desiredSet != sTerrainWavesSet && !dirChanged)
     {
+        // Crossing the rough boundary swaps the base frame art, so re-orient the dir buffer;
+        // the lazy reload re-flattens the banks from it.
+        if ((desiredSet == WAVES_SET_ROUGH) != (sTerrainWavesSet == WAVES_SET_ROUGH))
+            BuildWaveDirFrames(sWavesTravelDir);
         sTerrainWavesSet = desiredSet;
         RegisterTerrainWavesGroup(desiredSet, WAVES_REG_LAZY);
     }
@@ -1129,10 +1232,10 @@ static bool32 UpdateTerrainWavesWind(void)
 
 static void TilesetAnim_Terrain(u16 timer)
 {
+    (void)timer;
     // Advance the shared water step from a persistent accumulator rather than timer/16: the per-frame
     // cadence (WavesFrameTicks) grows as the wind drops, and a changing divisor would snap the phase.
     // Wraps at WAVES_STEP_WRAP like the old timer/16 so the water loops still close cleanly.
-    (void)timer;
     if (++sWavesStepAccum >= WavesFrameTicks())
     {
         sWavesStepAccum = 0;
@@ -1164,6 +1267,14 @@ static void TilesetAnim_Terrain(u16 timer)
 static s16 PhaseFn_Terrain_Water(s16 x, s16 y)
 {
     return sWavePhaseX * x + sWavePhaseY * y;
+}
+
+// Uniform phase: every cell shows the same frame in unison (no traveling wave). Used by the water/land
+// border, which ping-pongs as one rather than rippling across the map.
+static s16 PhaseFn_Zero(s16 x, s16 y)
+{
+    (void)x; (void)y;
+    return 0;
 }
 
 static void TilesetAnim_Building(u16 timer)
