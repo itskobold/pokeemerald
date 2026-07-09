@@ -22,6 +22,10 @@ extern u8 gCameraBiome;
 
 void DrawWholeMapView(void);
 void DrawSecondaryMapView(void);
+// Re-band every on-screen phased (water) cell for the current phase gradient, in one frame: re-points the
+// water surface among its existing band-slots after a wind-heading change, without the whole-view metatile
+// redraw DrawWholeMapView would do (no map/attribute re-resolve, land cells untouched). See UpdateTerrainWavesWind.
+void RebandPhasedMapView(void);
 void CurrentMapDrawMetatileAt(int x, int y);
 void GetCameraOffsetWithPan(s16 *x, s16 *y);
 void DrawDoorMetatileAt(int x, int y, u16 *tiles);

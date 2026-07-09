@@ -49,6 +49,19 @@ u16 FieldCompositorAcquire(const u16 *entries, u32 count, s16 x, s16 y);
 // stack resolves to COMPOSITE_BLANK_SLOT regardless of the mask.
 u16 FieldCompositorAcquireMasked(const u16 *draw, u32 drawCount, const u16 *mask, u32 maskCount, s16 x, s16 y);
 
+// Open / close a reband window around a full-view re-band (see RebandPhasedMapView). Begin pins and indexes
+// every on-screen banked phased slot so each per-cell FieldCompositorRebandSlot is a direct table read (no
+// hash probe) and no sibling is freed/recreated mid-walk; End drops the pins. Must be paired.
+void FieldCompositorBeginReband(void);
+void FieldCompositorEndReband(void);
+
+// Re-band one on-screen phased cell for the current phase gradient. Given the slot a tilemap cell currently
+// points at and that cell's map (x, y), returns the sibling slot for the cell's new band (refcount ++'d), or
+// COMPOSITE_SLOT_KEEP when nothing changes (blank/non-phased cell, or pool full - leave the cell as-is). The
+// caller releases the old slot and writes the returned one. Re-points only among the recipe's existing
+// band-slots, so a wind-heading change re-bands the water surface without a whole-view metatile redraw.
+u16 FieldCompositorRebandSlot(u16 slot, s16 x, s16 y);
+
 // Release a slot previously returned by FieldCompositorAcquire (no-op for the blank slot). The slot
 // isn't reusable until the next FieldCompositorReclaimFreedSlots (a one-frame hold; see below).
 void FieldCompositorRelease(u16 slot);
@@ -96,27 +109,6 @@ void FieldCompositorSetPhasedGroupFixedClock(u32 index);
 // Register the group with a fixed bandCount > every set's frameCount so phases are swap-invariant and no
 // re-phasing redraw is needed. See the .c comment. Used by the terrain water waves scaling with the wind.
 void FieldCompositorReloadPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, s16 (*phaseFn)(s16 x, s16 y));
-
-// Drain, up to `budget` frames per call, the pending bank rebuilds (rebuildMask, set by
-// FieldCompositorReloadPhasedGroup) for banks referencing [firstTileId, lastTileId]; returns TRUE when none
-// remain. Reflattens into heap only (no VRAM writes, no tearing), spread across frames so a full-screen
-// content swap never spikes. Keep the surface frozen (skip the phased step) until it returns TRUE, then
-// re-phase + FieldCompositorRefreshPhasedSlots to land the new content atomically. Used by the wind-heading
-// wave swap.
-bool32 FieldCompositorProcessBankRebuild(u16 firstTileId, u16 lastTileId, u32 budget);
-
-// Recompose every live phased slot into VRAM now (cheap bank copies), from the main-loop step tick where the
-// per-frame delta is tiny. For a heading flip's full-screen large-delta refresh use the VBlank path below.
-void FieldCompositorRefreshPhasedSlots(void);
-
-// Start a VBlank-driven refresh of the whole phased surface (after a heading flip re-phases the map). Doing
-// the recompose in the main loop tears (a screen of large-delta writes mid-scanout); FieldCompositorPhased-
-// FlipRefreshTick, called bounded from the field VBlank, lands every write during blanking instead.
-void FieldCompositorBeginPhasedFlipRefresh(void);
-bool32 FieldCompositorPhasedFlipRefreshActive(void);
-// Recompose up to `budget` phased slots, resuming from the cursor; TRUE when the surface is fully refreshed.
-// Call ONLY from the field VBlank.
-bool32 FieldCompositorPhasedFlipRefreshTick(u32 budget);
 
 // Drop all phased groups (call when a primary tileset that owns them is being swapped out; the new
 // tileset re-registers its own). Phased groups live in primary-tileset tile-id space.

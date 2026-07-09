@@ -2130,12 +2130,6 @@ static void VBlankCB_Field(void)
     FieldUpdateBgTilemapScroll();
     TransferPlttBuffer();
     TransferTilesetAnimsBuffer();
-    // After a wind-heading flip re-phases the water, the whole surface is recomposed here in VBlank (bounded
-    // per frame) rather than in the main loop, so the full-screen large-delta writes land during blanking and
-    // don't tear. No-op unless a flip is landing. Held while field controls are locked (a menu/message box is
-    // up); the flip stays frozen and the refresh resumes once controls unlock (see TilesetAnim_Terrain).
-    if (!ArePlayerFieldControlsLocked())
-        FieldCompositorPhasedFlipRefreshTick(192);
 }
 
 // True while VBlankCB_Field is the active VBlank handler, i.e. FieldUpdateBgTilemapScroll's

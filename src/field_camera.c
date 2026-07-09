@@ -555,6 +555,72 @@ static void DrawCompositeCell(u16 offset, const u16 *bgEntries, u32 bgCount, con
     }
 }
 
+// Re-band one plane's cell at map position (x, y): if it points at a phased slot, re-point it to the sibling
+// slot for its new band under the current gradient. Non-phased/blank cells return KEEP and are left untouched.
+static void RebandCellPlane(u16 *cell, s16 x, s16 y)
+{
+    u16 old = *cell & 0x3FF;
+    u16 reband;
+
+    if (old == COMPOSITE_BLANK_SLOT) // empty foreground/reflection cell - never phased, skip the call
+        return;
+    reband = FieldCompositorRebandSlot(old, x, y);
+    if (reband != COMPOSITE_SLOT_KEEP)
+    {
+        FieldCompositorRelease(old);
+        *cell = reband;
+    }
+}
+
+// Re-band every on-screen phased (water) cell for the current phase gradient, coherently in this one frame.
+// Walks the whole visible metatile grid but does compositor work only for phased cells (RebandCellPlane
+// early-outs on the rest), so it's far cheaper than the whole-view DrawWholeMapView the wind-heading change
+// used to do - and being one frame it can't tear the way a redraw spread across a moving camera would.
+void RebandPhasedMapView(void)
+{
+    u8 i, j, p;
+    u32 rowBase;
+    u8 temp;
+
+    // Pin + index every on-screen banked phased slot so each cell re-band below is a direct table lookup.
+    FieldCompositorBeginReband();
+    for (i = 0; i < 32; i += 2)
+    {
+        temp = sFieldCameraOffset.yTileOffset + i;
+        if (temp >= 32)
+            temp -= 32;
+        rowBase = temp * 32;
+        for (j = 0; j < 32; j += 2)
+        {
+            s16 x = gCameraPos.x + j / 2;
+            s16 y = gCameraPos.y + i / 2;
+            u32 off;
+
+            temp = sFieldCameraOffset.xTileOffset + j;
+            if (temp >= 32)
+                temp -= 32;
+            off = rowBase + temp;
+            // Each metatile is a 2x2 tile block sharing one map (x, y); re-band all four sub-tile cells.
+            for (p = 0; p < 4; p++)
+            {
+                u32 cell = off + sSubTileCellOffsets[p];
+                RebandCellPlane(&gOverworldTilemapBuffer_Bg1[cell], x, y);
+                RebandCellPlane(&gOverworldTilemapBuffer_Bg2[cell], x, y);
+                RebandCellPlane(&gOverworldTilemapBuffer_Bg3[cell], x, y);
+            }
+        }
+    }
+    FieldCompositorEndReband();
+
+    sFieldTilemapDirty = TRUE;
+    if (!IsFieldBgTilemapFlushedInVBlank())
+    {
+        ScheduleBgCopyTilemapToVram(1);
+        ScheduleBgCopyTilemapToVram(2);
+        ScheduleBgCopyTilemapToVram(3);
+    }
+}
+
 // Tiles (map-grid coords, the space DrawMetatileAt and object currentCoords share) whose middle
 // layer is currently promoted into the foreground plane to occlude an object hiding behind a cliff.
 // Rebuilt each frame from object positions. Sized for each object's full sprite footprint (width x
