@@ -180,6 +180,16 @@ static u16 sPhasedStep;
 // the wind-coupled water cadence, so those slots animate at a steady speed regardless of wind. A slot picks
 // this vs sPhasedStep by its own fixedClock bit; the two clocks never meet in one bank (see fixedClock).
 static u16 sPhasedStepFixed;
+// Origin of the "world" frame the position-dependent phase is evaluated in (see PhaseForRecipe). A slot bakes
+// its phase from the map coordinate at acquire and never re-evaluates it, so if the coordinate frame shifts
+// underneath the on-screen slots - which it does on a map-connection transition, where gCameraPos re-bases
+// onto the new map (see CameraMove) - a physical tile's coordinate changes and freshly drawn cells would
+// disagree with the still-baked ones, seaming the surface. Phase is evaluated at (x - origin, y - origin)
+// instead, and FieldCompositorShiftPhaseOrigin folds each frame shift into this origin so a physical tile
+// keeps the same phase argument across the shift: the surface stays coherent with no full re-acquire. Reset
+// to 0 on a full map load / phased-group re-register (a fresh reference frame); persists across connections.
+static s16 sPhaseOriginX;
+static s16 sPhaseOriginY;
 // In EWRAM, not the default IWRAM: this file's statics live in scarce IWRAM, and the bank metadata is
 // touched per-slot (not per-pixel), so the slower EWRAM read is fine and the IWRAM is better spent.
 static EWRAM_DATA struct FrameBank sBanks[COMPOSITE_BANK_MAX] = {0};
@@ -381,6 +391,8 @@ void FieldCompositorInit(void)
     sBankPoolFull = FALSE;
     sPhasedStep = 0;
     sPhasedStepFixed = 0;
+    sPhaseOriginX = 0; // fresh reference frame on a full map load (a warp re-acquires the whole view)
+    sPhaseOriginY = 0;
     sAnimOverrideIndex = AllocZeroed(NUM_TILES_TOTAL * sizeof(u8));
     for (i = 0; i < NUM_TILES_TOTAL; i++)
         sAnimOverrideIndex[i] = ANIM_NOT_OVERRIDDEN;
@@ -538,7 +550,9 @@ static u8 PhaseForRecipe(const u16 *norm, u32 n, s16 x, s16 y)
 
         if (grp != NULL)
         {
-            s32 band = grp->phaseFn(x, y) % grp->bandCount;
+            // Evaluate in the frame-independent world origin (see sPhaseOriginX/Y) so a coordinate-frame
+            // shift under the on-screen slots doesn't seam the surface.
+            s32 band = grp->phaseFn(x - sPhaseOriginX, y - sPhaseOriginY) % grp->bandCount;
             if (band < 0)
                 band += grp->bandCount;
             return band * grp->bandStride;
@@ -1363,6 +1377,22 @@ void FieldCompositorClearPhasedGroups(void)
     RebuildPhasedTileMap(); // resets to the empty range (min > max), so every lookup rejects
     sPhasedStep = 0;
     sPhasedStepFixed = 0;
+    // The primary tileset re-registers its groups right after this and the map fully redraws, baking every
+    // cell fresh - so the accumulated connection-frame origin is stale; start the new phase field at zero.
+    sPhaseOriginX = 0;
+    sPhaseOriginY = 0;
+}
+
+// Shift the phase evaluation origin by a coordinate-frame delta (frameDx, frameDy) = how much a physical
+// tile's map coordinate changed when the frame re-based (gCamera.x/y at a connection transition; see
+// CameraMove). Applied so PhaseForRecipe evaluates the same physical tile at the same phase argument before
+// and after the shift: already-baked on-screen slots and cells drawn after the crossing stay coherent, with
+// no full-screen re-acquire. Call once per frame re-origin, before the post-shift cells are drawn.
+void FieldCompositorShiftPhaseOrigin(s16 frameDx, s16 frameDy)
+{
+    // Physical coord Xnew = Xold - frameDx, so arg = X - origin stays put when origin -= frameDx.
+    sPhaseOriginX -= frameDx;
+    sPhaseOriginY -= frameDy;
 }
 
 // Advance the phased (water) animation to `step` (all groups share it) and refresh every phased slot to

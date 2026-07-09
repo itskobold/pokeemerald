@@ -122,6 +122,12 @@ bool32 FieldCompositorPhasedFlipRefreshTick(u32 budget);
 // tileset re-registers its own). Phased groups live in primary-tileset tile-id space.
 void FieldCompositorClearPhasedGroups(void);
 
+// Shift the position-dependent phase's evaluation origin by a coordinate-frame delta, so the wave surface
+// stays coherent when the map coordinate frame re-bases under the on-screen slots (a map-connection
+// transition; see CameraMove). (frameDx, frameDy) is how much a physical tile's coordinate changed. Keeps
+// baked slots and cells drawn after the crossing in phase with no full re-acquire.
+void FieldCompositorShiftPhaseOrigin(s16 frameDx, s16 frameDy);
+
 // Advance the phased animation and refresh every phased slot to its new frame; call once per frame. Two
 // clocks: `windStep` drives the wind-coupled water groups, `fixedStep` (e.g. timer / 16) drives fixedClock
 // groups (the waterfall) at a steady rate; each slot picks its clock by its recipe. Banked slots

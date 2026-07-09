@@ -1246,6 +1246,11 @@ bool8 CameraMove(int x, int y)
         gCamera.active = TRUE;
         gCamera.x = old_x - gCameraPos.x;
         gCamera.y = old_y - gCameraPos.y;
+        // The frame just re-based onto the destination map: a physical tile's coordinate shifted by
+        // (gCamera.x, gCamera.y). Fold that into the compositor's phase origin now, before the restitched
+        // view is redrawn, so the position-dependent water phase stays continuous across the seam instead
+        // of the freshly drawn cells baking at a phase offset from the still-displayed ones.
+        FieldCompositorShiftPhaseOrigin(gCamera.x, gCamera.y);
         gCameraPos.x += x;
         gCameraPos.y += y;
         MoveMapViewToBackup(direction);
