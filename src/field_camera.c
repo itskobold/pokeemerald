@@ -10,6 +10,7 @@
 #include "gpu_regs.h"
 #include "main.h"
 #include "menu.h"
+#include "metatile_behavior.h"
 #include "overworld.h"
 #include "rotating_gate.h"
 #include "script.h"
@@ -716,8 +717,14 @@ void UpdateCliffFacePromotion(void)
             PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
         }
 
-        // The surf unit's overhang needs covering in FRONT too (top edges, walls alongside).
-        if (objEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))
+        // The surf unit's overhang needs covering in FRONT too (top edges, walls alongside). But a
+        // waterfall is ridden in FRONT the whole way: while on or crossing one, the surfer sits above
+        // the lower pool (baseElevation steps up to the waterfall's level), so the overhang clip would
+        // promote the lower pool tile below and draw it over the rider. Skip the overhang for the whole
+        // step whenever either footprint tile is a waterfall, so climbing on/off stays in front.
+        if (objEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
+         && !MetatileBehavior_IsWaterfall(MapGridGetMetatileBehaviorAt(objEvent->currentCoords.x, objEvent->currentCoords.y))
+         && !MetatileBehavior_IsWaterfall(MapGridGetMetatileBehaviorAt(objEvent->previousCoords.x, objEvent->previousCoords.y)))
         {
             PromoteSurfBlobOverhang(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
             PromoteSurfBlobOverhang(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);

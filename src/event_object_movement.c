@@ -5601,6 +5601,10 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // On a stairs tile, stepping off it down to the lower neighbour is a legitimate descent, not an
     // elevation mismatch.
     bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
+    // Waterfalls behave like stairs for elevation gating: surf/climb passes through them freely in both
+    // directions regardless of the elevation change between the tile and the pools it connects.
+    bool32 isWaterfall = MetatileBehavior_IsWaterfall(nextBehavior);
+    bool32 onWaterfall = MetatileBehavior_IsWaterfall(curBehavior);
     // Ignore front-terrain metatile collisions on the cliff plane (lets the cliff's first tile be entered).
     bool32 cliffFree = ObjectEventStepIsOnCliffPlane(objectEvent, x, y);
     // Cliff collision (bit 6) walls off tiles up on the cliff plane (above the object's committed level).
@@ -5611,7 +5615,7 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
     // so it can't escape the region via a stairs tile).
     bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
      && MapGridGetElevationAt(x, y) > objectEvent->baseElevation
-     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator));
+     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator || isWaterfall));
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         return COLLISION_OUTSIDE_RANGE;
@@ -5638,8 +5642,10 @@ static u8 GetVanillaCollision(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 
             return COLLISION_IMPASSABLE;
 
         // Block a DOWNWARD step (an UPWARD step is the climb behind the cliff). Skipped behind a cliff,
-        // and when stepping OFF a stairs tile (baseElevation may sit above the stairs' exit level).
-        if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs
+        // when stepping OFF a stairs tile (baseElevation may sit above the stairs' exit level), and when
+        // stepping onto OR off a waterfall (surf/climb passes through it freely in both directions,
+        // matching vanilla passable waterfalls).
+        if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs && !isWaterfall && !onWaterfall
          && MapGridGetElevationAt(x, y) < objectEvent->baseElevation)
             return COLLISION_ELEVATION_MISMATCH;
     }
@@ -5738,12 +5744,14 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
     bool32 isStairs = MetatileBehavior_IsElevationChange(nextBehavior);
     bool32 isEscalator = MetatileBehavior_IsEscalator(nextBehavior);
     bool32 onStairs = MetatileBehavior_IsElevationChange(curBehavior);
+    bool32 isWaterfall = MetatileBehavior_IsWaterfall(nextBehavior);
+    bool32 onWaterfall = MetatileBehavior_IsWaterfall(curBehavior);
     // See GetVanillaCollision for the cliff-plane collision rules mirrored here.
     bool32 cliffFree = objectEvent->cliffLayer != CLIFF_LAYER_FRONT
      || (!isStairs && MapGridGetElevationAt(x, y) > MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y));
     bool32 cliffCollision = MapGridGetCliffCollisionAt(x, y)
      && MapGridGetElevationAt(x, y) > objectEvent->baseElevation
-     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator));
+     && !(objectEvent->cliffLayer == CLIFF_LAYER_FRONT && (isStairs || isEscalator || isWaterfall));
 
     if (IsCoordOutsideObjectEventMovementRange(objectEvent, x, y))
         flags |= 1 << (COLLISION_OUTSIDE_RANGE - 1);
@@ -5760,8 +5768,9 @@ u8 GetCollisionFlagsAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 y, u8 d
          && !(objectEvent->isPlayer && (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING))
          && !MetatileBehavior_IsSurfableWaterOrUnderwater(MapGridGetMetatileBehaviorAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y)))
             flags |= 1 << (COLLISION_IMPASSABLE - 1);
-        // Stepping off a stairs tile is not elevation-gated; see GetVanillaCollision.
-        if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs && MapGridGetElevationAt(x, y) < objectEvent->baseElevation)
+        // Stepping off a stairs tile / onto or off a waterfall is not elevation-gated; see GetVanillaCollision.
+        if (objectEvent->cliffLayer == CLIFF_LAYER_FRONT && !onStairs && !isWaterfall && !onWaterfall
+         && MapGridGetElevationAt(x, y) < objectEvent->baseElevation)
             flags |= 1 << (COLLISION_ELEVATION_MISMATCH - 1);
     }
     if (DoesObjectCollideWithObjectAt(objectEvent, x, y))
@@ -8813,7 +8822,8 @@ static void GetGroundEffectFlags_Reflection(struct ObjectEvent *objEvent, u32 *f
         [REFL_TYPE_ICE   - 1] = GROUND_EFFECT_FLAG_ICE_REFLECTION,
         [REFL_TYPE_WATER - 1] = GROUND_EFFECT_FLAG_WATER_REFLECTION
     };
-    u8 reflType = ObjectEventGetNearbyReflectionType(objEvent);
+    // No reflection while behind/under a cliff: the object is hidden below it, not on the water surface.
+    u8 reflType = objEvent->cliffLayer == CLIFF_LAYER_FRONT ? ObjectEventGetNearbyReflectionType(objEvent) : 0;
 
     if (reflType)
     {
@@ -9351,7 +9361,9 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
     // Stairs carry no elevation of their own: no climb/crest, hold the current state. Cliff-face-side
     // is NOT included: an upward step onto it climbs behind like any other higher tile. Escalator warp
     // tiles are elevated cliff tiles too, but the player rides them in front, so don't climb behind.
-    if (MetatileBehavior_IsElevationChange(toBehavior) || MetatileBehavior_IsEscalator(toBehavior))
+    // Waterfalls are ridden up in front (surf/climb passes through them freely), so they never crest.
+    if (MetatileBehavior_IsElevationChange(toBehavior) || MetatileBehavior_IsEscalator(toBehavior)
+     || MetatileBehavior_IsWaterfall(toBehavior))
         return;
 
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
@@ -9364,11 +9376,12 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
          || toElevation <= objEvent->baseElevation)
             objEvent->surfacingFromCliff = TRUE;
     }
-    else if (toElevation > fromElevation && !MetatileBehavior_IsElevationChange(fromBehavior))
+    else if (toElevation > fromElevation && !MetatileBehavior_IsElevationChange(fromBehavior)
+          && !MetatileBehavior_IsWaterfall(fromBehavior))
     {
         // Stepped UP onto non-stairs terrain: climb behind the cliff, freezing the render base
-        // (baseElevation) at the level we left. Stepping OFF a stairs tile is excluded — its higher
-        // exit is the stairs' legitimate destination (matches the onStairs collision exception).
+        // (baseElevation) at the level we left. Stepping OFF a stairs tile or waterfall is excluded —
+        // its higher exit (e.g. the pool atop a waterfall) is the legitimate destination.
         // Remember the tile being left so its behavior is held while behind (see
         // ObjectEventUpdateMetatileBehaviors).
         objEvent->baseElevation = fromElevation;

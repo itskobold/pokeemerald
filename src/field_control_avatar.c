@@ -529,9 +529,9 @@ static const u8 *GetInteractedWaterScript(struct MapPosition *position, u8 metat
     if (FlagGet(FLAG_BADGE05_GET) == TRUE && PartyHasMonWithSurf() == TRUE && IsPlayerFacingSurfableFishableWater() == TRUE)
         return EventScript_UseSurf;
 
-    // Only the waterfall on the player's own elevation can be climbed.
+    // A waterfall in front can be climbed as long as the player isn't hidden behind a cliff face.
     if (MetatileBehavior_IsWaterfall(metatileBehavior) == TRUE
-     && MapGridGetElevationAt(position->x, position->y) == position->elevation)
+     && !IsPlayerBehindCliff())
     {
         if (FlagGet(FLAG_BADGE08_GET) == TRUE && IsPlayerSurfingNorth() == TRUE)
             return EventScript_UseWaterfall;

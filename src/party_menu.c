@@ -3908,7 +3908,7 @@ static bool8 SetUpFieldMove_Waterfall(void)
 
     GetXYCoordsOneStepInFrontOfPlayer(&x, &y);
     if (MetatileBehavior_IsWaterfall(MapGridGetMetatileBehaviorAt(x, y)) == TRUE && IsPlayerSurfingNorth() == TRUE
-     && MapGridGetElevationAt(x, y) == PlayerGetElevation())
+     && !IsPlayerBehindCliff())
     {
         gFieldCallback2 = FieldCallback_PrepareFadeInFromMenu;
         gPostMenuFieldCallback = FieldCallback_Waterfall;

@@ -74,11 +74,16 @@ void SetDebugNewGameFlags()
 
     CreateMon(mon, SPECIES_KYOGRE, 100, 31, FALSE, 0, OT_ID_PLAYER_ID, 0);
     SetMonMoveSlot(mon, MOVE_SURF, 0);
+    SetMonMoveSlot(mon, MOVE_WATERFALL, 1);
     GiveMonToPlayer(mon);
 
     Free(mon);
 
     nationalDexNum = SpeciesToNationalPokedexNum(SPECIES_RAYQUAZA);
+    GetSetPokedexFlag(nationalDexNum, FLAG_SET_SEEN);
+    GetSetPokedexFlag(nationalDexNum, FLAG_SET_CAUGHT);
+
+    nationalDexNum = SpeciesToNationalPokedexNum(SPECIES_KYOGRE);
     GetSetPokedexFlag(nationalDexNum, FLAG_SET_SEEN);
     GetSetPokedexFlag(nationalDexNum, FLAG_SET_CAUGHT);
 

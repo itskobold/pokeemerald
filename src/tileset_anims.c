@@ -294,6 +294,80 @@ const u16 *const gTilesetAnims_Terrain_Water_Currents_Side[] = {
     gTilesetAnims_Terrain_Water_Currents_Side_Frame11
 };
 
+// Terrain waterfall: a 6x6-tile (48x48) feature drawn over static cliff tiles, 4 frames, tiles 0x1A2..0x1C5.
+// Phased (banked) like the water surfaces so it carries the same diagonal wind ripple (PhaseFn_Terrain_Water),
+// but flagged fixedClock (see InitTilesetAnim_Terrain) so it animates at a steady 1/16 regardless of wind.
+// It only ever overlays static cliff tiles, never the wind-cadence water, so its banks stay single-clock.
+const u16 gTilesetAnims_Terrain_Waterfall_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Waterfall_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Waterfall_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Waterfall_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall/3.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Waterfall[] = {
+    gTilesetAnims_Terrain_Waterfall_Frame0,
+    gTilesetAnims_Terrain_Waterfall_Frame1,
+    gTilesetAnims_Terrain_Waterfall_Frame2,
+    gTilesetAnims_Terrain_Waterfall_Frame3
+};
+
+// Water edge: 12-frame 2x2 water surface (tiles 0x1C6..0x1C9). Phased like the other water surfaces.
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Edge_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/11.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water_Edge[] = {
+    gTilesetAnims_Terrain_Water_Edge_Frame0,
+    gTilesetAnims_Terrain_Water_Edge_Frame1,
+    gTilesetAnims_Terrain_Water_Edge_Frame2,
+    gTilesetAnims_Terrain_Water_Edge_Frame3,
+    gTilesetAnims_Terrain_Water_Edge_Frame4,
+    gTilesetAnims_Terrain_Water_Edge_Frame5,
+    gTilesetAnims_Terrain_Water_Edge_Frame6,
+    gTilesetAnims_Terrain_Water_Edge_Frame7,
+    gTilesetAnims_Terrain_Water_Edge_Frame8,
+    gTilesetAnims_Terrain_Water_Edge_Frame9,
+    gTilesetAnims_Terrain_Water_Edge_Frame10,
+    gTilesetAnims_Terrain_Water_Edge_Frame11
+};
+
+// Water fresh: 12-frame 2x2 water surface (tiles 0x1CA..0x1CD). Phased like the other water surfaces.
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/3.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame4[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/4.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame5[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/5.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame6[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/6.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame7[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/7.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame8[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/8.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame9[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/9.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame10[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/10.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Water_Fresh_Frame11[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/11.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Water_Fresh[] = {
+    gTilesetAnims_Terrain_Water_Fresh_Frame0,
+    gTilesetAnims_Terrain_Water_Fresh_Frame1,
+    gTilesetAnims_Terrain_Water_Fresh_Frame2,
+    gTilesetAnims_Terrain_Water_Fresh_Frame3,
+    gTilesetAnims_Terrain_Water_Fresh_Frame4,
+    gTilesetAnims_Terrain_Water_Fresh_Frame5,
+    gTilesetAnims_Terrain_Water_Fresh_Frame6,
+    gTilesetAnims_Terrain_Water_Fresh_Frame7,
+    gTilesetAnims_Terrain_Water_Fresh_Frame8,
+    gTilesetAnims_Terrain_Water_Fresh_Frame9,
+    gTilesetAnims_Terrain_Water_Fresh_Frame10,
+    gTilesetAnims_Terrain_Water_Fresh_Frame11
+};
+
 // Two source wave sets: the cardinal crest flows N->S (down), the diagonal crest flows NE->SW (down-left).
 // Every wind heading reuses one of these, mirrored/rotated to point the right way (see BuildWaveDirFrames).
 const u16 gTilesetAnims_Terrain_Water_Waves_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_waves/0.png", ".8bpp", "-palette_mod 16");
@@ -920,6 +994,9 @@ enum {
     PHASED_GROUP_TERRAIN_WATER_CURRENTS,
     PHASED_GROUP_TERRAIN_WATER_CURRENTS_SIDE,
     PHASED_GROUP_TERRAIN_WATER_WAVES,
+    PHASED_GROUP_TERRAIN_WATERFALL,
+    PHASED_GROUP_TERRAIN_WATER_EDGE,
+    PHASED_GROUP_TERRAIN_WATER_FRESH,
 };
 
 // The terrain water-wave overlay scales its animation with wind strength: below WAVES_WIND_CALM it holds
@@ -1198,6 +1275,21 @@ void InitTilesetAnim_Terrain(void)
     // Waves start at whatever set the current wind calls for, then swap at loop boundaries as it changes.
     sTerrainWavesSet = TerrainWavesSetForWind();
     RegisterTerrainWavesGroup(sTerrainWavesSet, WAVES_REG_COLD);
+
+    // Waterfall (tiles 0x1A2..0x1C5, 36 tiles = the 6x6 feature). Phased with the same diagonal wind ripple
+    // (PhaseFn_Terrain_Water, bandCount = its 4 frames) so it matches the surrounding water, but flagged
+    // fixedClock so it advances at a steady 1/16 (TilesetAnim_Terrain's fixedStep) instead of scaling with
+    // the wind like the water surfaces.
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATERFALL, 0x1A2, 36,
+        gTilesetAnims_Terrain_Waterfall, ARRAY_COUNT(gTilesetAnims_Terrain_Waterfall), 4, PhaseFn_Terrain_Water);
+    FieldCompositorSetPhasedGroupFixedClock(PHASED_GROUP_TERRAIN_WATERFALL);
+
+    // Water edge (0x1C6, 4 tiles) and water fresh (0x1CA, 4 tiles): 12-frame water surfaces phased with the
+    // same diagonal wind ripple (PhaseFn_Terrain_Water, bandCount 12) as the rest of the terrain water.
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_EDGE, 0x1C6, 4,
+        gTilesetAnims_Terrain_Water_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Edge), 12, PhaseFn_Terrain_Water);
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_FRESH, 0x1CA, 4,
+        gTilesetAnims_Terrain_Water_Fresh, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Fresh), 12, PhaseFn_Terrain_Water);
 }
 
 void InitTilesetAnim_Building(void)
@@ -1303,7 +1395,6 @@ static bool32 UpdateTerrainWavesWind(void)
 
 static void TilesetAnim_Terrain(u16 timer)
 {
-    (void)timer;
     // Advance the shared water step from a persistent accumulator rather than timer/16: the per-frame
     // cadence (WavesFrameTicks) grows as the wind drops, and a changing divisor would snap the phase.
     // Wraps at WAVES_STEP_WRAP like the old timer/16 so the water loops still close cleanly.
@@ -1324,10 +1415,11 @@ static void TilesetAnim_Terrain(u16 timer)
             return; // a flip was just staged: begin the freeze this frame
     }
 
-    // Water's animation frame advances every 16 timer ticks. All four water groups share one step and
-    // flip together; each on-screen slot's new frame is a cheap copy from its pre-composited bank (see
-    // FieldCompositorTickPhased), so the whole surface can update on one frame without a recompose spike.
-    FieldCompositorTickPhased(sWavesPhasedStep);
+    // Water's frame advances at the wind-coupled step (sWavesPhasedStep); the waterfall rides a separate
+    // fixed 1/16 step (timer / 16, constant regardless of wind). Each on-screen slot's new frame is a cheap
+    // copy from its pre-composited bank, so the whole surface updates on one frame without a recompose spike.
+    // timer wraps at 768 (a multiple of 16 and of the waterfall's 4 frames), so timer / 16 wraps cleanly.
+    FieldCompositorTickPhased(sWavesPhasedStep, timer / 16);
 }
 
 // Position -> raw signed phase for the water surfaces. A traveling wave toward the current wind heading:

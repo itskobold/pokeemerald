@@ -1436,6 +1436,13 @@ bool8 IsPlayerSurfingNorth(void)
         return FALSE;
 }
 
+// True while the player is climbing/hidden behind a cliff face (silhouetted). Waterfall climbing is
+// gated off in this state.
+bool8 IsPlayerBehindCliff(void)
+{
+    return gObjectEvents[gPlayerAvatar.objectEventId].cliffLayer != CLIFF_LAYER_FRONT;
+}
+
 bool8 IsPlayerFacingSurfableFishableWater(void)
 {
     struct ObjectEvent *playerObjEvent = &gObjectEvents[gPlayerAvatar.objectEventId];

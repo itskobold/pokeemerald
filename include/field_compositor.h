@@ -85,6 +85,12 @@ void FieldCompositorTickAnim(void);
 // halve the cost seamlessly.
 void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount, const u16 *const *frames, u8 frameCount, u8 bandCount, s16 (*phaseFn)(s16 x, s16 y));
 
+// Flag an already-registered group to animate on the fixed, wind-independent clock (steady 1/16) instead of
+// the wind-coupled water step (see FieldCompositorTickPhased's fixedStep). Only sound when the group's tiles
+// never share a composited slot with a wind-clock group; the terrain waterfall (overlays static cliff only)
+// is the intended user.
+void FieldCompositorSetPhasedGroupFixedClock(u32 index);
+
 // Swap an already-registered group's frame set at runtime (frames/frameCount may change). Repairs the live
 // banks that reference it and marks the affected slots dirty (recomposed gradually by FieldCompositorTickAnim).
 // Register the group with a fixed bandCount > every set's frameCount so phases are swap-invariant and no
@@ -116,10 +122,11 @@ bool32 FieldCompositorPhasedFlipRefreshTick(u32 budget);
 // tileset re-registers its own). Phased groups live in primary-tileset tile-id space.
 void FieldCompositorClearPhasedGroups(void);
 
-// Advance the phased (water) animation to `step` (e.g. timer / 16) and refresh every phased slot to its
-// new frame; call once per frame. Banked slots (pre-composited at slot creation) refresh via a cheap
-// copy, so the whole surface flips together each step without the per-slot re-flatten spike. Only a real
-// step change does work.
-void FieldCompositorTickPhased(u16 step);
+// Advance the phased animation and refresh every phased slot to its new frame; call once per frame. Two
+// clocks: `windStep` drives the wind-coupled water groups, `fixedStep` (e.g. timer / 16) drives fixedClock
+// groups (the waterfall) at a steady rate; each slot picks its clock by its recipe. Banked slots
+// (pre-composited at slot creation) refresh via a cheap copy, so the surface flips together without the
+// per-slot re-flatten spike. Only a real change to either step does work.
+void FieldCompositorTickPhased(u16 windStep, u16 fixedStep);
 
 #endif // GUARD_FIELD_COMPOSITOR_H

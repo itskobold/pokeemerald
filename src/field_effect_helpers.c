@@ -183,6 +183,11 @@ static void UpdateObjectReflectionSprite(struct Sprite *reflectionSprite)
         if (objectEvent->hideReflection == TRUE)
             reflectionSprite->invisible = TRUE;
 
+        // Hold the reflection hidden until the buried-object silhouette darkening has fully faded, so
+        // it doesn't pop in mid-fade as the object emerges from behind a cliff onto the water.
+        if (ShouldDrawCliffSilhouettes())
+            reflectionSprite->invisible = TRUE;
+
         if (reflectionSprite->sIsStillReflection == FALSE)
         {
             // Sets the reflection sprite's rot/scale matrix to the appropriate

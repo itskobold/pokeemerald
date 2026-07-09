@@ -65,6 +65,9 @@ struct CompositeSlot
     // (pool/heap full), which also flatten live; else an index into sBanks and the slot's animation is a
     // cheap per-step copy from that bank instead of a re-flatten.
     u8 bank;
+    // TRUE if this slot's phased group runs on the fixed clock (see PhasedAnimGroup.fixedClock). Copied
+    // from the recipe at acquire so ComposeSlot picks sPhasedStepFixed vs sPhasedStep with one field read.
+    u8 fixedClock;
     u16 refcount;
     u16 nextInBucket; // BUCKET_EMPTY-terminated singly linked list within its hash bucket
 };
@@ -124,6 +127,10 @@ struct PhasedAnimGroup
     u8 bandCount;
     u8 bandStride;
     bool8 active;
+    // TRUE = this group animates on the fixed (wind-independent) clock (sPhasedStepFixed) instead of the
+    // wind-coupled water step. Only valid when the group's tiles never share a composited slot with a
+    // wind-clock group (a bank has one frame index, so it can't mix clocks); the waterfall qualifies.
+    bool8 fixedClock;
 };
 
 // Layer count of a left-packed (transparent entries dropped) recipe; derivable, so it isn't stored.
@@ -158,13 +165,21 @@ static u16 sPhasedMaxTile;
 // active groups ever span more tile ids than this, the map is disabled and lookups fall back to the scan.
 // EWRAM to spare the IWRAM stack headroom; the flatten it serves reads its 64+ source bytes from
 // ROM/EWRAM anyway, so the slower load is noise.
-#define PHASED_TILE_SPAN 64
+// Must cover the span of all active phased tile ids (max - min). The terrain groups run 0x170..0x1CD (the
+// water_edge/water_fresh surfaces end the range), a span of 93; 128 keeps the fast map valid with headroom. Grow this
+// (a cheap EWRAM byte each) if a tileset ever adds phased tiles past that, else the map disables and every
+// phased-tile lookup falls back to the group scan.
+#define PHASED_TILE_SPAN 128
 static EWRAM_DATA u8 sPhasedGroupMap[PHASED_TILE_SPAN] = {0};
 static bool8 sPhasedMapValid;
 // Current animation step shared by all phased groups (advances every 16 frames). The displayed frame of
 // a phased slot is (sPhasedStep + slot.phase) % period; folded here rather than per-group so a bank's
 // single frame index is unambiguous.
 static u16 sPhasedStep;
+// Second phased clock for groups flagged fixedClock (the waterfall): advances at a constant 1/16 instead of
+// the wind-coupled water cadence, so those slots animate at a steady speed regardless of wind. A slot picks
+// this vs sPhasedStep by its own fixedClock bit; the two clocks never meet in one bank (see fixedClock).
+static u16 sPhasedStepFixed;
 // In EWRAM, not the default IWRAM: this file's statics live in scarce IWRAM, and the bank metadata is
 // touched per-slot (not per-pixel), so the slower EWRAM read is fine and the IWRAM is better spent.
 static EWRAM_DATA struct FrameBank sBanks[COMPOSITE_BANK_MAX] = {0};
@@ -365,6 +380,7 @@ void FieldCompositorInit(void)
                          sBankCount < COMPOSITE_BANK_MAX ? " [trimmed]" : "");
     sBankPoolFull = FALSE;
     sPhasedStep = 0;
+    sPhasedStepFixed = 0;
     sAnimOverrideIndex = AllocZeroed(NUM_TILES_TOTAL * sizeof(u8));
     for (i = 0; i < NUM_TILES_TOTAL; i++)
         sAnimOverrideIndex[i] = ANIM_NOT_OVERRIDDEN;
@@ -531,6 +547,29 @@ static u8 PhaseForRecipe(const u16 *norm, u32 n, s16 x, s16 y)
     return 0;
 }
 
+// Whether a recipe animates on the fixed clock: TRUE iff it has at least one phased group and EVERY phased
+// group in it is fixedClock. A recipe mixing a fixed and a wind group (none exist in the terrain data - the
+// waterfall only overlays static cliff tiles) falls back to the wind clock, so water can never accidentally
+// ride the fixed step and a shared bank never needs two clocks.
+static bool32 RecipeUsesFixedClock(const u16 *norm, u32 n)
+{
+    u32 i;
+    bool32 any = FALSE;
+
+    for (i = 0; i < n; i++)
+    {
+        u8 sub;
+        struct PhasedAnimGroup *grp = FindPhasedGroup(norm[i] & SUBTILE_ENTRY_TILE_MASK, &sub);
+        if (grp != NULL)
+        {
+            if (!grp->fixedClock)
+                return FALSE;
+            any = TRUE;
+        }
+    }
+    return any;
+}
+
 // Per-byte "nonzero -> 0xFF" mask of a 4-pixel word, so an 8BPP layer can be composited four pixels at
 // a time: opaque pixels get the mask, transparent (zero) pixels get 0 and leave the layer below intact.
 // Carry-safe SWAR - (byte & 0x7F) + 0x7F never overflows its byte, so per-byte flags don't contaminate
@@ -655,11 +694,13 @@ static void ComposeSlot(u16 slot, u8 *scratch)
 {
     struct CompositeSlot *s = &sPool[slot];
     const void *src;
+    // Fixed-clock slots (the waterfall) run off the wind-independent step; everything else off the water step.
+    u16 step = s->fixedClock ? sPhasedStepFixed : sPhasedStep;
 
     if (s->bank < sBankCount)
     {
         struct FrameBank *bk = &sBanks[s->bank];
-        u32 idx = FastMod(sPhasedStep + s->phase, bk->period);
+        u32 idx = FastMod(step + s->phase, bk->period);
 
         if (bk->builtMask & (1u << idx))
             src = sBankTiles + (s->bank * COMPOSITE_BANK_FRAMES + idx) * TILE_SIZE_8BPP;
@@ -671,7 +712,7 @@ static void ComposeSlot(u16 slot, u8 *scratch)
     }
     else
     {
-        FlattenRecipe(s->entries, SlotCount(s), s->maskBits, sPhasedStep + s->phase, scratch);
+        FlattenRecipe(s->entries, SlotCount(s), s->maskBits, step + s->phase, scratch);
         src = scratch;
     }
 
@@ -892,6 +933,7 @@ static u16 AcquireHashedSlot(const u16 *norm, u32 n, u8 maskBits, u8 phase)
     // flattens live (BANK_NONE/BANK_UNBANKED). Only new slots resolve a bank; a hash hit above keeps the
     // existing slot's bank and its single ref, so refcounts stay balanced.
     sPool[slot].bank = ResolveBank(norm, n, maskBits);
+    sPool[slot].fixedClock = RecipeUsesFixedClock(norm, n);
     if (sPool[slot].bank != BANK_NONE)
         sPhasedSlotCount++;
     sPool[slot].refcount = 1;
@@ -1117,7 +1159,19 @@ void FieldCompositorRegisterPhasedGroup(u32 index, u16 firstTileId, u8 tileCount
     grp->bandCount = bandCount;
     grp->bandStride = (bandCount <= frameCount) ? (frameCount / bandCount) : 1;
     grp->active = TRUE;
+    grp->fixedClock = FALSE; // wind clock by default; opt in via FieldCompositorSetPhasedGroupFixedClock
     RebuildPhasedTileMap();
+}
+
+// Mark an already-registered phased group as running on the fixed (wind-independent) clock: its slots
+// animate at a steady 1/16 (sPhasedStepFixed) rather than the wind-coupled water step. Call after
+// registering. Only sound when the group's tiles never co-composite with a wind-clock group (a shared bank
+// carries one frame index, so it can't mix clocks); the terrain waterfall qualifies - it only overlays
+// static cliff tiles. A mixed cell would just fall back to the wind clock (see RecipeUsesFixedClock).
+void FieldCompositorSetPhasedGroupFixedClock(u32 index)
+{
+    if (index < COMPOSITE_PHASED_GROUP_COUNT)
+        sPhasedGroups[index].fixedClock = TRUE;
 }
 
 // Re-point an already-registered phased group at a new frame set (frames/frameCount may change) while the
@@ -1308,19 +1362,21 @@ void FieldCompositorClearPhasedGroups(void)
         sPhasedGroups[g].active = FALSE;
     RebuildPhasedTileMap(); // resets to the empty range (min > max), so every lookup rejects
     sPhasedStep = 0;
+    sPhasedStepFixed = 0;
 }
 
 // Advance the phased (water) animation to `step` (all groups share it) and refresh every phased slot to
 // its new frame. A banked slot (the common water case) is a cheap 64-byte copy from its pre-composited
 // bank; only unbanked-phased slots re-flatten. Call once per frame; only a real step change does work.
-void FieldCompositorTickPhased(u16 step)
+void FieldCompositorTickPhased(u16 windStep, u16 fixedStep)
 {
     if (!sActive)
         return;
     BankBuildTick(); // spread new recipes' frame builds across frames (runs every frame, not just on step change)
-    if (step == sPhasedStep)
+    if (windStep == sPhasedStep && fixedStep == sPhasedStepFixed)
         return;
-    sPhasedStep = step;
+    sPhasedStep = windStep;
+    sPhasedStepFixed = fixedStep;
     FieldCompositorRefreshPhasedSlots();
 }
 
