@@ -23,6 +23,8 @@ extern u16 gReflectionPaletteBuffer[];
 static void UpdateObjectReflectionSprite(struct Sprite *);
 static void LoadObjectReflectionPalette(struct ObjectEvent *objectEvent, struct Sprite *sprite);
 static void LoadSpecialReflectionPalette(struct Sprite *);
+static void UpdateSurfBlobReflectionSprite(struct Sprite *);
+static void SetUpSurfBlobReflection(u8 blobSpriteId, u8 playerObjId);
 static void LoadFieldEffectPalette_(u8 fieldEffect, bool8 updateGammaType);
 static void UpdateGrassFieldEffectSubpriority(struct Sprite *, u8);
 static void RaiseFieldEffectSubpriorityBehindObjects(struct Sprite *, u8);
@@ -1156,6 +1158,13 @@ u32 FldEff_SurfBlob(void)
         sprite->sVelocity = -1;
         sprite->sPrevX = -1;
         sprite->sPrevY = -1;
+        // Give the blob a reflection tied to its OWN lifetime, not to a one-shot ground-effect edge.
+        // Every path that (re)spawns the blob - fresh mount, waterfall, map reload while surfing -
+        // runs through here, so each gets a reflection; it then just toggles visibility with the
+        // player's own reflection. (Keying off GroundEffect_WaterReflection's hasReflection 0->1 edge
+        // missed the reload-while-surfing paths, where hasReflection never re-edges - the reflection
+        // was recreated for the player but never for the new blob, hence the intermittent misses.)
+        SetUpSurfBlobReflection(spriteId, gFieldEffectArguments[2]);
     }
     FieldEffectActiveListRemove(FLDEFF_SURF_BLOB);
     return spriteId;
@@ -1333,6 +1342,93 @@ static void UpdateBobbingEffect(struct ObjectEvent *playerObj, struct Sprite *pl
 #undef sIntervalIdx
 #undef sPrevX
 #undef sPrevY
+
+// The surf blob is its own sprite (not an object event), so the ground-effect reflection system
+// never gives it one. Mirror the player's reflection here: a darkened, priority-3 copy that tracks
+// the blob and borrows the darkened palette the player's own reflection already built.
+#define sBlobReflSpriteId    data[0]
+#define sBlobReflPlayerObjId data[1]
+
+static void SetUpSurfBlobReflection(u8 blobSpriteId, u8 playerObjId)
+{
+    struct Sprite *blobSprite = &gSprites[blobSpriteId];
+    struct Sprite *reflectionSprite;
+    u8 reflectionId;
+
+    // Subpriority 153 sits the blob's reflection just behind the player's reflection (created at 152).
+    reflectionId = CreateCopySpriteAt(blobSprite, blobSprite->x, blobSprite->y, 153);
+    if (reflectionId == MAX_SPRITES)
+        return;
+
+    reflectionSprite = &gSprites[reflectionId];
+    reflectionSprite->callback = UpdateSurfBlobReflectionSprite;
+    reflectionSprite->oam.priority = 3; // as SetUpReflection: over BG3, under BG2
+    reflectionSprite->oam.affineMode = ST_OAM_AFFINE_NORMAL; // water (wavy) reflection
+    reflectionSprite->oam.matrixNum = 0;
+    reflectionSprite->usingSheet = TRUE;
+    reflectionSprite->anims = gDummySpriteAnimTable;
+    StartSpriteAnim(reflectionSprite, 0);
+    reflectionSprite->affineAnims = gDummySpriteAffineAnimTable;
+    reflectionSprite->affineAnimBeginning = TRUE;
+    reflectionSprite->subspriteMode = SUBSPRITES_OFF;
+    reflectionSprite->coordOffsetEnabled = TRUE;
+    reflectionSprite->sBlobReflSpriteId = blobSpriteId;
+    reflectionSprite->sBlobReflPlayerObjId = playerObjId;
+}
+
+static void UpdateSurfBlobReflectionSprite(struct Sprite *reflectionSprite)
+{
+    struct ObjectEvent *playerObj = &gObjectEvents[reflectionSprite->sBlobReflPlayerObjId];
+    struct Sprite *blobSprite = &gSprites[reflectionSprite->sBlobReflSpriteId];
+    u8 paletteNum;
+
+    // Die ONLY with the blob (dismount destroys it, and the slot may be reused for another effect) or
+    // if the player object goes inactive. Losing the reflection itself (behind a cliff, non-reflective
+    // water) just hides us below - the sprite persists for the blob's whole lifetime and reappears
+    // when the player's reflection does, so it survives reload-while-surfing without a hasReflection edge.
+    if (!playerObj->active || blobSprite->callback != UpdateSurfBlobFieldEffect)
+    {
+        reflectionSprite->inUse = FALSE;
+        return;
+    }
+
+    reflectionSprite->oam.shape = blobSprite->oam.shape;
+    reflectionSprite->oam.size = blobSprite->oam.size;
+    reflectionSprite->oam.tileNum = blobSprite->oam.tileNum;
+    // The blob's East frame is its West frame with hFlip (shared tiles), and the reflection is drawn
+    // in affine mode where flips live in the matrix - mirror the player reflection: matrix 1 for a
+    // flipped source, 0 otherwise, so the reflection faces the same way as the blob.
+    reflectionSprite->oam.matrixNum = (blobSprite->oam.matrixNum & ST_OAM_HFLIP) ? 1 : 0;
+    reflectionSprite->subspriteTables = blobSprite->subspriteTables;
+    reflectionSprite->subspriteTableNum = blobSprite->subspriteTableNum;
+    reflectionSprite->subspriteMode = blobSprite->subspriteMode;
+    reflectionSprite->invisible = blobSprite->invisible;
+    reflectionSprite->x = blobSprite->x;
+    // Mirror about the player's waterline: the blob sprite sits 8px (half a tile) below the player
+    // sprite, so its reflection is one tile higher than the naive height-2 offset would place it.
+    reflectionSprite->y = blobSprite->y + 14;
+    reflectionSprite->centerToCornerVecX = blobSprite->centerToCornerVecX;
+    reflectionSprite->centerToCornerVecY = blobSprite->centerToCornerVecY;
+    reflectionSprite->x2 = blobSprite->x2;
+    reflectionSprite->y2 = -blobSprite->y2;
+    reflectionSprite->coordOffsetEnabled = blobSprite->coordOffsetEnabled;
+
+    // Borrow the darkened palette the player's own reflection built (source tag + 0x1000). The blob
+    // mirrors the player's palette slot each frame, so this stays in sync under DOWP re-allocation.
+    // Until the player has a reflection that palette doesn't exist (lookup returns 0xFF); stay hidden.
+    paletteNum = IndexOfSpritePaletteTag(GetSpritePaletteTagByPaletteNum(blobSprite->oam.paletteNum) + 0x1000);
+    if (paletteNum != 0xFF)
+        reflectionSprite->oam.paletteNum = paletteNum;
+
+    // Track the player's own reflection: visible only where it is (reflective water, in front of any
+    // cliff), hidden otherwise. hasReflection covers terrain + cliff state in one flag.
+    if (!playerObj->hasReflection || paletteNum == 0xFF
+     || playerObj->hideReflection == TRUE || ShouldDrawCliffSilhouettes())
+        reflectionSprite->invisible = TRUE;
+}
+
+#undef sBlobReflSpriteId
+#undef sBlobReflPlayerObjId
 
 #define sSpriteId data[0]
 #define sBobY     data[1]

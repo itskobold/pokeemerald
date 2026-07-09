@@ -124,6 +124,7 @@ static void UpdateObjectEventRender(struct ObjectEvent *, struct Sprite *);
 static void InitObjectEventBehindCliff(struct ObjectEvent *);
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent *);
 static void GetGroundEffectFlags_Reflection(struct ObjectEvent *, u32 *);
+static void GetGroundEffectFlags_ReflectionOnFinishStep(struct ObjectEvent *);
 static void GetGroundEffectFlags_TallGrassOnSpawn(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_LongGrassOnSpawn(struct ObjectEvent *, u32 *);
 static void GetGroundEffectFlags_SandHeap(struct ObjectEvent *, u32 *);
@@ -8799,6 +8800,7 @@ static void GetAllGroundEffectFlags_OnFinishStep(struct ObjectEvent *objEvent, u
     GetGroundEffectFlags_HotSprings(objEvent, flags);
     GetGroundEffectFlags_Seaweed(objEvent, flags);
     GetGroundEffectFlags_JumpLanding(objEvent, flags);
+    GetGroundEffectFlags_ReflectionOnFinishStep(objEvent);
 }
 
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent *objEvent)
@@ -8822,8 +8824,13 @@ static void GetGroundEffectFlags_Reflection(struct ObjectEvent *objEvent, u32 *f
         [REFL_TYPE_ICE   - 1] = GROUND_EFFECT_FLAG_ICE_REFLECTION,
         [REFL_TYPE_WATER - 1] = GROUND_EFFECT_FLAG_WATER_REFLECTION
     };
-    // No reflection while behind/under a cliff: the object is hidden below it, not on the water surface.
-    u8 reflType = objEvent->cliffLayer == CLIFF_LAYER_FRONT ? ObjectEventGetNearbyReflectionType(objEvent) : 0;
+    // On the water surface in front of a cliff, or mid-step surfacing out from behind one (so the
+    // reflection reappears the instant the exit step begins). Climbing behind a cliff the object is
+    // above the water, so no new reflection is made here - but an existing one is NOT cleared: it's
+    // left for GetGroundEffectFlags_ReflectionOnFinishStep to drop on arrival, so the reflection
+    // lingers across the whole climb-behind step instead of popping the instant the step commits.
+    bool32 atSurface = objEvent->cliffLayer == CLIFF_LAYER_FRONT || objEvent->surfacingFromCliff;
+    u8 reflType = atSurface ? ObjectEventGetNearbyReflectionType(objEvent) : 0;
 
     if (reflType)
     {
@@ -8833,10 +8840,20 @@ static void GetGroundEffectFlags_Reflection(struct ObjectEvent *objEvent, u32 *f
             *flags |= reflectionFlags[reflType - 1];
         }
     }
-    else
+    else if (objEvent->cliffLayer == CLIFF_LAYER_FRONT)
     {
+        // Only clear immediately off the water on plain terrain; behind a cliff, defer to finish-step.
         objEvent->hasReflection = FALSE;
     }
+}
+
+// Arrived behind a cliff: the object is above the water now, so drop the reflection that was kept
+// alive across the climb-behind step (see GetGroundEffectFlags_Reflection). Front-of-cliff arrivals
+// keep theirs - a surfacing exit already flipped cliffLayer back to FRONT before this runs.
+static void GetGroundEffectFlags_ReflectionOnFinishStep(struct ObjectEvent *objEvent)
+{
+    if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
+        objEvent->hasReflection = FALSE;
 }
 
 // No grass rustle while behind/under a cliff: the object is hidden below it, not in the grass on top.
@@ -9451,6 +9468,8 @@ void GroundEffect_StepOnLongGrass(struct ObjectEvent *objEvent, struct Sprite *s
 void GroundEffect_WaterReflection(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
     SetUpReflection(objEvent, sprite, FALSE);
+    // The surf blob gets its own reflection at spawn (FldEff_SurfBlob), tied to the blob's lifetime
+    // rather than this one-shot edge, so it survives blob re-spawns that carry no hasReflection edge.
 }
 
 void GroundEffect_IceReflection(struct ObjectEvent *objEvent, struct Sprite *sprite)

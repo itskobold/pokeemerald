@@ -3081,9 +3081,15 @@ static void SurfFieldEffect_End(struct Task *task)
         FieldEffectActiveListRemove(FLDEFF_USE_SURF);
         // The mount leaves a ring of water around the player composited at a stale wave phase (a slot's
         // phase is baked at acquire time and never re-evaluated, so the band stays offset until something
-        // re-acquires it - walking scrolls it, a menu full-redraws it). Re-acquire the whole view now, on
-        // arrival, so the surface is uniform the instant control returns. One-time, like a location swap.
-        DrawWholeMapView();
+        // re-acquires it). Re-acquire just that local ring, not the whole view: DrawWholeMapView here
+        // walked all ~600 on-screen cells in one frame = a visible hitch as control returned. Off-screen
+        // tiles self-skip; a screen-wide heading change is covered by the wave-flip land's own redraw.
+        {
+            s16 cx = objectEvent->currentCoords.x, cy = objectEvent->currentCoords.y, dx, dy;
+            for (dy = -4; dy <= 4; dy++)
+                for (dx = -4; dx <= 4; dx++)
+                    CurrentMapDrawMetatileAt(cx + dx, cy + dy);
+        }
         DestroyTask(FindTaskIdByFunc(Task_SurfFieldEffect));
     }
 }
