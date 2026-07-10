@@ -993,6 +993,13 @@ bool8 IsBikingDisallowedByPlayer(void)
     return TRUE;
 }
 
+// Whether a bike could be ridden on a tile with this behavior (same criteria as mounting one).
+// Used to decide if surfing should hand the player back to their bike on dismount.
+bool8 CanRideBikeOnMetatile(u8 tileBehavior)
+{
+    return (Overworld_IsBikingAllowed() == TRUE && !IsRunningDisallowedByMetatile(tileBehavior));
+}
+
 bool8 IsPlayerNotUsingAcroBikeOnBumpySlope(void)
 {
     if (TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_ACRO_BIKE)

@@ -34,6 +34,9 @@
 #define NUM_ACRO_BIKE_COLLISIONS 5
 
 static EWRAM_DATA u8 sSpinStartFacingDir = 0;
+// The bike flag (MACH/ACRO) the player was riding when they started surfing, or 0 if on foot.
+// Captured at surf-start so the surf dismount can hand the player back to that bike.
+static EWRAM_DATA u8 sSurfDismountBike = 0;
 EWRAM_DATA struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT] = {};
 EWRAM_DATA struct PlayerAvatar gPlayerAvatar = {};
 // The player's elevation level (the raw tile elevation, 0-127). Updated on warp-in and on each
@@ -80,6 +83,7 @@ static u8 CheckMovementInputNotOnBike(u8);
 static void PlayerNotOnBikeNotMoving(u8, u16);
 static void PlayerNotOnBikeTurningInPlace(u8, u16);
 static void PlayerNotOnBikeMoving(u8, u16);
+static bool8 TryStartAutoFieldMove(u8);
 static u8 CheckForPlayerAvatarCollision(u8);
 static u8 CheckForPlayerAvatarStaticCollision(u8);
 static u8 CheckForObjectEventStaticCollision(struct ObjectEvent *, s16, s16, u8, u8);
@@ -355,6 +359,11 @@ void PlayerStep(u8 direction, u16 newKeys, u16 heldKeys)
         {
             npc_clear_strange_bits(playerObjEvent);
             DoPlayerAvatarTransition();
+            // On a waterfall the downward current carries the player down (forced movement). Steering up
+            // against it cancels the descent and starts a climb.
+            if (MetatileBehavior_IsWaterfall(playerObjEvent->currentMetatileBehavior)
+             && TryStartAutoFieldMove(direction))
+                return;
             if (TryDoMetatileBehaviorForcedMovement() == 0)
             {
                 MovePlayerAvatarUsingKeypadInput(direction, newKeys, heldKeys);
@@ -429,10 +438,16 @@ static bool8 TryReversePlayerMovement(struct ObjectEvent *playerObjEvent, u8 dir
 
     if (direction == DIR_NONE || direction != GetOppositeDirection(travelDir))
         return FALSE;
-    if (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_FORCED_MOVE)
-        return FALSE;
-    if (MetatileBehaviorForcesMovement(playerObjEvent->currentMetatileBehavior))
-        return FALSE;
+    // On a waterfall, steering up against the downward current reverses the step immediately for a
+    // responsive cancel (the climb itself starts at the next tile boundary; see PlayerStep). Elsewhere
+    // a forced/terrain-steered move can't be reversed.
+    if (!MetatileBehavior_IsWaterfall(playerObjEvent->currentMetatileBehavior))
+    {
+        if (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_FORCED_MOVE)
+            return FALSE;
+        if (MetatileBehaviorForcesMovement(playerObjEvent->currentMetatileBehavior))
+            return FALSE;
+    }
     return ObjectEventReverseHeldMovement(playerObjEvent);
 }
 
@@ -696,10 +711,85 @@ static void PlayerNotOnBikeTurningInPlace(u8 direction, u16 heldKeys)
     PlayerTurnInPlace(direction);
 }
 
+// Returns the party slot of the first non-egg mon that knows move, or PARTY_SIZE if none.
+static u8 GetPartyMonSlotWithMove(u16 move)
+{
+    u8 i;
+
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        if (GetMonData(&gPlayerParty[i], MON_DATA_SPECIES) == SPECIES_NONE)
+            break;
+        if (!GetMonData(&gPlayerParty[i], MON_DATA_IS_EGG) && MonKnowsMove(&gPlayerParty[i], move))
+            return i;
+    }
+    return PARTY_SIZE;
+}
+
+// Auto-start Surf / Waterfall when the player steps toward water/a waterfall with a party mon that
+// knows the move. Skips the "used HM" show-mon banner; Surf still keeps the jump-onto-blob animation.
+static bool8 TryStartAutoFieldMove(u8 direction)
+{
+    struct ObjectEvent *playerObjEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
+    s16 x = playerObjEvent->currentCoords.x;
+    s16 y = playerObjEvent->currentCoords.y;
+    u8 behavior;
+    u8 slot;
+
+    MoveCoords(direction, &x, &y);
+    behavior = MapGridGetMetatileBehaviorAt(x, y);
+
+    // Step onto surfable water while on foot or riding a bike.
+    if (!(gPlayerAvatar.flags & (PLAYER_AVATAR_FLAG_SURFING | PLAYER_AVATAR_FLAG_UNDERWATER))
+     && FlagGet(FLAG_BADGE05_GET) == TRUE
+     && MetatileBehavior_IsSurfableFishableWater(behavior)
+     && MapGridGetElevationAt(x, y) == playerObjEvent->baseElevation)
+    {
+        slot = GetPartyMonSlotWithMove(MOVE_SURF);
+        if (slot != PARTY_SIZE)
+        {
+            // Face the input direction before mounting. Right after a dismount runningState is still
+            // MOVING, so a new direction arrives before the turn is applied; the surf jump reads
+            // movementDirection, so without this it would mount in the stale dismount direction.
+            ObjectEventTurn(playerObjEvent, direction);
+            gFieldEffectArguments[0] = slot;
+            SetFieldMoveSkipIntro(TRUE);
+            gPlayerAvatar.preventStep = TRUE;
+            FieldEffectStart(FLDEFF_USE_SURF);
+            return TRUE;
+        }
+    }
+
+    // Surf north into a waterfall (not while hidden behind a cliff face).
+    if ((gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
+     && direction == DIR_NORTH
+     && FlagGet(FLAG_BADGE08_GET) == TRUE
+     && MetatileBehavior_IsWaterfall(behavior)
+     && !IsPlayerBehindCliff())
+    {
+        slot = GetPartyMonSlotWithMove(MOVE_WATERFALL);
+        if (slot != PARTY_SIZE)
+        {
+            ObjectEventTurn(playerObjEvent, direction);
+            gFieldEffectArguments[0] = slot;
+            SetFieldMoveSkipIntro(TRUE);
+            gPlayerAvatar.preventStep = TRUE;
+            FieldEffectStart(FLDEFF_USE_WATERFALL);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static void PlayerNotOnBikeMoving(u8 direction, u16 heldKeys)
 {
-    u8 collision = CheckForPlayerAvatarCollision(direction);
-    
+    u8 collision;
+
+    if (TryStartAutoFieldMove(direction))
+        return;
+
+    collision = CheckForPlayerAvatarCollision(direction);
+
     if (collision)
     {
         if (collision == COLLISION_LEDGE_JUMP)
@@ -1117,6 +1207,9 @@ static void PlayerRun(u8 direction)
 // step (COPY_MOVE_NONE). Same for the faraway-island Mew variants below.
 void PlayerOnBikeCollide(u8 direction)
 {
+    // Riding into surfable water auto-starts Surf (tracking the bike so it's restored on dismount).
+    if (TryStartAutoFieldMove(direction))
+        return;
     PlayCollisionSoundIfNotFacingWarp(direction);
     PlayerSetAnimId(GetWalkInPlaceNormalMovementAction(direction), COPY_MOVE_NONE);
 }
@@ -1772,18 +1865,48 @@ static bool8 PlayerAvatar_SecretBaseMatSpinStep3(struct Task *task, struct Objec
     return FALSE;
 }
 
+// Records which bike (if any) the player was riding when Surf started, so the surf dismount can put
+// them back on it. Called at surf-start; see SurfFieldEffect_Init.
+void SetSurfDismountBike(u8 bikeFlags)
+{
+    sSurfDismountBike = bikeFlags;
+}
+
 static void CreateStopSurfingTask(u8 direction)
 {
+    struct ObjectEvent *playerObjEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
     u8 taskId;
+    u8 restoreBike = 0;
+
+    // If the player surfed here from a bike, return to it on dismount - but only if the tile they land
+    // on actually allows biking; otherwise fall back to on foot.
+    if (sSurfDismountBike)
+    {
+        s16 x = playerObjEvent->currentCoords.x;
+        s16 y = playerObjEvent->currentCoords.y;
+        MoveCoords(direction, &x, &y);
+        if (CanRideBikeOnMetatile(MapGridGetMetatileBehaviorAt(x, y)))
+            restoreBike = sSurfDismountBike;
+    }
+    sSurfDismountBike = 0;
 
     LockPlayerFieldControls();
     Overworld_ClearSavedMusic();
-    Overworld_ChangeMusicToDefault();
+    if (restoreBike)
+    {
+        Overworld_SetSavedMusic(MUS_CYCLING);
+        Overworld_ChangeMusicTo(MUS_CYCLING);
+    }
+    else
+    {
+        Overworld_ChangeMusicToDefault();
+    }
     gPlayerAvatar.flags ^= PLAYER_AVATAR_FLAG_SURFING;
     gPlayerAvatar.flags |= PLAYER_AVATAR_FLAG_ON_FOOT;
     gPlayerAvatar.preventStep = TRUE;
     taskId = CreateTask(Task_StopSurfingInit, 0xFF);
     gTasks[taskId].data[0] = direction;
+    gTasks[taskId].data[1] = restoreBike;
     Task_StopSurfingInit(taskId);
 }
 
@@ -1807,11 +1930,19 @@ static void Task_WaitStopSurfing(u8 taskId)
 
     if (ObjectEventClearHeldMovementIfFinished(playerObjEvent))
     {
-        ObjectEventSetGraphicsId(playerObjEvent, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_STATE_NORMAL));
+        u8 blobSpriteId = playerObjEvent->fieldEffectSpriteId;
+        u8 restoreBike = gTasks[taskId].data[1];
+
+        // Restoring a bike switches graphics/flags and resets bike state via the avatar transition;
+        // otherwise land on foot as usual.
+        if (restoreBike)
+            SetPlayerAvatarTransitionFlags(restoreBike);
+        else
+            ObjectEventSetGraphicsId(playerObjEvent, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_STATE_NORMAL));
         ObjectEventSetHeldMovement(playerObjEvent, GetFaceDirectionMovementAction(playerObjEvent->facingDirection));
         gPlayerAvatar.preventStep = FALSE;
         UnlockPlayerFieldControls();
-        DestroySprite(&gSprites[playerObjEvent->fieldEffectSpriteId]);
+        DestroySprite(&gSprites[blobSpriteId]);
 #ifdef BUGFIX
         // If this is not defined but the player steps into grass from surfing, they will appear over the grass instead of in the grass.
         playerObjEvent->triggerGroundEffectsOnMove = TRUE;

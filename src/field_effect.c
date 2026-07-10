@@ -37,6 +37,10 @@
 EWRAM_DATA s32 gFieldEffectArguments[8] = {0};
 EWRAM_DATA u16 gReflectionPaletteBuffer[0x10] = {0};
 
+// Set before FLDEFF_USE_SURF / FLDEFF_USE_WATERFALL to skip the field-move pose and
+// the "used HM" show-mon banner. Consumed (and reset) when the effect task starts.
+static bool8 sSkipFieldMoveIntro;
+
 // Static type declarations
 
 static void Task_PokecenterHeal(u8 taskId);
@@ -1829,12 +1833,15 @@ static bool8 EscalatorWarpIn_End(struct Task *task)
 
 #define tState data[0]
 #define tMonId data[1]
+#define tSkipIntro data[2]
 
 bool8 FldEff_UseWaterfall(void)
 {
     u8 taskId;
     taskId = CreateTask(Task_UseWaterfall, 0xff);
     gTasks[taskId].tMonId = gFieldEffectArguments[0];
+    gTasks[taskId].tSkipIntro = sSkipFieldMoveIntro;
+    sSkipFieldMoveIntro = FALSE;
     Task_UseWaterfall(taskId);
     return FALSE;
 }
@@ -1848,7 +1855,16 @@ static bool8 WaterfallFieldEffect_Init(struct Task *task, struct ObjectEvent *ob
 {
     LockPlayerFieldControls();
     gPlayerAvatar.preventStep = TRUE;
-    task->tState++;
+    // Auto-waterfall skips the "used HM" show-mon banner, going straight to the climb.
+    if (task->tSkipIntro)
+    {
+        ObjectEventClearHeldMovementIfFinished(objectEvent);
+        task->tState = 3;
+    }
+    else
+    {
+        task->tState++;
+    }
     return FALSE;
 }
 
@@ -1877,17 +1893,33 @@ static bool8 WaterfallFieldEffect_WaitForShowMon(struct Task *task, struct Objec
 
 static bool8 WaterfallFieldEffect_RideUp(struct Task *task, struct ObjectEvent *objectEvent)
 {
-    ObjectEventSetHeldMovement(objectEvent, GetWalkSlowMovementAction(DIR_NORTH));
+    // Ride the current up: matches the downward descent's speed and is a reversible step, so steering
+    // down can cancel the climb mid-tile (see below) rather than only at tile boundaries.
+    ObjectEventSetHeldMovement(objectEvent, GetRideWaterCurrentMovementAction(DIR_NORTH));
     task->tState++;
     return FALSE;
 }
 
 static bool8 WaterfallFieldEffect_ContinueRideOrEnd(struct Task *task, struct ObjectEvent *objectEvent)
 {
+    // Responsive cancel: steering down mid-climb reverses the current step immediately (gliding back
+    // down) instead of waiting for the tile to finish. The effect then ends and the downward current
+    // carries the player the rest of the way - same hand-off as the tile-boundary cancel below.
+    if ((gMain.heldKeys & DPAD_DOWN) && ObjectEventReverseHeldMovement(objectEvent))
+    {
+        UnlockPlayerFieldControls();
+        gPlayerAvatar.preventStep = FALSE;
+        DestroyTask(FindTaskIdByFunc(Task_UseWaterfall));
+        FieldEffectActiveListRemove(FLDEFF_USE_WATERFALL);
+        return FALSE;
+    }
+
     if (!ObjectEventClearHeldMovementIfFinished(objectEvent))
         return FALSE;
 
-    if (MetatileBehavior_IsWaterfall(objectEvent->currentMetatileBehavior))
+    // Keep climbing while on the waterfall, unless the player steers down - that cancels the climb and
+    // ends the effect, handing control back so the downward current carries them down instead.
+    if (MetatileBehavior_IsWaterfall(objectEvent->currentMetatileBehavior) && !(gMain.heldKeys & DPAD_DOWN))
     {
         // Still ascending waterfall, back to WaterfallFieldEffect_RideUp
         task->tState = 3;
@@ -1903,6 +1935,7 @@ static bool8 WaterfallFieldEffect_ContinueRideOrEnd(struct Task *task, struct Ob
 
 #undef tState
 #undef tMonId
+#undef tSkipIntro
 
 bool8 FldEff_UseDive(void)
 {
@@ -2990,12 +3023,20 @@ static void SpriteCB_FieldMoveMonSlideOffscreen(struct Sprite *sprite)
 #define tState data[0]
 #define tDestX data[1]
 #define tDestY data[2]
+#define tSkipIntro data[3]
 #define tMonId data[15]
+
+void SetFieldMoveSkipIntro(bool8 skip)
+{
+    sSkipFieldMoveIntro = skip;
+}
 
 u8 FldEff_UseSurf(void)
 {
     u8 taskId = CreateTask(Task_SurfFieldEffect, 0xff);
     gTasks[taskId].tMonId = gFieldEffectArguments[0];
+    gTasks[taskId].tSkipIntro = sSkipFieldMoveIntro;
+    sSkipFieldMoveIntro = FALSE;
     Overworld_ClearSavedMusic();
     Overworld_ChangeMusicTo(MUS_SURF);
     return FALSE;
@@ -3019,10 +3060,13 @@ static void SurfFieldEffect_Init(struct Task *task)
     LockPlayerFieldControls();
     FreezeObjectEvents();
     gPlayerAvatar.preventStep = TRUE;
+    // Remember any bike being ridden (captured before the flag is cleared) so the dismount can restore it.
+    SetSurfDismountBike(gPlayerAvatar.flags & (PLAYER_AVATAR_FLAG_MACH_BIKE | PLAYER_AVATAR_FLAG_ACRO_BIKE));
     SetPlayerAvatarStateMask(PLAYER_AVATAR_FLAG_SURFING);
     PlayerGetDestCoords(&task->tDestX, &task->tDestY);
     MoveCoords(gObjectEvents[gPlayerAvatar.objectEventId].movementDirection, &task->tDestX, &task->tDestY);
-    task->tState++;
+    // Auto-surf skips the field-move pose and show-mon banner, going straight to the surf-blob jump.
+    task->tState = task->tSkipIntro ? 3 : 1;
 }
 
 static void SurfFieldEffect_FieldMovePose(struct Task *task)
@@ -3097,6 +3141,7 @@ static void SurfFieldEffect_End(struct Task *task)
 #undef tState
 #undef tDestX
 #undef tDestY
+#undef tSkipIntro
 #undef tMonId
 
 u8 FldEff_RayquazaSpotlight(void)

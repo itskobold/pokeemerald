@@ -52,6 +52,7 @@ void SetPlayerAvatarStateMask(u8 flags);
 u8 GetPlayerAvatarGraphicsIdByStateId(u8 state);
 u8 GetJumpSpecialMovementAction(u32);
 bool8 PartyHasMonWithSurf(void);
+void SetSurfDismountBike(u8 bikeFlags);
 bool8 IsPlayerFacingSurfableFishableWater(void);
 bool8 IsPlayerSurfingNorth(void);
 bool8 IsPlayerBehindCliff(void);

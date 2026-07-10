@@ -10,6 +10,7 @@ extern void (*gPostMenuFieldCallback)(void);
 extern bool8 (*gFieldCallback2)(void);
 
 u32 FieldEffectStart(u8 id);
+void SetFieldMoveSkipIntro(bool8 skip);
 bool8 FieldEffectActiveListContains(u8 id);
 void FieldEffectActiveListClear(void);
 void ReturnToFieldFromFlyMapSelect(void);
