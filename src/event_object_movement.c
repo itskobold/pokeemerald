@@ -9038,7 +9038,7 @@ static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *objEvent, u32 *
 // count, so an object never reflects in water on a different level (e.g. below a bridge).
 #define RETURN_REFLECTION_TYPE_AT(x, y)          \
     result = MapGridGetMetatileReflectionAt(x, y); \
-    if (result != REFL_TYPE_NONE && MapGridGetElevationAt(x, y) == objEvent->baseElevation) \
+    if (result != REFL_TYPE_NONE && (ignoreElevation || MapGridGetElevationAt(x, y) == objEvent->baseElevation)) \
         return result;
 
 static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *objEvent)
@@ -9051,6 +9051,9 @@ static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *objEvent)
     s16 i, j;
     u8 result; // used by RETURN_REFLECTION_TYPE_AT
     s16 one = 1;
+    // Climbing a waterfall the object's baseElevation shifts toward the top-of-falls level while the
+    // reflective water tiles below stay at the bottom level, so skip the elevation match there.
+    bool8 ignoreElevation = MetatileBehavior_IsWaterfall(objEvent->currentMetatileBehavior);
 
     for (i = 0; i < height; i++)
     {
