@@ -49,6 +49,7 @@ static void TilesetAnim_BikeShop(u16);
 static void TilesetAnim_BattlePyramid(u16);
 static void TilesetAnim_BattleDome(u16);
 static s16 PhaseFn_Terrain_Water(s16, s16);
+static s16 PhaseFn_Terrain_Waterfall(s16, s16);
 static void QueueAnimTiles_General_Flower(u16);
 static void QueueAnimTiles_General_Water(u16);
 static void QueueAnimTiles_General_SandWaterEdge(u16);
@@ -294,9 +295,9 @@ const u16 *const gTilesetAnims_Terrain_Water_Currents_Side[] = {
     gTilesetAnims_Terrain_Water_Currents_Side_Frame11
 };
 
-// Terrain waterfall: a 6x6-tile (48x48) feature drawn over static cliff tiles, 4 frames, tiles 0x1A2..0x1C5.
-// Phased (banked) like the water surfaces so it carries the same diagonal wind ripple (PhaseFn_Terrain_Water),
-// but flagged fixedClock (see InitTilesetAnim_Terrain) so it animates at a steady 1/16 regardless of wind.
+// Terrain waterfall: a 2x4-tile (16x32) feature drawn over static cliff tiles, 4 frames, tiles 0x1A2..0x1A9.
+// Phased (banked) like the water surfaces, but horizontally only (PhaseFn_Terrain_Waterfall) so each column
+// falls in unison; flagged fixedClock (see InitTilesetAnim_Terrain) so it animates at a steady 1/16 regardless of wind.
 // It only ever overlays static cliff tiles, never the wind-cadence water, so its banks stay single-clock.
 const u16 gTilesetAnims_Terrain_Waterfall_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall/0.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Waterfall_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall/1.png", ".8bpp", "-palette_mod 16");
@@ -310,7 +311,7 @@ const u16 *const gTilesetAnims_Terrain_Waterfall[] = {
     gTilesetAnims_Terrain_Waterfall_Frame3
 };
 
-// Water edge: 12-frame 2x2 water surface (tiles 0x1C6..0x1C9). Phased like the other water surfaces.
+// Water edge: 12-frame 2x2 water surface (tiles 0x1AA..0x1AD). Phased like the other water surfaces.
 const u16 gTilesetAnims_Terrain_Water_Edge_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/0.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Edge_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/1.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Edge_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_edge/2.png", ".8bpp", "-palette_mod 16");
@@ -339,7 +340,7 @@ const u16 *const gTilesetAnims_Terrain_Water_Edge[] = {
     gTilesetAnims_Terrain_Water_Edge_Frame11
 };
 
-// Water fresh: 12-frame 2x2 water surface (tiles 0x1CA..0x1CD). Phased like the other water surfaces.
+// Water fresh: 12-frame 2x2 water surface (tiles 0x1AE..0x1B1). Phased like the other water surfaces.
 const u16 gTilesetAnims_Terrain_Water_Fresh_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/0.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Fresh_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/1.png", ".8bpp", "-palette_mod 16");
 const u16 gTilesetAnims_Terrain_Water_Fresh_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/water_fresh/2.png", ".8bpp", "-palette_mod 16");
@@ -366,6 +367,21 @@ const u16 *const gTilesetAnims_Terrain_Water_Fresh[] = {
     gTilesetAnims_Terrain_Water_Fresh_Frame9,
     gTilesetAnims_Terrain_Water_Fresh_Frame10,
     gTilesetAnims_Terrain_Water_Fresh_Frame11
+};
+
+// Waterfall spray: a 4x2-tile (32x16) feature at the waterfall's base, 4 frames, tiles 0x1B2..0x1B9.
+// Same handling as the waterfall proper: phased horizontally only (PhaseFn_Terrain_Waterfall, bandCount =
+// its 4 frames) so it stays in step with the falling columns, and fixedClock for a steady 1/16 cadence.
+const u16 gTilesetAnims_Terrain_Waterfall_Spray_Frame0[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall_spray/0.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Waterfall_Spray_Frame1[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall_spray/1.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Waterfall_Spray_Frame2[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall_spray/2.png", ".8bpp", "-palette_mod 16");
+const u16 gTilesetAnims_Terrain_Waterfall_Spray_Frame3[] = INCGFX_U16("data/tilesets/primary/terrain/anim/waterfall_spray/3.png", ".8bpp", "-palette_mod 16");
+
+const u16 *const gTilesetAnims_Terrain_Waterfall_Spray[] = {
+    gTilesetAnims_Terrain_Waterfall_Spray_Frame0,
+    gTilesetAnims_Terrain_Waterfall_Spray_Frame1,
+    gTilesetAnims_Terrain_Waterfall_Spray_Frame2,
+    gTilesetAnims_Terrain_Waterfall_Spray_Frame3
 };
 
 // One source wave set (water_waves/): frames 0-6 are the cardinal crest (flows N->S, down), frames 7-12 the
@@ -999,6 +1015,7 @@ enum {
     PHASED_GROUP_TERRAIN_WATERFALL,
     PHASED_GROUP_TERRAIN_WATER_EDGE,
     PHASED_GROUP_TERRAIN_WATER_FRESH,
+    PHASED_GROUP_TERRAIN_WATERFALL_SPRAY,
 };
 
 // The terrain water-wave overlay scales its animation with wind strength: below WAVES_WIND_CALM it holds
@@ -1279,20 +1296,27 @@ void InitTilesetAnim_Terrain(void)
     sTerrainWavesSet = TerrainWavesSetForWind();
     RegisterTerrainWavesGroup(sTerrainWavesSet, WAVES_REG_COLD);
 
-    // Waterfall (tiles 0x1A2..0x1C5, 36 tiles = the 6x6 feature). Phased with the same diagonal wind ripple
-    // (PhaseFn_Terrain_Water, bandCount = its 4 frames) so it matches the surrounding water, but flagged
-    // fixedClock so it advances at a steady 1/16 (TilesetAnim_Terrain's fixedStep) instead of scaling with
-    // the wind like the water surfaces.
-    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATERFALL, 0x1A2, 36,
-        gTilesetAnims_Terrain_Waterfall, ARRAY_COUNT(gTilesetAnims_Terrain_Waterfall), 4, PhaseFn_Terrain_Water);
+    // Waterfall (tiles 0x1A2..0x1A9, 8 tiles = the 2x4 feature). Phased horizontally only
+    // (PhaseFn_Terrain_Waterfall, bandCount = its 4 frames) so each column falls in unison - a column effect
+    // rather than the water's diagonal ripple. Flagged fixedClock so it advances at a steady 1/16
+    // (TilesetAnim_Terrain's fixedStep) instead of scaling with the wind like the water surfaces.
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATERFALL, 0x1A2, 8,
+        gTilesetAnims_Terrain_Waterfall, ARRAY_COUNT(gTilesetAnims_Terrain_Waterfall), 4, PhaseFn_Terrain_Waterfall);
     FieldCompositorSetPhasedGroupFixedClock(PHASED_GROUP_TERRAIN_WATERFALL);
 
-    // Water edge (0x1C6, 4 tiles) and water fresh (0x1CA, 4 tiles): 12-frame water surfaces phased with the
+    // Water edge (0x1AA, 4 tiles) and water fresh (0x1AE, 4 tiles): 12-frame water surfaces phased with the
     // same diagonal wind ripple (PhaseFn_Terrain_Water, bandCount 12) as the rest of the terrain water.
-    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_EDGE, 0x1C6, 4,
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_EDGE, 0x1AA, 4,
         gTilesetAnims_Terrain_Water_Edge, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Edge), 12, PhaseFn_Terrain_Water);
-    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_FRESH, 0x1CA, 4,
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATER_FRESH, 0x1AE, 4,
         gTilesetAnims_Terrain_Water_Fresh, ARRAY_COUNT(gTilesetAnims_Terrain_Water_Fresh), 12, PhaseFn_Terrain_Water);
+
+    // Waterfall spray (tiles 0x1B2..0x1B9, 8 tiles = the 4x2 feature). Same rules as the waterfall proper:
+    // phased horizontally only (PhaseFn_Terrain_Waterfall, bandCount = its 4 frames) and fixedClock so it
+    // falls in unison columns at a steady 1/16, staying in step with the waterfall above it.
+    FieldCompositorRegisterPhasedGroup(PHASED_GROUP_TERRAIN_WATERFALL_SPRAY, 0x1B2, 8,
+        gTilesetAnims_Terrain_Waterfall_Spray, ARRAY_COUNT(gTilesetAnims_Terrain_Waterfall_Spray), 4, PhaseFn_Terrain_Waterfall);
+    FieldCompositorSetPhasedGroupFixedClock(PHASED_GROUP_TERRAIN_WATERFALL_SPRAY);
 }
 
 void InitTilesetAnim_Building(void)
@@ -1384,6 +1408,13 @@ static void TilesetAnim_Terrain(u16 timer)
 static s16 PhaseFn_Terrain_Water(s16 x, s16 y)
 {
     return sWavePhaseX * x + sWavePhaseY * y;
+}
+
+// Waterfall keeps only the horizontal gradient (drop the y term) so every cell in a column shares a phase:
+// the fall animates as coherent vertical columns rather than the water's diagonal ripple.
+static s16 PhaseFn_Terrain_Waterfall(s16 x, s16 y)
+{
+    return sWavePhaseX * x;
 }
 
 static void TilesetAnim_Building(u16 timer)

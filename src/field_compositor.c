@@ -108,7 +108,7 @@ struct FrameBank
 // copy. The chosen phase (0..frameCount-1) is folded into the slot recipe key, so cells in the same
 // band still share a slot; distinct on-screen slots stay bounded by frameCount per recipe, not by the
 // number of animated cells - that bound is what keeps large water areas off the 512-slot pool.
-#define COMPOSITE_PHASED_GROUP_COUNT 12
+#define COMPOSITE_PHASED_GROUP_COUNT 13
 
 struct PhasedAnimGroup
 {
@@ -539,8 +539,13 @@ static void RebuildPhasedTileMap(void)
 // would seam because 256 is not a multiple of bandCount.
 static u8 PhaseForRecipe(const u16 *norm, u32 n, s16 x, s16 y)
 {
+    struct PhasedAnimGroup *chosen = NULL;
     u32 i;
 
+    // Prefer a fixedClock group (the waterfall): in a mixed waterfall+water slot its phase must drive the
+    // recipe so the fall stays in coherent vertical columns (PhaseFn_Terrain_Waterfall) instead of inheriting
+    // water's diagonal ripple. Otherwise the first phased group wins - the common single-group case takes it
+    // on the first hit. This keeps clock (RecipeUsesFixedClock) and phase picking the same group.
     for (i = 0; i < n; i++)
     {
         u8 sub;
@@ -548,38 +553,44 @@ static u8 PhaseForRecipe(const u16 *norm, u32 n, s16 x, s16 y)
 
         if (grp != NULL)
         {
-            // Evaluate in the frame-independent world origin (see sPhaseOriginX/Y) so a coordinate-frame
-            // shift under the on-screen slots doesn't seam the surface.
-            s32 band = grp->phaseFn(x - sPhaseOriginX, y - sPhaseOriginY) % grp->bandCount;
-            if (band < 0)
-                band += grp->bandCount;
-            return band * grp->bandStride;
+            if (chosen == NULL)
+                chosen = grp;
+            if (grp->fixedClock)
+            {
+                chosen = grp;
+                break;
+            }
         }
+    }
+    if (chosen != NULL)
+    {
+        // Evaluate in the frame-independent world origin (see sPhaseOriginX/Y) so a coordinate-frame
+        // shift under the on-screen slots doesn't seam the surface.
+        s32 band = chosen->phaseFn(x - sPhaseOriginX, y - sPhaseOriginY) % chosen->bandCount;
+        if (band < 0)
+            band += chosen->bandCount;
+        return band * chosen->bandStride;
     }
     return 0;
 }
 
-// Whether a recipe animates on the fixed clock: TRUE iff it has at least one phased group and EVERY phased
-// group in it is fixedClock. A recipe mixing a fixed and a wind group (none exist in the terrain data - the
-// waterfall only overlays static cliff tiles) falls back to the wind clock, so water can never accidentally
-// ride the fixed step and a shared bank never needs two clocks.
+// Whether a recipe animates on the fixed clock: TRUE iff it carries at least one fixedClock phased group
+// (the waterfall / its spray). When a waterfall subtile co-composites with wind-clock water in one slot the
+// waterfall wins - the whole slot rides the steady 1/16 fixed step instead of drifting onto the wind-coupled
+// water cycle. A bank uses one clock for all its layers, so the blended water there just rides it too; that's
+// fine, the waterfall is the dominant feature. PhaseForRecipe picks the matching (fixedClock) phase.
 static bool32 RecipeUsesFixedClock(const u16 *norm, u32 n)
 {
     u32 i;
-    bool32 any = FALSE;
 
     for (i = 0; i < n; i++)
     {
         u8 sub;
         struct PhasedAnimGroup *grp = FindPhasedGroup(norm[i] & SUBTILE_ENTRY_TILE_MASK, &sub);
-        if (grp != NULL)
-        {
-            if (!grp->fixedClock)
-                return FALSE;
-            any = TRUE;
-        }
+        if (grp != NULL && grp->fixedClock)
+            return TRUE;
     }
-    return any;
+    return FALSE;
 }
 
 // Per-byte "nonzero -> 0xFF" mask of a 4-pixel word, so an 8BPP layer can be composited four pixels at
