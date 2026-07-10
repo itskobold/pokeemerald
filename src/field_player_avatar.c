@@ -37,6 +37,10 @@ static EWRAM_DATA u8 sSpinStartFacingDir = 0;
 // The bike flag (MACH/ACRO) the player was riding when they started surfing, or 0 if on foot.
 // Captured at surf-start so the surf dismount can hand the player back to that bike.
 static EWRAM_DATA u8 sSurfDismountBike = 0;
+// Set when an up-steer reverses a waterfall descent step, latching the intent to climb. A tapped
+// up can be released before the reversal glide reaches the tile boundary; without this the climb
+// trigger (which reads the live direction) would miss and the current would resume the descent.
+static EWRAM_DATA bool8 sWaterfallReverseClimbPending = 0;
 EWRAM_DATA struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT] = {};
 EWRAM_DATA struct PlayerAvatar gPlayerAvatar = {};
 // The player's elevation level (the raw tile elevation, 0-127). Updated on warp-in and on each
@@ -361,9 +365,21 @@ void PlayerStep(u8 direction, u16 newKeys, u16 heldKeys)
             DoPlayerAvatarTransition();
             // On a waterfall the downward current carries the player down (forced movement). Steering up
             // against it cancels the descent and starts a climb.
-            if (MetatileBehavior_IsWaterfall(playerObjEvent->currentMetatileBehavior)
-             && TryStartAutoFieldMove(direction))
-                return;
+            if (MetatileBehavior_IsWaterfall(playerObjEvent->currentMetatileBehavior))
+            {
+                // A tapped up may have already reversed the descent step and been released before the
+                // reversal glided back to this boundary; sWaterfallReverseClimbPending latches that
+                // intent so the climb still starts here. Consume it at this one boundary: an active
+                // down-steer (keep descending) drops it, otherwise it forces the climb direction.
+                bool8 climbPending = sWaterfallReverseClimbPending && direction != DIR_SOUTH;
+                sWaterfallReverseClimbPending = FALSE;
+                if (TryStartAutoFieldMove(climbPending ? DIR_NORTH : direction))
+                    return;
+            }
+            else
+            {
+                sWaterfallReverseClimbPending = FALSE;
+            }
             if (TryDoMetatileBehaviorForcedMovement() == 0)
             {
                 MovePlayerAvatarUsingKeypadInput(direction, newKeys, heldKeys);
@@ -447,8 +463,13 @@ static bool8 TryReversePlayerMovement(struct ObjectEvent *playerObjEvent, u8 dir
             return FALSE;
         if (MetatileBehaviorForcesMovement(playerObjEvent->currentMetatileBehavior))
             return FALSE;
+        return ObjectEventReverseHeldMovement(playerObjEvent);
     }
-    return ObjectEventReverseHeldMovement(playerObjEvent);
+    // Latch the climb intent so a tapped (released before the glide finishes) up still climbs.
+    if (!ObjectEventReverseHeldMovement(playerObjEvent))
+        return FALSE;
+    sWaterfallReverseClimbPending = TRUE;
+    return TRUE;
 }
 
 // Lets the player start or stop dashing partway through a step instead of only at tile boundaries.
