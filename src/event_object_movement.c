@@ -9034,10 +9034,11 @@ static void GetGroundEffectFlags_JumpLanding(struct ObjectEvent *objEvent, u32 *
 }
 
 // Reflection type comes straight from the tile's reflection attribute (METATILE_REFLECTION_* ==
-// REFL_TYPE_*), not from any metatile behavior.
+// REFL_TYPE_*), not from any metatile behavior. Only reflective tiles at the object's own elevation
+// count, so an object never reflects in water on a different level (e.g. below a bridge).
 #define RETURN_REFLECTION_TYPE_AT(x, y)          \
     result = MapGridGetMetatileReflectionAt(x, y); \
-    if (result != REFL_TYPE_NONE)                \
+    if (result != REFL_TYPE_NONE && MapGridGetElevationAt(x, y) == objEvent->baseElevation) \
         return result;
 
 static u8 ObjectEventGetNearbyReflectionType(struct ObjectEvent *objEvent)
