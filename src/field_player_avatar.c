@@ -1620,6 +1620,13 @@ void InitPlayerAvatar(s16 x, s16 y, u8 direction, u8 gender)
     objectEventId = SpawnSpecialObjectEvent(&playerObjEventTemplate);
     objectEvent = &gObjectEvents[objectEventId];
     objectEvent->isPlayer = TRUE;
+    // A warp-in lands the player standing on the destination tile, never mid-climb behind a cliff
+    // (that state is only entered by an in-map step). The spawn resolves the behind-cliff plane from
+    // the template's default elevation, which can leave the player stuck behind if warped onto a tile
+    // above it (e.g. debug "warp to tile" taken while behind a cliff), so recompute the render base
+    // from the arrival tile and clear the plane. See InitObjectEventBehindCliff.
+    objectEvent->baseElevation = MapGridGetElevationAt(objectEvent->currentCoords.x, objectEvent->currentCoords.y);
+    objectEvent->cliffLayer = CLIFF_LAYER_FRONT;
     objectEvent->warpArrowSpriteId = CreateWarpArrowSprite();
     ObjectEventTurn(objectEvent, direction);
     ClearPlayerAvatarInfo();
