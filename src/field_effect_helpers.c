@@ -84,29 +84,8 @@ static s16 GetReflectionVerticalOffset(struct ObjectEvent *objectEvent)
 
 static void LoadObjectReflectionPalette(struct ObjectEvent *objectEvent, struct Sprite *reflectionSprite)
 {
-    u8 bridgeType;
-    u16 bridgeReflectionVerticalOffsets[] = {
-        [BRIDGE_TYPE_POND_LOW - 1] = 12,
-        [BRIDGE_TYPE_POND_MED - 1] = 28,
-        [BRIDGE_TYPE_POND_HIGH - 1] = 44
-    };
     reflectionSprite->sReflectionVerticalOffset = 0;
-    if (!GetObjectEventGraphicsInfo(objectEvent->graphicsId)->disableReflectionPaletteLoad
-     && ((bridgeType = MetatileBehavior_GetBridgeType(objectEvent->previousMetatileBehavior))
-      || (bridgeType = MetatileBehavior_GetBridgeType(objectEvent->currentMetatileBehavior))))
-    {
-        // When walking on a bridge high above water (Route 120), the reflection is a solid dark blue color.
-        // This is so the sprite blends in with the dark water metatile underneath the bridge.
-        reflectionSprite->sReflectionVerticalOffset = bridgeReflectionVerticalOffsets[bridgeType - 1];
-        LoadObjectEventPalette(OBJ_EVENT_PAL_TAG_BRIDGE_REFLECTION);
-        reflectionSprite->oam.paletteNum = IndexOfSpritePaletteTag(OBJ_EVENT_PAL_TAG_BRIDGE_REFLECTION);
-        UpdatePaletteGammaType(reflectionSprite->oam.paletteNum, GAMMA_NORMAL);
-        UpdateSpritePaletteWithWeather(reflectionSprite->oam.paletteNum);
-    }
-    else
-    {
-        LoadSpecialReflectionPalette(reflectionSprite);
-    }
+    LoadSpecialReflectionPalette(reflectionSprite);
 }
 
 // Builds a darkened copy of the reflected object's palette on the fly and loads it into a
@@ -308,7 +287,7 @@ static const struct SubspriteTable sGrassCliffPromoteSubspriteTable[] = {
 // to the dynamic cliff plane and is the price of the grass not vanishing behind the cliff face.
 static void MatchFieldEffectToFrontSplit(struct Sprite *sprite, struct ObjectEvent *objEvent, s16 tileX, s16 tileY)
 {
-    if (objEvent->cliffLayer == CLIFF_LAYER_FRONT && IsTileCliffPromoted(tileX, tileY))
+    if (objEvent->cliffLayer == CLIFF_LAYER_FRONT && IsTilePromoted(tileX, tileY))
     {
         sprite->subspriteTables = sGrassCliffPromoteSubspriteTable;
         sprite->subspriteTableNum = 0;
@@ -402,7 +381,7 @@ void UpdateShadowFieldEffect(struct Sprite *sprite)
         else
         {
             // Hide while behind a cliff, else the shadow pokes out in front of the cliff face.
-            UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
+            UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(objectEvent));
         }
     }
 }
@@ -486,7 +465,7 @@ void UpdateTallGrassFieldEffect(struct Sprite *sprite)
             metatileBehavior = 4;
 
         // Hide while the triggering object is behind a cliff, else the grass pokes out in front of it.
-        UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
+        UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(objectEvent));
         UpdateGrassFieldEffectSubpriority(sprite, metatileBehavior);
     }
 }
@@ -585,7 +564,7 @@ void UpdateLongGrassFieldEffect(struct Sprite *sprite)
             sprite->sObjectMoved = TRUE;
 
         // Hide while the triggering object is behind a cliff, else the grass pokes out in front of it.
-        UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
+        UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(objectEvent));
         UpdateGrassFieldEffectSubpriority(sprite, 0);
     }
 }
@@ -676,7 +655,7 @@ void UpdateShortGrassFieldEffect(struct Sprite *sprite)
         // Hide while the object is behind a cliff: this sprite follows it, so it'd otherwise poke
         // out in front of the cliff face.
         UpdateObjectEventSpriteInvisibility(sprite, linkedSprite->invisible
-            || gObjectEvents[objectEventId].cliffLayer != CLIFF_LAYER_FRONT);
+            || ObjectEventIsRenderedBehind(&gObjectEvents[objectEventId]));
     }
 }
 
@@ -814,7 +793,7 @@ void UpdateSplashFieldEffect(struct Sprite *sprite)
         sprite->x = gSprites[gObjectEvents[objectEventId].spriteId].x;
         sprite->y = gSprites[gObjectEvents[objectEventId].spriteId].y;
         // Hide while the object is behind a cliff, else the splash pokes out in front of it.
-        UpdateObjectEventSpriteInvisibility(sprite, gObjectEvents[objectEventId].cliffLayer != CLIFF_LAYER_FRONT);
+        UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(&gObjectEvents[objectEventId]));
     }
 }
 
@@ -903,7 +882,7 @@ static void UpdateFeetInFlowingWaterFieldEffect(struct Sprite *sprite)
         sprite->subpriority = linkedSprite->subpriority;
         RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         // Hide while the object is behind a cliff, else the splash pokes out in front of it.
-        UpdateObjectEventSpriteInvisibility(sprite, objectEvent->cliffLayer != CLIFF_LAYER_FRONT);
+        UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(objectEvent));
         if (objectEvent->currentCoords.x != sprite->sPrevX || objectEvent->currentCoords.y != sprite->sPrevY)
         {
             sprite->sPrevX = objectEvent->currentCoords.x;
@@ -976,7 +955,7 @@ void UpdateHotSpringsWaterFieldEffect(struct Sprite *sprite)
         sprite->subpriority = linkedSprite->subpriority - 1;
         RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         // Hide while the object is behind a cliff, else the water pokes out in front of it.
-        UpdateObjectEventSpriteInvisibility(sprite, gObjectEvents[objectEventId].cliffLayer != CLIFF_LAYER_FRONT);
+        UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(&gObjectEvents[objectEventId]));
     }
 }
 
@@ -1222,7 +1201,7 @@ static void UpdateSurfBlobClipping(struct Sprite *sprite, struct ObjectEvent *pl
     s16 x, y;
 
     GetObjectEventRenderCoords(playerObj, &x, &y);
-    if (playerObj->cliffLayer != CLIFF_LAYER_FRONT
+    if (ObjectEventIsRenderedBehind(playerObj)
      && MapGridGetElevationAt(x, y) > playerObj->baseElevation
      && MapGridGetElevationAt(x, y + 1) <= playerObj->baseElevation)
     {
@@ -1294,7 +1273,8 @@ void SynchronizeSurfPosition(struct ObjectEvent *playerObj, struct Sprite *sprit
         for (i = DIR_SOUTH; i <= DIR_EAST; i++, x = sprite->sPrevX, y = sprite->sPrevY)
         {
             MoveCoords(i, &x, &y);
-            if (MapGridGetElevationAt(x, y) == ELEVATION_DEFAULT)
+            // Map-relative on purpose: "is this neighbor ordinary ground" is a tile-level check.
+            if (MapGridGetTileElevationAt(x, y) == ELEVATION_DEFAULT)
             {
                 // While dismounting the surf blob bobs at a slower rate
                 sprite->sIntervalIdx++;
@@ -1534,7 +1514,7 @@ void UpdateSandPileFieldEffect(struct Sprite *sprite)
         sprite->subpriority = gSprites[gObjectEvents[objectEventId].spriteId].subpriority;
         RaiseFieldEffectSubpriorityBehindObjects(sprite, objectEventId);
         // Hide while the object is behind a cliff (this sprite follows it).
-        UpdateObjectEventSpriteInvisibility(sprite, gObjectEvents[objectEventId].cliffLayer != CLIFF_LAYER_FRONT);
+        UpdateObjectEventSpriteInvisibility(sprite, ObjectEventIsRenderedBehind(&gObjectEvents[objectEventId]));
     }
 }
 

@@ -808,11 +808,6 @@ static bool8 TryStartWarpEventScript(struct MapPosition *position, u16 metatileB
             DoTeleportTileWarp();
             return TRUE;
         }
-        if (MetatileBehavior_IsUnionRoomWarp(metatileBehavior) == TRUE)
-        {
-            DoSpinExitWarp();
-            return TRUE;
-        }
         if (MetatileBehavior_IsMtPyreHole(metatileBehavior) == TRUE)
         {
             ScriptContext_SetupScript(EventScript_FallDownHoleMtPyre);
@@ -839,8 +834,7 @@ static bool8 IsWarpMetatileBehavior(u16 metatileBehavior)
      && MetatileBehavior_IsLavaridge1FWarp(metatileBehavior) != TRUE
      && MetatileBehavior_IsAquaHideoutWarp(metatileBehavior) != TRUE
      && MetatileBehavior_IsMtPyreHole(metatileBehavior) != TRUE
-     && MetatileBehavior_IsMossdeepGymWarp(metatileBehavior) != TRUE
-     && MetatileBehavior_IsUnionRoomWarp(metatileBehavior) != TRUE)
+     && MetatileBehavior_IsMossdeepGymWarp(metatileBehavior) != TRUE)
         return FALSE;
     return TRUE;
 }
@@ -939,12 +933,17 @@ static bool8 TryDoorWarp(struct MapPosition *position, u16 metatileBehavior, u8 
 }
 
 // An event interacts only on the player's elevation, unless its EVENT_ELEVATION_ANY
-// flag is set (then it interacts from any elevation).
-static bool32 EventElevationMatches(u8 eventElevation, u8 playerElevation)
+// flag is set (then it interacts from any elevation). Event elevations are stored
+// map-relative; (x, y) are the event's map-local coords, used to add the location
+// base so the comparison is between effective elevations.
+static bool32 EventElevationMatches(u8 eventElevation, u8 playerElevation, u16 x, u16 y)
 {
+    u32 effective;
+
     if (eventElevation & EVENT_ELEVATION_ANY)
         return TRUE;
-    return (eventElevation & EVENT_ELEVATION_MASK) == playerElevation;
+    effective = (eventElevation & EVENT_ELEVATION_MASK) + MapGridGetBaseElevationAt(x + MAP_OFFSET, y + MAP_OFFSET);
+    return SATURATE_ELEVATION(effective) == playerElevation;
 }
 
 static s8 GetWarpEventAtPosition(struct MapHeader *mapHeader, u16 x, u16 y, u8 elevation)
@@ -957,7 +956,7 @@ static s8 GetWarpEventAtPosition(struct MapHeader *mapHeader, u16 x, u16 y, u8 e
     {
         if ((u16)warpEvent->x == x && (u16)warpEvent->y == y)
         {
-            if (EventElevationMatches(warpEvent->elevation, elevation))
+            if (EventElevationMatches(warpEvent->elevation, elevation, x, y))
                 return i;
         }
     }
@@ -994,7 +993,7 @@ static const u8 *GetCoordEventScriptAtPosition(struct MapHeader *mapHeader, u16 
     {
         if ((u16)coordEvents[i].x == x && (u16)coordEvents[i].y == y)
         {
-            if (EventElevationMatches(coordEvents[i].elevation, elevation))
+            if (EventElevationMatches(coordEvents[i].elevation, elevation, x, y))
             {
                 const u8 *script = TryRunCoordEventScript(&coordEvents[i]);
                 if (script != NULL)
@@ -1020,7 +1019,7 @@ static const struct BgEvent *GetBackgroundEventAtPosition(struct MapHeader *mapH
     {
         if ((u16)bgEvents[i].x == x && (u16)bgEvents[i].y == y)
         {
-            if (EventElevationMatches(bgEvents[i].elevation, elevation))
+            if (EventElevationMatches(bgEvents[i].elevation, elevation, x, y))
                 return &bgEvents[i];
         }
     }

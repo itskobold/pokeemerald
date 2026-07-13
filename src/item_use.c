@@ -261,8 +261,6 @@ static bool32 CanFish(void)
     {
         if (MetatileBehavior_IsSurfableWaterOrUnderwater(tileBehavior) && MapGridGetCollisionAt(x, y) == 0)
             return TRUE;
-        if (MetatileBehavior_IsBridgeOverWaterNoEdge(tileBehavior) == TRUE)
-            return TRUE;
     }
 
     return FALSE;

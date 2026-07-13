@@ -1,14 +1,6 @@
 #ifndef GUARD_METATILE_BEHAVIOR_H
 #define GUARD_METATILE_BEHAVIOR_H
 
-// Return values for MetatileBehavior_GetBridgeType
-enum {
-    BRIDGE_TYPE_OCEAN, // For log bridges over 'ocean' style water (Routes 110/119 use this).
-    BRIDGE_TYPE_POND_LOW,
-    BRIDGE_TYPE_POND_MED,
-    BRIDGE_TYPE_POND_HIGH,
-};
-
 bool8 MetatileBehavior_IsATile(u8 metatileBehavior);
 bool8 MetatileBehavior_IsEncounterTile(u8 metatileBehavior);
 bool8 MetatileBehavior_IsJumpEast(u8 metatileBehavior);
@@ -78,9 +70,6 @@ bool8 MetatileBehavior_IsLongGrass(u8 metatileBehavior);
 bool8 MetatileBehavior_IsBerryTreeSoil(u8 metatileBehavior);
 bool8 MetatileBehavior_IsAshGrass(u8 metatileBehavior);
 bool8 MetatileBehavior_IsFootprints(u8 metatileBehavior);
-bool8 MetatileBehavior_IsBridgeOverWater(u8 metatileBehavior);
-u8 MetatileBehavior_GetBridgeType(u8 metatileBehavior);
-bool8 MetatileBehavior_IsBridgeOverWaterNoEdge(u8 metatileBehavior);
 bool8 MetatileBehavior_IsLandWildEncounter(u8 metatileBehavior);
 bool8 MetatileBehavior_IsWaterWildEncounter(u8 metatileBehavior);
 bool8 MetatileBehavior_IsIndoorEncounter(u8 metatileBehavior);
@@ -116,7 +105,6 @@ bool8 MetatileBehavior_IsSecretBaseSpinMat(u8 metatileBehavior);
 bool8 MetatileBehavior_IsLavaridgeB1FWarp(u8 metatileBehavior);
 bool8 MetatileBehavior_IsLavaridge1FWarp(u8 metatileBehavior);
 bool8 MetatileBehavior_IsAquaHideoutWarp(u8 metatileBehavior);
-bool8 MetatileBehavior_IsUnionRoomWarp(u8 metatileBehavior);
 bool8 MetatileBehavior_IsMossdeepGymWarp(u8 metatileBehavior);
 bool8 MetatileBehavior_IsSurfableFishableWater(u8 metatileBehavior);
 bool8 MetatileBehavior_IsMtPyreHole(u8 metatileBehavior);

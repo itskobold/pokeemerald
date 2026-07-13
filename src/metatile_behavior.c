@@ -93,18 +93,18 @@ static const u8 sTileBitAttributes[NUM_METATILE_BEHAVIORS] =
     [MB_WATER_SOUTH_ARROW_WARP]          = TILE_FLAG_UNUSED | TILE_FLAG_SURFABLE,
     [MB_DEEP_SOUTH_WARP]                 = TILE_FLAG_UNUSED,
     [MB_UNUSED_6F]                       = TILE_FLAG_UNUSED | TILE_FLAG_SURFABLE,
-    [MB_BRIDGE_OVER_POND_LOW]            = TILE_FLAG_UNUSED,
-    [MB_BRIDGE_OVER_POND_MED]            = TILE_FLAG_UNUSED,
-    [MB_BRIDGE_OVER_POND_HIGH]           = TILE_FLAG_UNUSED,
+    [MB_UNUSED_71]                       = TILE_FLAG_UNUSED,
+    [MB_UNUSED_72]                       = TILE_FLAG_UNUSED,
+    [MB_UNUSED_73]                       = TILE_FLAG_UNUSED,
     [MB_PACIFIDLOG_VERTICAL_LOG_TOP]     = TILE_FLAG_UNUSED,
     [MB_PACIFIDLOG_VERTICAL_LOG_BOTTOM]  = TILE_FLAG_UNUSED,
     [MB_PACIFIDLOG_HORIZONTAL_LOG_LEFT]  = TILE_FLAG_UNUSED,
     [MB_PACIFIDLOG_HORIZONTAL_LOG_RIGHT] = TILE_FLAG_UNUSED,
     [MB_FORTREE_BRIDGE]                  = TILE_FLAG_UNUSED,
-    [MB_BRIDGE_OVER_POND_MED_EDGE_1]     = TILE_FLAG_UNUSED,
-    [MB_BRIDGE_OVER_POND_MED_EDGE_2]     = TILE_FLAG_UNUSED,
-    [MB_BRIDGE_OVER_POND_HIGH_EDGE_1]    = TILE_FLAG_UNUSED,
-    [MB_BRIDGE_OVER_POND_HIGH_EDGE_2]    = TILE_FLAG_UNUSED,
+    [MB_UNUSED_7A]                       = TILE_FLAG_UNUSED,
+    [MB_UNUSED_7B]                       = TILE_FLAG_UNUSED,
+    [MB_UNUSED_7C]                       = TILE_FLAG_UNUSED,
+    [MB_UNUSED_7D]                       = TILE_FLAG_UNUSED,
     [MB_UNUSED_BRIDGE]                   = TILE_FLAG_UNUSED,
     [MB_BIKE_BRIDGE_OVER_BARRIER]        = TILE_FLAG_UNUSED,
     [MB_SECRET_BASE_SCENERY]             = TILE_FLAG_UNUSED,
@@ -744,55 +744,6 @@ bool8 MetatileBehavior_IsFootprints(u8 metatileBehavior)
         return FALSE;
 }
 
-// For the sections of log bridges that span water / water's edge.
-// Note that the rest of the metatiles for these bridges use MB_NORMAL.
-// This is used to allow encounters on the water below the bridge.
-bool8 MetatileBehavior_IsBridgeOverWater(u8 metatileBehavior)
-{
-    if ((metatileBehavior == MB_BRIDGE_OVER_OCEAN
-      || metatileBehavior == MB_BRIDGE_OVER_POND_LOW
-      || metatileBehavior == MB_BRIDGE_OVER_POND_MED
-      || metatileBehavior == MB_BRIDGE_OVER_POND_HIGH)
-      || (metatileBehavior == MB_BRIDGE_OVER_POND_HIGH_EDGE_1
-       || metatileBehavior == MB_BRIDGE_OVER_POND_HIGH_EDGE_2
-       || metatileBehavior == MB_UNUSED_BRIDGE
-       || metatileBehavior == MB_BIKE_BRIDGE_OVER_BARRIER))
-        return TRUE;
-    else
-        return FALSE;
-}
-
-u8 MetatileBehavior_GetBridgeType(u8 metatileBehavior)
-{
-    // MB_BRIDGE_OVER_OCEAN     --> BRIDGE_TYPE_OCEAN     (Routes 110/119)
-    // MB_BRIDGE_OVER_POND_LOW  --> BRIDGE_TYPE_POND_LOW  (Unused)
-    // MB_BRIDGE_OVER_POND_MED  --> BRIDGE_TYPE_POND_MED  (Route 120, south)
-    // MB_BRIDGE_OVER_POND_HIGH --> BRIDGE_TYPE_POND_HIGH (Route 120, north)
-    if (metatileBehavior >= MB_BRIDGE_OVER_OCEAN
-     && metatileBehavior <= MB_BRIDGE_OVER_POND_HIGH)
-        return metatileBehavior - MB_BRIDGE_OVER_OCEAN;
-
-    if (metatileBehavior >= MB_BRIDGE_OVER_POND_MED_EDGE_1
-     && metatileBehavior <= MB_BRIDGE_OVER_POND_MED_EDGE_2)
-        return BRIDGE_TYPE_POND_MED;
-
-    if (metatileBehavior >= MB_BRIDGE_OVER_POND_HIGH_EDGE_1
-     && metatileBehavior <= MB_BRIDGE_OVER_POND_HIGH_EDGE_2)
-        return BRIDGE_TYPE_POND_HIGH;
-
-    return BRIDGE_TYPE_OCEAN;
-}
-
-// Used to allow fishing below the bridge metatiles.
-bool8 MetatileBehavior_IsBridgeOverWaterNoEdge(u8 metatileBehavior)
-{
-    if (metatileBehavior >= MB_BRIDGE_OVER_OCEAN
-     && metatileBehavior <= MB_BRIDGE_OVER_POND_HIGH)
-        return TRUE;
-    else
-        return FALSE;
-}
-
 bool8 MetatileBehavior_IsLandWildEncounter(u8 metatileBehavior)
 {
     if (MetatileBehavior_IsSurfableWaterOrUnderwater(metatileBehavior) == FALSE
@@ -1119,17 +1070,6 @@ bool8 MetatileBehavior_IsLavaridge1FWarp(u8 metatileBehavior)
 bool8 MetatileBehavior_IsAquaHideoutWarp(u8 metatileBehavior)
 {
     if (metatileBehavior == MB_AQUA_HIDEOUT_WARP)
-        return TRUE;
-    else
-        return FALSE;
-}
-
-bool8 MetatileBehavior_IsUnionRoomWarp(u8 metatileBehavior)
-{
-    // This metatile behavior is re-used for some reason by
-    // the Union Room exit metatile. This function is used to
-    // initiate a teleport-style warp.
-    if (metatileBehavior == MB_BRIDGE_OVER_OCEAN)
         return TRUE;
     else
         return FALSE;

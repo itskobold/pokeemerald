@@ -1444,7 +1444,11 @@ static u8 InitObjectEventStateFromTemplateAt(const struct ObjectEventTemplate *t
     objectEvent->previousCoords.x = x;
     objectEvent->previousCoords.y = y;
     objectEvent->drawAtHighestElevation = (template->elevation & EVENT_ELEVATION_ANY) != 0;
-    objectEvent->baseElevation = template->elevation & EVENT_ELEVATION_MASK;
+    // Template elevations are map-relative; add the spawn tile's location base.
+    {
+        u32 elevation = (template->elevation & EVENT_ELEVATION_MASK) + MapGridGetBaseElevationAt(x, y);
+        objectEvent->baseElevation = SATURATE_ELEVATION(elevation);
+    }
     objectEvent->range.rangeX = template->movementRangeX;
     objectEvent->range.rangeY = template->movementRangeY;
     objectEvent->trainerType = template->trainerType;
@@ -9105,12 +9109,19 @@ static const u8 sRenderBandSubpriorityBases[] = {
     [RENDER_BAND_TOP]    = OBJ_SUBPRIORITY_TOP,
 };
 
+// True when the object is drawn behind terrain (BEHIND band, obscured, hidden follower effects). An
+// under-bridge object is on the cliff plane for collision but renders normally, so it is FRONT here.
+bool32 ObjectEventIsRenderedBehind(const struct ObjectEvent *objEvent)
+{
+    return objEvent->cliffLayer == CLIFF_LAYER_BEHIND || objEvent->cliffLayer == CLIFF_LAYER_OBSCURED;
+}
+
 // The render band an object event's sprite (and any sprite anchored to it) draws in.
 u8 GetObjectEventRenderBand(const struct ObjectEvent *objEvent)
 {
     if (objEvent->drawAtHighestElevation)
         return RENDER_BAND_TOP;
-    if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
+    if (ObjectEventIsRenderedBehind(objEvent))
         return RENDER_BAND_BEHIND;
     return RENDER_BAND_FRONT;
 }
@@ -9151,22 +9162,63 @@ static bool32 IsObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
     return TRUE;
 }
 
-// True when the tile is cliff-promoted (its layers occlude some hiding object) but THIS object is
-// in front of that promotion, so its sprite must not be hidden by it. A FRONT object is south of
-// any higher terrain its sprite overlaps, so it is in front of every promotion it touches. A
-// BEHIND object is in front only of promoted tiles at or below its own base — those were promoted
-// for some deeper object; tiles above its base are the cliff it is itself hiding under.
+// True when a NON-BRIDGE higher tile obscures the object (a real cliff face), as opposed to only bridge
+// deck tiles above it. Scans the feet column the sprite spans (like IsObjectEventFullyBehindCliff). This
+// is what gives cliff precedence over bridge: a deck tile the object stands under is higher terrain too,
+// but must NOT count as a cliff, so an object under a bridge stays visible unless a real cliff also hides
+// it. (The render-side footprint promotion applies the same test per footprint column; see
+// PromoteObjectFootprint in field_camera.c.) A bridged tile whose metatile carries cliff art still
+// occludes an UNDER_BRIDGE object: deck-only promotion lifts the metatile's BEHIND-named upper layers
+// too (see DrawMetatileAtWithId), so no cliff-vs-deck distinction is needed here.
+static bool32 IsObjectEventBehindCliffTerrain(struct ObjectEvent *objEvent)
+{
+    const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    s16 x = objEvent->currentCoords.x;
+    s16 y = objEvent->currentCoords.y;
+    u32 rows = (graphicsInfo->height + 15) / 16;
+    u32 r;
+
+    for (r = 0; r < rows; r++)
+    {
+        if (MapGridGetElevationAt(x, y - r) > objEvent->baseElevation
+         && MapGridGetBridgeAt(x, y - r) == 0)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// Pick the non-front layer for an object that is behind higher terrain at its current tile. CLIFF STATE
+// TAKES PRECEDENCE over bridge: if any non-bridge higher tile obscures the object it is behind a cliff
+// (drawn behind / obscured), even when its feet are on a bridge deck. Only when nothing but deck tiles are
+// above it is it "under a bridge" — rendered normally, occluded solely by the promoted deck. allowObscured
+// is FALSE at begin-step, where entering OBSCURED is deferred to arrival (see UpdateObjectEventFullyBehindCliff).
+static u8 ResolveBehindCliffLayer(struct ObjectEvent *objEvent, bool32 allowObscured)
+{
+    if (IsObjectEventBehindCliffTerrain(objEvent))
+        return (allowObscured && IsObjectEventFullyBehindCliff(objEvent)) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
+    if (MapGridGetBridgeAt(objEvent->currentCoords.x, objEvent->currentCoords.y) != 0)
+        return CLIFF_LAYER_UNDER_BRIDGE;
+    return CLIFF_LAYER_BEHIND;
+}
+
+// True when the tile is promoted (its layers occlude some hiding/under-passing object) but THIS
+// object is in front of that promotion, so its sprite must not be hidden by it. A FRONT object is
+// south of any higher terrain its sprite overlaps — and an object walking ON a promoted deck is
+// FRONT — so it is in front of every promotion it touches. A BEHIND object is in front only of
+// promoted tiles at or below its own base — those were promoted for some deeper object; tiles above
+// its base are the cliff it is itself hiding under. An UNDER_BRIDGE object is neither FRONT nor
+// above the deck, so the promoted deck stays over it.
 static bool32 ObjectEventIsInFrontOfPromotionAt(struct ObjectEvent *objEvent, s16 x, s16 y)
 {
-    if (!IsTileCliffPromoted(x, y))
+    if (!IsTilePromoted(x, y))
         return FALSE;
     return objEvent->cliffLayer == CLIFF_LAYER_FRONT
         || MapGridGetElevationAt(x, y) <= objEvent->baseElevation;
 }
 
-// An object overlapping a cliff-promoted tile it is in front of would be wrongly hidden by the
-// promotion (the promoted layers draw over the whole tile at BG priority 1, field sprites at OAM
-// priority 2). Compute the bitmask of the sprite's 16px tile-rows that overlap such a tile; the
+// An object overlapping a promoted tile (cliff face or bridge deck) it is in front of would be
+// wrongly hidden by the promotion (the promoted layers draw over the whole tile at BG priority 1,
+// field sprites at OAM priority 2). Compute the bitmask of the sprite's 16px tile-rows that overlap such a tile; the
 // caller switches those rows to the priority-1 split tables so they draw OVER the promotion while
 // the rest render normally. Rows over the object's OWN cliff (tiles above its base) stay down and
 // remain correctly hidden. Only the CENTER column is checked: a raise is full-row-width, and a
@@ -9267,7 +9319,7 @@ static void InitObjectEventBehindCliff(struct ObjectEvent *objEvent)
     if (MapGridGetElevationAt(objEvent->currentCoords.x, objEvent->currentCoords.y) > objEvent->baseElevation)
     {
         // Spawned already behind a cliff: no tile was left to inherit, so fall back to plain ground.
-        objEvent->cliffLayer = IsObjectEventFullyBehindCliff(objEvent) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
+        objEvent->cliffLayer = ResolveBehindCliffLayer(objEvent, TRUE);
         objEvent->cliffMetatileBehavior = MB_NORMAL;
     }
     else
@@ -9300,7 +9352,7 @@ static void UpdateObjectEventFullyBehindCliff(struct ObjectEvent *objEvent)
     if (objEvent->drawAtHighestElevation) // "any elevation" objects never go behind a cliff
         return;
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
-        objEvent->cliffLayer = IsObjectEventFullyBehindCliff(objEvent) ? CLIFF_LAYER_OBSCURED : CLIFF_LAYER_BEHIND;
+        objEvent->cliffLayer = ResolveBehindCliffLayer(objEvent, TRUE);
 }
 
 // Run at begin-step: reveal an object as it starts sliding out of an obscuring tile, rather than
@@ -9388,13 +9440,25 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
 
     if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
     {
-        // Crested up off the face band (above both the frozen base and the tile we left), or dropped
-        // back to the base or below: surface. The clear is deferred to step finish so the sprite stays
-        // behind the top 2 layers for the whole leaving step (see DoGroundEffects_OnFinishStep).
-        // Otherwise lateral along the face band, or part-way down it: hold behind.
-        if ((toElevation > objEvent->baseElevation && toElevation > fromElevation)
-         || toElevation <= objEvent->baseElevation)
+        bool32 destIsBridge = MapGridGetBridgeAt(objEvent->currentCoords.x, objEvent->currentCoords.y) != 0;
+
+        // Under a bridge, now stepping behind a cliff: hide immediately, mirroring the eager FRONT->BEHIND
+        // climb (rather than staying visible under the deck until arrival). Checked before surfacing so a
+        // cliff taller than the deck isn't mistaken for cresting out to the front.
+        if (objEvent->cliffLayer == CLIFF_LAYER_UNDER_BRIDGE && IsObjectEventBehindCliffTerrain(objEvent))
+        {
+            objEvent->cliffLayer = CLIFF_LAYER_BEHIND;
+        }
+        // Crested up off the face band (above both the frozen base and the tile we left), or dropped back
+        // to the base or below: surface to the front. Deferred to step finish so the sprite stays behind
+        // for the whole leaving step (see DoGroundEffects_OnFinishStep). A bridge tile above base is passed
+        // UNDER, not crested over, so it never surfaces here — the finish-step resolve turns it into
+        // UNDER_BRIDGE, a lazy reveal mirroring BEHIND->FRONT. Otherwise hold behind (lateral along the band).
+        else if (toElevation <= objEvent->baseElevation
+              || (toElevation > objEvent->baseElevation && toElevation > fromElevation && !destIsBridge))
+        {
             objEvent->surfacingFromCliff = TRUE;
+        }
     }
     else if (toElevation > fromElevation && !MetatileBehavior_IsElevationChange(fromBehavior)
           && !MetatileBehavior_IsWaterfall(fromBehavior))
@@ -9405,7 +9469,7 @@ static void UpdateObjectEventBehindCliff(struct ObjectEvent *objEvent)
         // Remember the tile being left so its behavior is held while behind (see
         // ObjectEventUpdateMetatileBehaviors).
         objEvent->baseElevation = fromElevation;
-        objEvent->cliffLayer = CLIFF_LAYER_BEHIND;
+        objEvent->cliffLayer = ResolveBehindCliffLayer(objEvent, FALSE);
         objEvent->cliffMetatileBehavior = fromBehavior;
         objEvent->surfacingFromCliff = FALSE;
     }

@@ -171,6 +171,21 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
     // The secondary tileset is authored per location in the map's json.
     for (int i = 0; i < num_locations; i++) {
         Json loc = locations[i];
+        // Optional per-location bridge tile graphics (32 graphics * 8 subtiles = 256 u16, two 2x2
+        // layers each). porymap authors these into a .bin and records its path in
+        // "bridge_tiles_filepath"; absent -> NULL.
+        std::string bridgeLabel = "NULL";
+        auto bt_it = loc.object_items().find("bridge_tiles_filepath");
+        if (bt_it != loc.object_items().end() && !bt_it->second.string_value().empty()) {
+            bridgeLabel = mapName + "_BridgeTiles_" + std::to_string(i);
+            text << "\t.align 2\n"
+                 << bridgeLabel << ":\n"
+                 << "\t.incbin \"" << bt_it->second.string_value() << "\"\n";
+        }
+        // Optional per-location base elevation (0-255, added to every tile level); absent -> 0.
+        std::string base_elevation = json_to_string(loc, "base_elevation", true);
+        if (base_elevation.empty())
+            base_elevation = "0";
         text << "\t.align 2\n"
              << mapName << "_MapHeaderLocationData_" << i << ":\n"
              << "\t.4byte " << json_to_string(loc, "secondary_tileset") << "\n"
@@ -179,7 +194,9 @@ string generate_map_header_text(Json map_data, Json layouts_data) {
              << "\t.byte "  << json_to_string(loc, "map_type") << "\n"
              << "\t.byte "  << json_to_string(loc, "battle_scene") << "\n"
              << "\t.byte "  << json_to_string(loc, "show_map_name") << "\n"
-             << "\t.align 2\n"; // pad MapHeaderLocationData to a multiple of 4 bytes
+             << "\t.byte "  << base_elevation << "\n"
+             << "\t.align 2\n" // pad to a 4-byte boundary before the bridgeTiles pointer
+             << "\t.4byte " << bridgeLabel << "\n";
     }
 
     // Map headers are referenced by pointer and read directly from ROM, so each

@@ -779,9 +779,32 @@ static void FillNorthEastConnection(struct MapHeader const *mapHeader, struct Ma
     }
 }
 
-u8 MapGridGetElevationAt(int x, int y)
+// The tile's raw 4-bit attribute level, without the location base. Only for checks that
+// are inherently map-relative (e.g. "is this ordinary ground level" vs ELEVATION_DEFAULT).
+u8 MapGridGetTileElevationAt(int x, int y)
 {
     return UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
+}
+
+// Base elevation of the location the tile selects (via its 2-bit location attribute),
+// resolved against the map the camera focus belongs to. 0 before a map is loaded.
+u8 MapGridGetBaseElevationAt(int x, int y)
+{
+    const struct MapHeader *header = ActiveLocationHeader();
+    u8 location = UNPACK_LOCATION(GetMapGridBlockAt(x, y));
+    const struct MapHeaderLocationData *data;
+
+    if (location >= MAX_MAP_LOCATIONS || header->locations[location] == NULL)
+        location = 0;
+    data = header->locations[location];
+    return data != NULL ? data->baseElevation : 0;
+}
+
+// Effective elevation: the location's base plus the tile's 4-bit level.
+u8 MapGridGetElevationAt(int x, int y)
+{
+    u32 elevation = MapGridGetBaseElevationAt(x, y) + UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
+    return SATURATE_ELEVATION(elevation);
 }
 
 // Elevation for stairs-bottom render overrides. Connection tiles within the border carry the
@@ -791,7 +814,7 @@ u8 MapGridGetElevationOrZeroAt(int x, int y)
 {
     if (!AreCoordsWithinMapGridBounds(x, y) || GetMapGridBlockAt(x, y) == MAPGRID_UNDEFINED)
         return 0;
-    return UNPACK_ELEVATION(GetMapGridAttrAt(x, y));
+    return MapGridGetElevationAt(x, y);
 }
 
 u8 MapGridGetBgMaterialAt(int x, int y)
@@ -802,6 +825,14 @@ u8 MapGridGetBgMaterialAt(int x, int y)
     if (GetMapGridBlockAt(x, y) == MAPGRID_UNDEFINED)
         return UNPACK_BGMATERIAL(GetBorderAttrAt(x, y));
     return UNPACK_BGMATERIAL(GetMapGridAttrAt(x, y));
+}
+
+// Per-tile bridge graphic selector (0 = no bridge, 1-31 = a bridge in the active location's table).
+u8 MapGridGetBridgeAt(int x, int y)
+{
+    if (GetMapGridBlockAt(x, y) == MAPGRID_UNDEFINED)
+        return UNPACK_BRIDGE(GetBorderAttrAt(x, y));
+    return UNPACK_BRIDGE(GetMapGridAttrAt(x, y));
 }
 
 u8 MapGridGetCollisionAt(int x, int y)
@@ -873,8 +904,17 @@ u32 MapGridGetMetatileIdAt(int x, int y)
 
 u32 MapGridGetMetatileBehaviorAt(int x, int y)
 {
-    u16 attributes = GetMetatileAttributesById(MapGridGetMetatileIdAt(x, y));
-    u32 behavior = UNPACK_BEHAVIOR(attributes);
+    u16 attributes;
+    u32 behavior;
+
+    // A cell carrying bridge data is a bridge deck: it always behaves as MB_NORMAL, overriding both the
+    // metatile's own behavior and any bgMaterial inheritance (so you walk on the deck rather than, say,
+    // surf the water it spans).
+    if (MapGridGetBridgeAt(x, y) != 0)
+        return MB_NORMAL;
+
+    attributes = GetMetatileAttributesById(MapGridGetMetatileIdAt(x, y));
+    behavior = UNPACK_BEHAVIOR(attributes);
 
     // bgMaterial overlays keep their own behavior — but a plain (MB_NORMAL) overlay inherits the
     // ground material's behavior, so its terrain feel (grass, sand, ...) comes from the material.
@@ -893,8 +933,15 @@ u8 MapGridGetMetatileLayerTypeAt(int x, int y)
 // and the BG3 reflective-background render path.
 u8 MapGridGetMetatileReflectionAt(int x, int y)
 {
-    u16 metatile = MapGridGetMetatileIdAt(x, y);
-    return UNPACK_REFLECTION(GetMetatileAttributesById(metatile));
+    u16 attributes = GetMetatileAttributesById(MapGridGetMetatileIdAt(x, y));
+    u8 reflection = UNPACK_REFLECTION(attributes);
+
+    // A plain (non-reflective) overlay over a reflective bgMaterial inherits the material's reflection,
+    // mirroring how MapGridGetMetatileBehaviorAt inherits behavior. This is what lets an object reflect
+    // in material-defined water — e.g. the water a bridge deck spans.
+    if (reflection == METATILE_REFLECTION_NONE && UNPACK_USES_BGMATERIAL(attributes))
+        reflection = UNPACK_REFLECTION(GetMetatileAttributesById(MapGridGetBgMaterialAt(x, y)));
+    return reflection;
 }
 
 void MapGridSetMetatileIdAt(int x, int y, u16 metatile)

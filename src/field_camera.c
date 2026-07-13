@@ -26,6 +26,11 @@
 // so the player is exposed as 0 instead.
 #define TRACK_LOCAL_ID_PLAYER 0
 
+// Promotion kinds for the promoted-tile set (see its definition below).
+#define PROMOTE_CLIFF  (1 << 0)
+#define PROMOTE_BRIDGE (1 << 1)
+#define PROMOTE_WALKED (1 << 2)
+
 EWRAM_DATA bool8 gUnusedBikeCameraAheadPanback = FALSE;
 
 struct FieldCameraOffset
@@ -45,7 +50,7 @@ static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
 static void DrawMetatileAtWithId(const struct MapLayout *, u16, int, int, u16 metatileId);
 static void DrawCompositeCell(u16, const u16 *, u32, const u16 *, u32, const u16 *, u32, bool32, s16, s16);
-static bool32 IsCliffPromotedCell(int, int);
+static u32 GetPromotedKind(int, int);
 static void CameraPanningCB_PanAhead(void);
 static void UpdateFreecamMovement(struct CameraObject *);
 static void UpdateCameraPanMovement(struct CameraObject *);
@@ -359,28 +364,19 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
 // scroll-edge redraws) and the system-stack budget is tight (see ProbeStackWatermark in overworld.c).
 // Main-loop only, so statics are safe.
 static EWRAM_DATA u16 sLayers[3] = {0};
-// Each holds up to 4: the bgMaterial background layer plus all three of the tile's own layers. The
-// material routes with the bottom layer's plane flags, so it can land in any of the three planes.
-static EWRAM_DATA u16 sBg[4] = {0};
-static EWRAM_DATA u16 sFg[4] = {0};
-static EWRAM_DATA u16 sRefl[4] = {0};
-
-// Layer content at a subtile, for the cliff-promotion scan. Layer 0 also counts the bgMaterial ground
-// that fills an empty ground cell: the material stands in for the bottom layer, so it must promote
-// with it to occlude a behind-cliff object under material-backed ground. NULL materialTiles = tile only.
-static inline bool32 LayerSubtileHasContent(const u16 *tiles, const u16 *materialTiles, u32 layer, u32 sub)
-{
-    if ((tiles[layer * 4 + sub] & 0x3FF) != 0)
-        return TRUE;
-    return layer == 0 && materialTiles != NULL && (materialTiles[sub] & 0x3FF) != 0;
-}
+// Each holds up to COMPOSITE_MAX_LAYERS: the tile's three own layers (or the bgMaterial background
+// layer in place of an empty ground) plus a bridged cell's two bridge layers, all of which can land
+// in the same plane. The material routes with the bottom layer's plane flags, so it can land in any.
+static EWRAM_DATA u16 sBg[COMPOSITE_MAX_LAYERS] = {0};
+static EWRAM_DATA u16 sFg[COMPOSITE_MAX_LAYERS] = {0};
+static EWRAM_DATA u16 sRefl[COMPOSITE_MAX_LAYERS] = {0};
 
 // As DrawMetatileAt, but with the metatile id already resolved (lets callers that have fetched it —
 // e.g. the secondary-only redraw's id filter — skip a redundant map-grid lookup).
 static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, int x, int y, u16 metatileId)
 {
     const u16 *tiles;
-    // Set for flagged metatiles: primary metatile #bgMaterial (0-15)'s ground composites beneath the
+    // Set for flagged metatiles: primary metatile #bgMaterial (0-31)'s ground composites beneath the
     // tile's own layers in the empty bottom-layer cells. NULL = normal render.
     const u16 *materialTiles = NULL;
     // The bgMaterial metatile id (valid when materialTiles != NULL) and whether ITS OWN layer-0
@@ -388,11 +384,15 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     // overlay tile's, so an overlay whose layer 0 reflects can't drag a plain material onto BG3.
     u16 materialId = 0;
     bool32 materialReflects = FALSE;
-    // True when an object stands behind a cliff at this tile: the cell composites using the
-    // metatile's "behind cliff" layer flags instead of its "in front of cliff" flags.
-    bool32 promote = IsCliffPromotedCell(x, y);
+    // The cell's promotion kind (see the promoted set above). PROMOTE_CLIFF: an object is rendered
+    // behind the tile — composite with the metatile's "behind" layer flags, anchored bridge graphics
+    // carried forward with their anchor layers. PROMOTE_BRIDGE (deck-only): an object merely passes
+    // under the tile's bridge — the metatile keeps its "in front" routing and only the bridge overlay
+    // layers are forced to the foreground, so the object draws behind the deck but over the terrain.
+    u32 promotedKind = GetPromotedKind(x, y);
+    bool32 promote = (promotedKind & PROMOTE_CLIFF) != 0;
     // 3-bit mask (one bit per layer 0/1/2) selecting which layers go to the foreground plane for
-    // this cell's current cliff state; the rest go to the background plane. See METATILE_COMPOSITE_*.
+    // this cell's current promotion state; the rest go to the background plane. See METATILE_COMPOSITE_*.
     u32 fgMask;
     u16 attributes;
     // 3-bit mask (one bit per layer 0/1/2) of layers routed to the BG3 reflective plane. They render
@@ -401,6 +401,25 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     u32 reflMask;
     // When set, reflection layers hole-punch the bg plane; when clear they only draw to BG3.
     bool32 punchHole;
+    // Bridge overlay for this tile (the active location's bridge graphic): two 2x2 layers, always
+    // drawn bottom then top. NULL = no bridge here. WHERE they composite is the metatile's bridge
+    // MODE: backmost of the foreground plane (default), riding the ANCHOR metatile layer and
+    // inheriting its plane routing, or foremost of the foreground plane. Deck-only promotion (an
+    // object passing under the deck) forces an anchored overlay to the foreground; the two fg modes
+    // are already there.
+    const u16 *bridgeBottom = NULL;
+    const u16 *bridgeTop = NULL;
+    u32 bridgeAnchor = 0;
+    u32 bridgeMode = METATILE_BRIDGE_MODE_FG_BACK;
+    bool32 bridgeForceFg = (promotedKind & PROMOTE_BRIDGE) != 0;
+    // Walked deck with no occlusion promotion: the bottom layer draws to the top of the BACKGROUND
+    // (planks under the walker's feet) while the top layer keeps its mode placement. Any occlusion
+    // kind wins over it — the deck stays foreground and the walker front-splits above instead.
+    bool32 bridgeWalked = promotedKind == PROMOTE_WALKED;
+    // The per-metatile compositing flags (fg/bg masks + bridge anchors), fetched once and reused below.
+    u16 compositing;
+    // The tile's per-cell bridge attribute (1-31, 0 = none). Selects the overlay graphic below.
+    u32 bridgeIndex = MapGridGetBridgeAt(x, y);
     u32 p;
 
     if (metatileId > NUM_METATILES_TOTAL)
@@ -418,34 +437,34 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     else
         tiles = GetActiveLocationData()->secondaryTileset->metatiles + (metatileId - NUM_METATILES_IN_PRIMARY) * NUM_TILES_PER_METATILE;
 
-    fgMask = promote ? METATILE_COMPOSITE_BEHIND(GetMetatileCompositingById(metatileId))
-                     : METATILE_COMPOSITE_FRONT(GetMetatileCompositingById(metatileId));
-    // Behind an object, when the tile's promoted foreground layers are all blank — i.e. plain elevated
-    // ground with no painted cliff face — promote every layer that HAS content so the whole ground tile
-    // occludes the behind-object. (Promoting only the bottom layer left upper-layer content in the
-    // background plane, drawn behind the sprite and hidden, so multi-layer ground showed only its base.)
-    // When the promoted layers DO have content (a painted cliff face/fringe) that authored foreground
-    // does the occluding; forcing extra layers forward would wrongly hide a partly-obscured sprite that
-    // should still draw behind the (transparent-in-places) foreground layer.
+    compositing = GetMetatileCompositingById(metatileId);
+
+    // Promoted cells use the metatile's BEHIND layer mask, in-front cells its FRONT mask. Both are
+    // authored per metatile (metatile_compositing.bin); the mask is authoritative — a BEHIND layer
+    // left out of the mask stays in the background even when an object hides behind / passes under
+    // the tile. (Plain elevated ground bakes its ground layer into BEHIND so it still occludes; see
+    // tools/bake_cliff_promote.py.) Bridge cells are no different: their bridge graphics ride their
+    // anchor layers (see the composite loop below), so promotion carries deck art forward exactly
+    // when its anchor layer comes forward.
+    // Deck-only promotion (an object passes under/behind this tile's bridge without a full CLIFF
+    // promote) additionally lifts the metatile's BEHIND-named UPPER layers (1/2): a bridged tile
+    // whose metatile carries cliff art in them is a cliff face with a deck riding it, and that art
+    // must occlude the object like the deck does. Layer 0 (and the bgMaterial standing in for it)
+    // never lifts — ground stays behind the object. A true walk-under deck's spanned terrain names
+    // no upper layers in BEHIND, so it is unaffected and the object keeps drawing over it.
     if (promote)
-    {
-        bool32 fgEmpty = TRUE;
-        u32 l, sub;
-        for (l = 0; l < 3 && fgEmpty; l++)
-            if (fgMask & (1 << l))
-                for (sub = 0; sub < 4; sub++)
-                    if (LayerSubtileHasContent(tiles, materialTiles, l, sub)) { fgEmpty = FALSE; break; }
-        if (fgEmpty)
-            for (l = 0; l < 3; l++)
-                for (sub = 0; sub < 4; sub++)
-                    if (LayerSubtileHasContent(tiles, materialTiles, l, sub)) { fgMask |= (1 << l); break; }
-    }
+        fgMask = METATILE_COMPOSITE_BEHIND(compositing);
+    else if (bridgeForceFg)
+        fgMask = METATILE_COMPOSITE_FRONT(compositing)
+               | (METATILE_COMPOSITE_BEHIND(compositing) & ~(1 << 0));
+    else
+        fgMask = METATILE_COMPOSITE_FRONT(compositing);
 
     // Reflection layers: the explicit per-layer flag mask wins; each background layer it names goes
     // to BG3 (multiple layers may be flagged). As a fallback, a metatile with a reflection type but
     // no flags routes ALL its background layers to BG3 (the "whole-tile reflective" case). Foreground
     // layers never reflect.
-    reflMask = METATILE_COMPOSITE_REFLECTION(GetMetatileCompositingById(metatileId)) & ~fgMask;
+    reflMask = METATILE_COMPOSITE_REFLECTION(compositing) & ~fgMask;
     if (reflMask == 0 && UNPACK_REFLECTION(attributes) != METATILE_REFLECTION_NONE)
         reflMask = METATILE_COMPOSITE_LAYER_MASK & ~fgMask;
     // With the punch flag set, reflection layers hole-punch the BG2 composite so the surface shows
@@ -463,43 +482,132 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
                         || (mRefl == 0 && UNPACK_REFLECTION(GetMetatileAttributesById(materialId)) != METATILE_REFLECTION_NONE);
     }
 
-    // For each of the metatile's four sub-tiles, route its three layers (ground/middle/top) into the
-    // foreground, background, or reflection plane, preserving bottom->top order within each plane.
-    // bgMaterial composites the material metatile's ground as an extra bottom layer (see below).
+    // Bridge overlay: the tile's bridge attribute (1-31) selects one of the active location's bridge
+    // graphics (two 2x2 layers). Mode and anchor come from the base metatile's compositing fields.
+    if (bridgeIndex != 0)
+    {
+        const struct MapHeaderLocationData *loc = GetActiveLocationData();
+        if (loc->bridgeTiles != NULL)
+        {
+            // Each graphic is 8 u16: bottom 2x2 layer then top 2x2 layer.
+            bridgeBottom = loc->bridgeTiles + (bridgeIndex - 1) * 8;
+            bridgeTop = bridgeBottom + 4;
+            bridgeAnchor = METATILE_COMPOSITE_BRIDGE_ANCHOR(compositing);
+            bridgeMode = METATILE_COMPOSITE_BRIDGE_MODE(compositing);
+        }
+    }
+
+    // For each of the metatile's four sub-tiles, compose its layers bottom-to-top into the foreground,
+    // background, and reflection plane arrays. Within a plane the append order IS the draw order
+    // (first appended is drawn lowest). The layer walk runs in TWO PHASES so bridge graphics stay in
+    // sync with cliff promotion: phase 0 emits the layers whose foreground-ness comes only from
+    // promotion (they were background before the cell promoted), then a FG_BACK overlay composites,
+    // then phase 1 emits everything else (background/reflection layers, layers foreground in their
+    // own right, an ANCHOR-mode overlay with its anchor). Promotion therefore slides terrain into the
+    // foreground BENEATH a FG_BACK overlay — the cell's bridge-over-terrain order is never inverted —
+    // while always-foreground layers keep drawing over it. At each metatile layer l: the layer itself
+    // (plus the bgMaterial ground beneath an empty layer 0), routed by the fg/reflection masks, then
+    // in ANCHOR mode the overlay anchored on l (bottom then top), appended immediately after so it
+    // draws directly on top of its anchor in the SAME plane (a bridge over a reflective anchor goes
+    // to the bg plane, above the reflective surface, never to BG3). A FG_FRONT overlay is appended
+    // last, over everything. Empty (id 0) subtiles are skipped; the compositor drops them anyway.
+    // A plane holds at most the metatile's 3 own layers plus the 2 bridge layers, i.e.
+    // COMPOSITE_MAX_LAYERS.
     for (p = 0; p < 4; p++)
     {
         u32 bgCount = 0, fgCount = 0, reflCount = 0;
-        u32 l;
-
-        // bgMaterial: the material metatile's ground layer composites beneath the tile's own three
-        // layers (a 4th layer). Gated per-subtile: only EMPTY bottom-layer cells (id 0) get it — a
-        // non-empty ground subtile fully occupies the cell. Foreground routing tracks the overlay's
-        // BOTTOM layer (so behind a cliff the material promotes with the ground it stands in for);
-        // reflection uses the MATERIAL's own flags, so a non-reflective material stays on the bg
-        // plane even when the overlay's layer 0 reflects.
-        if (materialTiles && (tiles[p] & 0x3FF) == 0)
-        {
-            if (fgMask & (1 << 0))
-                sFg[fgCount++] = materialTiles[p];
-            else if (materialReflects)
-                sRefl[reflCount++] = materialTiles[p];
-            else
-                sBg[bgCount++] = materialTiles[p];
-        }
+        u32 l, phase;
 
         sLayers[0] = tiles[p];
         sLayers[1] = tiles[4 + p];
         sLayers[2] = tiles[8 + p];
 
-        for (l = 0; l < 3; l++)
+        for (phase = 0; phase < 2; phase++)
         {
-            if (fgMask & (1 << l))
-                sFg[fgCount++] = sLayers[l];
-            else if (reflMask & (1 << l))
-                sRefl[reflCount++] = sLayers[l];
-            else
-                sBg[bgCount++] = sLayers[l];
+            for (l = 0; l < 3; l++)
+            {
+                bool32 layerFg = (fgMask >> l) & 1;
+                // Foreground only because the cell is promoted (not in the metatile's FRONT mask).
+                bool32 promotedOnly = layerFg && !((METATILE_COMPOSITE_FRONT(compositing) >> l) & 1);
+
+                if ((phase == 0) != promotedOnly)
+                    continue;
+
+                // bgMaterial: the material metatile's ground layer composites beneath the tile's own layer 0
+                // (an extra bottom layer). Gated per-subtile: only an EMPTY layer-0 cell (id 0) gets it — a
+                // non-empty ground subtile fully occupies the cell. Foreground routing tracks layer 0 (so
+                // behind a cliff the material promotes with the ground it stands in for); reflection uses the
+                // MATERIAL's own flags, so a non-reflective material stays on the bg plane.
+                if (l == 0 && materialTiles && (sLayers[0] & 0x3FF) == 0 && (materialTiles[p] & 0x3FF))
+                {
+                    if (layerFg)
+                        sFg[fgCount++] = materialTiles[p];
+                    else if (materialReflects)
+                        sRefl[reflCount++] = materialTiles[p];
+                    else
+                        sBg[bgCount++] = materialTiles[p];
+                }
+
+                // The metatile's own layer l, routed by its fg/reflection masks.
+                if (sLayers[l] & 0x3FF)
+                {
+                    if (layerFg)
+                        sFg[fgCount++] = sLayers[l];
+                    else if (reflMask & (1 << l))
+                        sRefl[reflCount++] = sLayers[l];
+                    else
+                        sBg[bgCount++] = sLayers[l];
+                }
+
+                // ANCHOR mode: the overlay rides metatile layer l (bottom then top) in whichever
+                // phase l lands in, inheriting its fg/bg routing (or forced to the foreground by
+                // deck-only promotion — an object passing under the deck). A walked deck's bottom
+                // layer is emitted at the top of the background instead (after the walk, below).
+                if (bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_ANCHOR && bridgeAnchor == l)
+                {
+                    if (!bridgeWalked && (bridgeBottom[p] & 0x3FF))
+                    {
+                        if (layerFg || bridgeForceFg)
+                            sFg[fgCount++] = bridgeBottom[p];
+                        else
+                            sBg[bgCount++] = bridgeBottom[p];
+                    }
+                    if (bridgeTop[p] & 0x3FF)
+                    {
+                        if (layerFg || bridgeForceFg)
+                            sFg[fgCount++] = bridgeTop[p];
+                        else
+                            sBg[bgCount++] = bridgeTop[p];
+                    }
+                }
+            }
+
+            // FG_BACK mode: the overlay composites between the phases — above any promotion-added
+            // terrain, beneath every layer that is foreground in its own right (sprites stay under).
+            if (phase == 0 && bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_FG_BACK)
+            {
+                if (!bridgeWalked && (bridgeBottom[p] & 0x3FF))
+                    sFg[fgCount++] = bridgeBottom[p];
+                if (bridgeTop[p] & 0x3FF)
+                    sFg[fgCount++] = bridgeTop[p];
+            }
         }
+
+        // FG_FRONT mode: the overlay is the foremost of the foreground plane — appended after the
+        // layer walk, over everything in the cell.
+        if (bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_FG_FRONT)
+        {
+            if (!bridgeWalked && (bridgeBottom[p] & 0x3FF))
+                sFg[fgCount++] = bridgeBottom[p];
+            if (bridgeTop[p] & 0x3FF)
+                sFg[fgCount++] = bridgeTop[p];
+        }
+
+        // Walked deck: the bottom layer lands on top of the background, whatever the mode — over all
+        // of the metatile's background layers, beneath the walker standing on it.
+        if (bridgeBottom && bridgeWalked && (bridgeBottom[p] & 0x3FF))
+            sBg[bgCount++] = bridgeBottom[p];
+
         DrawCompositeCell(offset + sSubTileCellOffsets[p], sBg, bgCount, sFg, fgCount, sRefl, reflCount, punchHole, x, y);
     }
 }
@@ -621,54 +729,78 @@ void RebandPhasedMapView(void)
     }
 }
 
-// Tiles (map-grid coords, the space DrawMetatileAt and object currentCoords share) whose middle
-// layer is currently promoted into the foreground plane to occlude an object hiding behind a cliff.
-// Rebuilt each frame from object positions. Sized for each object's full sprite footprint (width x
-// height in tiles) at both its current and destination tile while stepping; a handful of tiles each.
+// Tiles (map-grid coords, the space DrawMetatileAt and object currentCoords share) currently
+// promoted into the foreground, each carrying a KIND bitmask — the kind is RUNTIME state (which
+// objects the tile covers and how), never metatile data:
+//   PROMOTE_CLIFF  - an object is rendered behind this tile (hiding behind a cliff, or a cliff the
+//                    deck crosses): the cell composites with its full BEHIND mask, anchored bridge
+//                    graphics riding their anchor layers (see DrawMetatileAtWithId).
+//   PROMOTE_BRIDGE - an object merely passes under this tile's bridge deck: the bridge overlay
+//                    layers are forced to the foreground, plus any UPPER metatile layers (1/2)
+//                    named in the BEHIND mask (cliff art carried by a bridged tile). Layer 0 /
+//                    bgMaterial keep their FRONT routing, so the object draws behind the deck
+//                    (and any wall art) but in front of the ground.
+//   PROMOTE_WALKED - an object stands ON this tile's bridge deck (its base equals the tile's
+//                    elevation): when this is the tile's ONLY kind, the deck's BOTTOM layer routes
+//                    to the top of the background so the walker draws over the planks, while the
+//                    top layer keeps its foreground placement (rails in front). Either occlusion
+//                    kind above overrides it — the deck stays foreground and the walker is lifted
+//                    over it by the front split instead.
+// A tile can carry several kinds (e.g. one object on the deck while another passes under). Rebuilt
+// each frame from object positions. Sized for each object's full sprite footprint (width x height in
+// tiles) at both its current and destination tile while stepping; a handful of tiles each.
 #define MAX_CLIFF_PROMOTED_TILES (OBJECT_EVENTS_COUNT * 6)
 // In EWRAM: IWRAM is nearly full, and these are referenced while UpdateCliffFacePromotion descends into
 // the compositor's deep redraw chain, so keeping them (and the per-frame prev snapshot) off the IWRAM
 // stack/bss avoids overflowing into other globals.
-EWRAM_DATA static struct Coords16 sCliffPromotedTiles[MAX_CLIFF_PROMOTED_TILES] = {0};
-EWRAM_DATA static struct Coords16 sCliffPromotedTilesPrev[MAX_CLIFF_PROMOTED_TILES] = {0};
-EWRAM_DATA static u8 sCliffPromotedTileCount = 0;
+EWRAM_DATA static struct Coords16 sPromotedTiles[MAX_CLIFF_PROMOTED_TILES] = {0};
+EWRAM_DATA static struct Coords16 sPromotedTilesPrev[MAX_CLIFF_PROMOTED_TILES] = {0};
+EWRAM_DATA static u8 sPromotedKinds[MAX_CLIFF_PROMOTED_TILES] = {0};
+EWRAM_DATA static u8 sPromotedKindsPrev[MAX_CLIFF_PROMOTED_TILES] = {0};
+EWRAM_DATA static u8 sPromotedTileCount = 0;
 
-// Whether a foreground cell should promote its middle layer (see DrawMetatileAt): true when a
-// behind-cliff object's sprite covers this tile, so the cliff's middle layer draws over it.
-static bool32 IsCliffPromotedCell(int x, int y)
+// The promoted-kind bitmask for a tile (0 if not currently promoted).
+static u32 GetPromotedKind(int x, int y)
 {
     u32 i;
 
-    for (i = 0; i < sCliffPromotedTileCount; i++)
+    for (i = 0; i < sPromotedTileCount; i++)
     {
-        if (sCliffPromotedTiles[i].x == x && sCliffPromotedTiles[i].y == y)
-            return TRUE;
+        if (sPromotedTiles[i].x == x && sPromotedTiles[i].y == y)
+            return sPromotedKinds[i];
     }
-    return FALSE;
+    return 0;
 }
 
-// Public query: is this tile currently cliff-promoted (a behind-object is hiding under it)? A FRONT
-// object overlapping such a tile splits its sprite so the overlapping rows draw over the promotion
-// (see UpdateObjectEventFrontSplit) rather than being wrongly hidden by it.
-bool32 IsTileCliffPromoted(s16 x, s16 y)
+// Public query: is this tile currently occlusion-promoted (an object is hiding behind it or under
+// its deck)? An object in front of / on top of the promotion splits its overlapping sprite rows over
+// it (see UpdateObjectEventRender's front split) rather than being wrongly hidden by it. WALKED-only
+// tiles are deliberately excluded: their deck bottom is already in the background under the walker
+// and the top layer must KEEP drawing over it, so no split may lift the walker above the rails.
+bool32 IsTilePromoted(s16 x, s16 y)
 {
-    return IsCliffPromotedCell(x, y);
+    return (GetPromotedKind(x, y) & (PROMOTE_CLIFF | PROMOTE_BRIDGE)) != 0;
 }
 
-static void AddCliffPromotedTile(s16 x, s16 y)
+// Add (x, y) to the promoted set with the given kind (deduped; ORs the kind onto an existing entry).
+static void AddPromotedTile(s16 x, s16 y, u32 kind)
 {
     u32 i;
 
-    for (i = 0; i < sCliffPromotedTileCount; i++)
+    for (i = 0; i < sPromotedTileCount; i++)
     {
-        if (sCliffPromotedTiles[i].x == x && sCliffPromotedTiles[i].y == y)
+        if (sPromotedTiles[i].x == x && sPromotedTiles[i].y == y)
+        {
+            sPromotedKinds[i] |= kind;
             return;
+        }
     }
-    if (sCliffPromotedTileCount < MAX_CLIFF_PROMOTED_TILES)
+    if (sPromotedTileCount < MAX_CLIFF_PROMOTED_TILES)
     {
-        sCliffPromotedTiles[sCliffPromotedTileCount].x = x;
-        sCliffPromotedTiles[sCliffPromotedTileCount].y = y;
-        sCliffPromotedTileCount++;
+        sPromotedTiles[sPromotedTileCount].x = x;
+        sPromotedTiles[sPromotedTileCount].y = y;
+        sPromotedKinds[sPromotedTileCount] = kind;
+        sPromotedTileCount++;
     }
 }
 
@@ -684,25 +816,79 @@ static bool32 WasInTileList(const struct Coords16 *list, u8 count, s16 x, s16 y)
     return FALSE;
 }
 
-// Promote every tile of the sprite's footprint when the object stands (feet) at tile (cx, cy): the
-// sprite is bottom-anchored and horizontally centred on that tile, so it spans ceil(width/16) tile
-// columns either side of centre and ceil(height/16) rows up from the feet. Each covered tile higher
-// than the frozen base (baseElevation) is a cliff face in front of that band, so its middle layer
-// is promoted over the sprite; rows/cols at or below the base are normal ground it stands in front of.
-// Only called for objects whose feet are behind a cliff (see UpdateCliffFacePromotion) — a FRONT object
-// at the base of a taller cliff is in front of the wall, so its head must NOT be promoted behind it.
-static void PromoteSpriteFootprint(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *graphicsInfo, s16 cx, s16 cy)
+// Promote the occluding tiles of the sprite's footprint when the object stands (feet) at tile
+// (cx, cy): the sprite is bottom-anchored and horizontally centred on that tile, so it spans
+// ceil(width/16) tile columns either side of centre and ceil(height/16) rows up from the feet.
+// A covered tile higher than the frozen base (baseElevation) occludes the sprite; rows/cols at or
+// below the base are normal ground it stands in front of. The kind is the object's relationship to
+// the tile, decided PER COLUMN of the footprint: a column whose covered tiles include real (non-
+// bridge) cliff terrain above the base has that part of the sprite behind the cliff — its above-base
+// tiles promote fully (PROMOTE_CLIFF — cliff, or cliff + bridge), but only for an object whose
+// frozen base sits below the terrain covering it: rendered behind (BEHIND/OBSCURED) or UNDER_BRIDGE.
+// The latter matters for wide sprites: a 32x32 sprite under/behind a bridged tile spans the
+// neighbouring plain wall tiles too, and without the column verdict those side slivers would peek
+// out past the promoted tiles. Any other column is at most under a deck: only its bridged higher
+// tiles promote, deck-only (PROMOTE_BRIDGE), for EVERY object — an under-bridge walker renders
+// normally (FRONT band) and is occluded by the promoted deck plus the tile's BEHIND-named upper
+// layers, drawing in front of the tile's ground.
+// Per-column (not per position) matters for wide sprites: a 32x32 sprite stepping out sideways from
+// behind a bridge/cliff still has its trailing side column behind the terrain while its centre is
+// already clear, and that column must stay fully promoted or the sprite's rear sliver pops in front
+// of the wall (and per column, not per object, so the eager UNDER_BRIDGE->BEHIND commit doesn't
+// fully promote the all-deck column being left — its terrain must stay behind the walker). A plain
+// cliff tile never promotes for a FRONT object — it is in front of the wall, so its head must NOT
+// be promoted behind it. A covered bridged tile AT the object's own level is a walked deck
+// (PROMOTE_WALKED — its bottom layer goes behind the sprite): checked across the whole footprint,
+// not just the feet tile, so a wide sprite's side columns and a tall sprite's head rows overlapping
+// neighbouring same-level deck tiles slide over their planks too.
+static void PromoteObjectFootprint(struct ObjectEvent *objEvent, const struct ObjectEventGraphicsInfo *graphicsInfo, s16 cx, s16 cy, bool32 belowTerrain)
 {
     s16 half = graphicsInfo->width / 2;
     s16 colStart = (8 - half) >> 4;       // left edge px (centre at +8) -> column, floored
     s16 colEnd = (8 + half - 1) >> 4;     // right edge px (inclusive) -> column, floored
     s16 rows = (graphicsInfo->height + 15) / 16;
     s16 c, r;
+    u8 elevation;
 
-    for (r = 0; r < rows; r++)
-        for (c = colStart; c <= colEnd; c++)
-            if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->baseElevation)
-                AddCliffPromotedTile(cx + c, cy - r);
+    for (c = colStart; c <= colEnd; c++)
+    {
+        bool32 columnBehindCliff = FALSE;
+
+        if (belowTerrain)
+        {
+            for (r = 0; r < rows; r++)
+            {
+                if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->baseElevation
+                 && MapGridGetBridgeAt(cx + c, cy - r) == 0)
+                    columnBehindCliff = TRUE;
+            }
+        }
+
+        for (r = 0; r < rows; r++)
+        {
+            elevation = MapGridGetElevationAt(cx + c, cy - r);
+            if (elevation > objEvent->baseElevation)
+            {
+                bool32 bridged = MapGridGetBridgeAt(cx + c, cy - r) != 0;
+
+                // The kinds are not exclusive: a bridged tile in a behind-cliff column promotes as
+                // CLIFF | BRIDGE, so the deck overlay is forced forward even when its anchor layer
+                // isn't in the metatile's BEHIND mask — CLIFF alone would leave the deck in the
+                // background and the hidden object would draw over it. Any other bridged tile
+                // promotes deck-only (BRIDGE), which also lifts the metatile's BEHIND-named upper
+                // layers — cliff art carried by a bridged tile occludes a partially-covered object
+                // even when its column has no plain cliff tile (see DrawMetatileAtWithId).
+                if (columnBehindCliff)
+                    AddPromotedTile(cx + c, cy - r, bridged ? PROMOTE_CLIFF | PROMOTE_BRIDGE : PROMOTE_CLIFF);
+                else if (bridged)
+                    AddPromotedTile(cx + c, cy - r, PROMOTE_BRIDGE);
+            }
+            else if (elevation == objEvent->baseElevation && MapGridGetBridgeAt(cx + c, cy - r) != 0)
+            {
+                AddPromotedTile(cx + c, cy - r, PROMOTE_WALKED);
+            }
+        }
+    }
 }
 
 // The surf unit (blob + 32-wide surfer) overhangs the surfer's tile by 8px south and to both
@@ -723,13 +909,44 @@ static void PromoteSurfBlobOverhang(struct ObjectEvent *objEvent, const struct O
 
     for (c = colStart; c <= colEnd; c++)
     {
-        if (MapGridGetElevationAt(cx + c, cy + 1) != objEvent->baseElevation)
-            AddCliffPromotedTile(cx + c, cy + 1);
+        bool32 columnCliff;
+
+        // The overhang tuck promotes even for a FRONT surfer, with the same per-tile attribution as
+        // the footprint walk: an above-base BRIDGED tile promotes deck-only (its BEHIND-named upper
+        // layers lift with the deck; its ground stays back — see DrawMetatileAtWithId), an above-base
+        // plain tile is a cliff face, a below-base south tile is the face below a top edge (cliff,
+        // plus its deck if bridged — the whole tile occludes the tuck), and a same-level bridged
+        // south tile is a walked deck — the blob's 8px overhang hangs over its planks, which must
+        // stay behind the blob.
+        u8 southElevation = MapGridGetElevationAt(cx + c, cy + 1);
+        if (southElevation > objEvent->baseElevation)
+            AddPromotedTile(cx + c, cy + 1, MapGridGetBridgeAt(cx + c, cy + 1) != 0 ? PROMOTE_BRIDGE : PROMOTE_CLIFF);
+        else if (southElevation < objEvent->baseElevation)
+            AddPromotedTile(cx + c, cy + 1, MapGridGetBridgeAt(cx + c, cy + 1) != 0 ? PROMOTE_CLIFF | PROMOTE_BRIDGE : PROMOTE_CLIFF);
+        else if (MapGridGetBridgeAt(cx + c, cy + 1) != 0)
+            AddPromotedTile(cx + c, cy + 1, PROMOTE_WALKED);
         if (c == 0 || MapGridGetElevationAt(cx + c, cy) <= objEvent->baseElevation)
             continue;
+        // Side wall column: same per-column attribution as the footprint walk — real (non-bridge)
+        // cliff terrain above the base anywhere in the column means its bridged tiles occlude with
+        // terrain AND deck (CLIFF | BRIDGE); an all-deck column stays deck-only.
+        columnCliff = FALSE;
         for (r = 0; r < rows; r++)
+        {
+            if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->baseElevation
+             && MapGridGetBridgeAt(cx + c, cy - r) == 0)
+                columnCliff = TRUE;
+        }
+        for (r = 0; r < rows; r++)
+        {
             if (MapGridGetElevationAt(cx + c, cy - r) > objEvent->baseElevation)
-                AddCliffPromotedTile(cx + c, cy - r);
+            {
+                u32 kind = MapGridGetBridgeAt(cx + c, cy - r) != 0 ? PROMOTE_BRIDGE : 0;
+                if (columnCliff)
+                    kind |= PROMOTE_CLIFF;
+                AddPromotedTile(cx + c, cy - r, kind);
+            }
+        }
     }
 }
 
@@ -749,39 +966,50 @@ static void RedrawCliffTile(s16 x, s16 y)
     CurrentMapDrawMetatileAt(x, y);
 }
 
-// Rebuild the cliff-promoted tile set from current object positions and redraw any tile that
-// entered or left it (its foreground recipe changed). Called once per frame from the overworld.
+// Rebuild the cliff-promoted-tile set from current object positions and redraw any tile whose
+// promotion changed (its foreground recipe changed). Called once per frame from the overworld.
 void UpdateCliffFacePromotion(void)
 {
-    struct Coords16 *prev = sCliffPromotedTilesPrev;
-    u8 prevCount = sCliffPromotedTileCount;
+    struct Coords16 *prev = sPromotedTilesPrev;
+    u8 prevCount = sPromotedTileCount;
     u32 i;
 
     for (i = 0; i < prevCount; i++)
-        prev[i] = sCliffPromotedTiles[i];
-    sCliffPromotedTileCount = 0;
+    {
+        prev[i] = sPromotedTiles[i];
+        sPromotedKindsPrev[i] = sPromotedKinds[i];
+    }
+    sPromotedTileCount = 0;
 
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         struct ObjectEvent *objEvent = &gObjectEvents[i];
         const struct ObjectEventGraphicsInfo *graphicsInfo;
+        bool32 behind;
 
         if (!objEvent->active || objEvent->drawAtHighestElevation)
             continue;
 
         graphicsInfo = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+        behind = ObjectEventIsRenderedBehind(objEvent)
+              || objEvent->cliffLayer == CLIFF_LAYER_UNDER_BRIDGE;
 
-        // Occlusion is gated on the foot-based cliff state, not per-tile elevation: only an object whose
-        // feet are behind the cliff (BEHIND/OBSCURED) is promoted. This stops a FRONT object's head from
-        // flipping "behind" just because the tile north of it is higher terrain it stands in front of.
-        // Cover the sprite's whole footprint at the tile it is leaving and the tile it is entering, so a
-        // mid-step sprite straddling both is occluded across its full span (and its destination is set up
-        // before it arrives). The two footprints coincide when not stepping; AddCliffPromotedTile dedups.
-        if (objEvent->cliffLayer != CLIFF_LAYER_FRONT)
-        {
-            PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
-            PromoteSpriteFootprint(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
-        }
+        // One footprint walk per object covers both occlusion systems (see PromoteObjectFootprint):
+        // bridge decks promote deck-only for any object below them (the under-vs-on-top discriminator
+        // is the base-vs-tile-elevation test inside the walk), full promotion only where the object's
+        // frozen base is below the terrain covering it (BEHIND/OBSCURED, and UNDER_BRIDGE — a wide
+        // sprite under/behind a bridged tile also spans neighbouring plain wall tiles, whose columns
+        // must occlude its side slivers) — refined per footprint COLUMN inside the walk, so a step
+        // between under-a-deck and behind-a-cliff never fully promotes the all-deck part of the
+        // sprite's cover, and a wide sprite emerging sideways keeps its still-covered column promoted.
+        // Gating cliffs on the foot-based state stops a FRONT object's head from flipping "behind"
+        // just because the tile north of it is higher terrain it stands in front of. Cover the sprite's
+        // whole footprint at the tile it is leaving and the tile it is entering, so a mid-step sprite
+        // straddling both is occluded across its full span. Footprints coincide when not stepping;
+        // deduped. Walked decks (same-level bridged tiles the sprite covers) are marked inside the
+        // same walk.
+        PromoteObjectFootprint(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y, behind);
+        PromoteObjectFootprint(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y, behind);
 
         // The surf unit's overhang needs covering in FRONT too (top edges, walls alongside). But a
         // waterfall is ridden in FRONT the whole way: while on or crossing one, the surfer sits above
@@ -795,16 +1023,20 @@ void UpdateCliffFacePromotion(void)
             PromoteSurfBlobOverhang(objEvent, graphicsInfo, objEvent->currentCoords.x, objEvent->currentCoords.y);
             PromoteSurfBlobOverhang(objEvent, graphicsInfo, objEvent->previousCoords.x, objEvent->previousCoords.y);
         }
+
     }
 
-    // Redraw tiles whose promotion state flipped. Off-screen tiles are skipped by
+    // Redraw tiles whose promotion changed (their compositing recipe changed): full and deck-only
+    // promotion composite differently, so a tile whose KIND changed redraws too, not just one that
+    // entered/left the set. The first loop catches kind changes and drop-outs (against the kind
+    // snapshot); the second catches tiles new this frame. Off-screen tiles are skipped by
     // RedrawCliffTile (and pick up the live state via the slice redraw when they scroll into view).
     for (i = 0; i < prevCount; i++)
-        if (!IsCliffPromotedCell(prev[i].x, prev[i].y))
+        if (GetPromotedKind(prev[i].x, prev[i].y) != sPromotedKindsPrev[i])
             RedrawCliffTile(prev[i].x, prev[i].y);
-    for (i = 0; i < sCliffPromotedTileCount; i++)
-        if (!WasInTileList(prev, prevCount, sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y))
-            RedrawCliffTile(sCliffPromotedTiles[i].x, sCliffPromotedTiles[i].y);
+    for (i = 0; i < sPromotedTileCount; i++)
+        if (!WasInTileList(prev, prevCount, sPromotedTiles[i].x, sPromotedTiles[i].y))
+            RedrawCliffTile(sPromotedTiles[i].x, sPromotedTiles[i].y);
 }
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)

@@ -136,7 +136,7 @@ struct PhasedAnimGroup
 // Layer count of a left-packed (transparent entries dropped) recipe; derivable, so it isn't stored.
 static inline u32 EntryCount(const u16 *e)
 {
-    return e[3] ? 4 : (e[2] ? 3 : (e[1] ? 2 : (e[0] ? 1 : 0)));
+    return e[4] ? 5 : (e[3] ? 4 : (e[2] ? 3 : (e[1] ? 2 : (e[0] ? 1 : 0))));
 }
 
 static inline u32 SlotCount(const struct CompositeSlot *s)
@@ -853,14 +853,23 @@ static u8 ResolveBank(const u16 *entries, u32 n, u8 maskBits)
                 freeBank = i;
             continue;
         }
-        if (sBanks[i].maskBits == maskBits
-         && sBanks[i].entries[0] == (n > 0 ? entries[0] : 0)
-         && sBanks[i].entries[1] == (n > 1 ? entries[1] : 0)
-         && sBanks[i].entries[2] == (n > 2 ? entries[2] : 0)
-         && sBanks[i].entries[3] == (n > 3 ? entries[3] : 0))
+        if (sBanks[i].maskBits == maskBits)
         {
-            sBanks[i].refcount++;
-            return i;
+            u32 j;
+            bool32 same = TRUE;
+            for (j = 0; j < COMPOSITE_MAX_LAYERS; j++)
+            {
+                if (sBanks[i].entries[j] != (j < n ? entries[j] : 0))
+                {
+                    same = FALSE;
+                    break;
+                }
+            }
+            if (same)
+            {
+                sBanks[i].refcount++;
+                return i;
+            }
         }
     }
     if (freeBank < 0)

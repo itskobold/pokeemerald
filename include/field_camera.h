@@ -34,7 +34,7 @@ void ResetCameraUpdateInfo(void);
 u32 InitCameraUpdateCallback(u8 trackedSpriteId);
 void CameraUpdate(void);
 void UpdateCliffFacePromotion(void);
-bool32 IsTileCliffPromoted(s16 x, s16 y);
+bool32 IsTilePromoted(s16 x, s16 y);
 void UpdateCameraElevation(void);
 void UpdateCameraBiome(void);
 bool8 IsFreecamActive(void);

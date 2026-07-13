@@ -16,21 +16,27 @@
 
 // Per-tile attributes are stored separately, one u16 per tile, in each
 // data/layouts/*/attributes.bin file (loaded parallel to map.bin):
-//   bits 0-7   elevation level (0-255, every value an ordinary level)
-//   bit 8      cliff collision (impassable only to objects climbing behind a cliff)
-//   bit 9      collision (impassable)
-//   bits 10-13 bgMaterial (currently unused)
+//   bits 0-3   elevation level (0-15, every value an ordinary level)
+//   bit 4      cliff collision (impassable only to objects climbing behind a cliff)
+//   bit 5      collision (impassable)
+//   bits 6-10  bgMaterial (0-31, selects a primary metatile as a borrowed ground fill)
+//   bits 11-15 bridge (0 = none, 1-31 = one of the active location's bridge graphics)
+// A tile's EFFECTIVE elevation is its 4-bit level plus the owning location's
+// baseElevation (see struct MapHeaderLocationData); MapGridGetElevationAt returns
+// that sum, saturated to ELEVATION_EFFECTIVE_MAX.
 // Movement semantics that used to ride on special elevation values live on metatile
 // behaviors: stairs (MB_FORWARD_STAIRS / MB_BACKWARD_STAIRS / MB_SIDEWAYS_STAIRS_*) gate level changes, the
 // surf behaviors gate water, and multi-level is handled by the behind-cliff system.
 // Scripts may toggle the collision bit at runtime (MapGridSetMetatileImpassabilityAt)
 // without disturbing the elevation level.
-#define MAPATTR_ELEVATION_MASK   0x00FF // Bits 0-7 (0-255)
+#define MAPATTR_ELEVATION_MASK   0x000F // Bits 0-3 (0-15)
 #define MAPATTR_ELEVATION_SHIFT  0
-#define MAPATTR_CLIFF_COLLISION  0x0100 // Bit 8, collision for objects behind a cliff
-#define MAPATTR_COLLISION        0x0200 // Bit 9, collision (impassable)
-#define MAPATTR_BGMATERIAL_MASK  0x3C00 // Bits 10-13 (unused for now)
-#define MAPATTR_BGMATERIAL_SHIFT 10
+#define MAPATTR_CLIFF_COLLISION  0x0010 // Bit 4, collision for objects behind a cliff
+#define MAPATTR_COLLISION        0x0020 // Bit 5, collision (impassable)
+#define MAPATTR_BGMATERIAL_MASK  0x07C0 // Bits 6-10 (0-31)
+#define MAPATTR_BGMATERIAL_SHIFT 6
+#define MAPATTR_BRIDGE_MASK      0xF800 // Bits 11-15, per-location bridge graphic (0 = none)
+#define MAPATTR_BRIDGE_SHIFT     11
 
 // The location attribute is 2 bits, so a map can define up to 4 distinct
 // per-location property sets (see struct MapHeaderLocationData / MapHeader).
@@ -38,33 +44,41 @@
 
 enum
 {
-    ELEVATION_DEFAULT = 5,     // Default ground level (levels 0-63 are all valid)
+    ELEVATION_DEFAULT = 5,     // Default ground level (tile levels 0-15 are all valid)
     ELEVATION_INVALID = 0xFFFF
 };
 
+// Effective elevations (location base + tile level) are u8 and saturate here, keeping
+// 0xFF free for the sentinels below.
+#define ELEVATION_EFFECTIVE_MAX 0xFE
+#define SATURATE_ELEVATION(elevation) ((elevation) > ELEVATION_EFFECTIVE_MAX ? ELEVATION_EFFECTIVE_MAX : (elevation))
+
 // Wildcard for elevation-matching occupancy queries (GetObjectEventIdByPosition):
-// matches an object at any elevation. Never a real level (those are 0-63).
+// matches an object at any elevation. Never a real level (those saturate at 0xFE).
 #define ELEVATION_MATCH_ANY 0xFF
 
-// Map events (warps, coord/bg events, object templates) store their level in the
-// low bits of their elevation byte. Bit 7 is the "any elevation" flag: when set,
-// the event interacts with the player regardless of elevation (for object events
-// it also forces always-on-top rendering). Levels are 0-63 so bit 7 is free.
+// Map events (warps, coord/bg events, object templates) store their map-relative level
+// (0-15, the location base is added when they meet an effective elevation) in the low
+// bits of their elevation byte. Bit 7 is the "any elevation" flag: when set, the event
+// interacts with the player regardless of elevation (for object events it also forces
+// always-on-top rendering). Bits 4-6 are unused (free).
 #define EVENT_ELEVATION_ANY  0x80
-#define EVENT_ELEVATION_MASK 0x7F
+#define EVENT_ELEVATION_MASK 0x0F
 
 // PACK_METATILE/PACK_LOCATION/PACK_BIOME operate on a map grid block (map.bin u16);
-// PACK_ELEVATION operates on an attribute byte (attributes.bin u8).
+// PACK_ELEVATION/PACK_BGMATERIAL/PACK_BRIDGE operate on an attribute value (attributes.bin u16).
 #define PACK_METATILE(metatileId) PACK(metatileId, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
 #define PACK_LOCATION(location)   PACK(location, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
 #define PACK_BIOME(biome)         PACK(biome, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
 #define PACK_ELEVATION(elevation) PACK(elevation, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
 #define PACK_BGMATERIAL(material)  PACK(material, MAPATTR_BGMATERIAL_SHIFT, MAPATTR_BGMATERIAL_MASK)
+#define PACK_BRIDGE(bridge)        PACK(bridge, MAPATTR_BRIDGE_SHIFT, MAPATTR_BRIDGE_MASK)
 #define UNPACK_METATILE(data)  UNPACK(data, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
 #define UNPACK_LOCATION(data)  UNPACK(data, MAPGRID_LOCATION_SHIFT, MAPGRID_LOCATION_MASK)
 #define UNPACK_BIOME(data)     UNPACK(data, MAPGRID_BIOME_SHIFT, MAPGRID_BIOME_MASK)
 #define UNPACK_ELEVATION(attr) UNPACK(attr, MAPATTR_ELEVATION_SHIFT, MAPATTR_ELEVATION_MASK)
 #define UNPACK_BGMATERIAL(attr) UNPACK(attr, MAPATTR_BGMATERIAL_SHIFT, MAPATTR_BGMATERIAL_MASK)
+#define UNPACK_BRIDGE(attr)     UNPACK(attr, MAPATTR_BRIDGE_SHIFT, MAPATTR_BRIDGE_MASK)
 
 // An undefined map grid block has every bit set (no real block, with metatile id
 // <= 0x3FF and biome 0, matches it).
@@ -113,20 +127,50 @@ enum MetatileReflectionType
 
 // Per-metatile foreground/background compositing flags. One u16 per metatile, stored in each
 // data/tilesets/*/*/metatile_compositing.bin (loaded parallel to metatile_attributes). Three 3-bit
-// fields, one bit per metatile layer (0=ground, 1=middle, 2=top):
-//   bits 0-2  in front of cliff: layer 0/1/2 -> foreground (else background)
-//   bits 3-5  behind cliff:      layer 0/1/2 -> foreground (else background)
-//   bits 6-8  reflection:        layer 0/1/2 is a reflection layer (bitmask; multiple may be set)
+// layer-bitmask fields, one bit per metatile layer (0=ground, 1=middle, 2=top), plus a 2-bit
+// bridge anchor:
+//   bits 0-2   in front of cliff: layer 0/1/2 -> foreground (else background)
+//   bits 3-5   behind cliff:      layer 0/1/2 -> foreground (else background)
+//   bits 6-8   reflection:        layer 0/1/2 is a reflection layer (bitmask; multiple may be set)
+//   bits 9-10  bridge anchor (0-2): the metatile layer the bridge overlay draws immediately above —
+//              the overlay's bottom layer right after that metatile layer, its top layer right after
+//              the bottom. Only used in BRIDGE_MODE_ANCHOR, where the overlay INHERITS the anchor
+//              layer's routing — its plane per the fg masks above (promotion included), so a
+//              promoted anchor carries its bridge graphics to the foreground with it.
+//   bits 11-12 bridge mode (see METATILE_BRIDGE_MODE_*): where the overlay composites.
+//              0 = backmost of the FOREGROUND plane (default): the overlay always draws in front of
+//                  sprites, beneath any foreground-routed metatile layers;
+//              1 = anchored: the overlay rides its anchor layer (above);
+//              2 = foremost of the FOREGROUND plane: over everything in the cell.
+//   bits 13-15 unused
 // A reflection layer renders to the BG3 reflective plane and (with the attribute punch flag) punches
-// a transparent hole through the BG2 background composite wherever it is opaque.
+// a transparent hole through the BG2 background composite wherever it is opaque; an anchored bridge
+// whose anchor is a reflection layer draws to the background plane (above the reflective surface),
+// never to BG3. The bridge fields only matter on a metatile that a bridge tile is painted over (see
+// DrawMetatileAtWithId).
 #define METATILE_COMPOSITE_FRONT_SHIFT  0
 #define METATILE_COMPOSITE_BEHIND_SHIFT 3
 #define METATILE_COMPOSITE_REFLECTION_SHIFT 6
 #define METATILE_COMPOSITE_LAYER_MASK   0x7
+#define METATILE_COMPOSITE_BRIDGE_ANCHOR_SHIFT 9
+#define METATILE_COMPOSITE_BRIDGE_ANCHOR_MASK  0x3 // anchor metatile layer 0-2
+#define METATILE_COMPOSITE_BRIDGE_MODE_SHIFT 11
+#define METATILE_COMPOSITE_BRIDGE_MODE_MASK  0x3
 #define METATILE_COMPOSITE_FRONT(flags)  (((flags) >> METATILE_COMPOSITE_FRONT_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
 #define METATILE_COMPOSITE_BEHIND(flags) (((flags) >> METATILE_COMPOSITE_BEHIND_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
 // Reflection layer bitmask (bit per layer, 0 = no reflection layer).
 #define METATILE_COMPOSITE_REFLECTION(flags) (((flags) >> METATILE_COMPOSITE_REFLECTION_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
+// Bridge anchor: the metatile layer the bridge overlay (bottom then top) draws immediately above.
+#define METATILE_COMPOSITE_BRIDGE_ANCHOR(flags) (((flags) >> METATILE_COMPOSITE_BRIDGE_ANCHOR_SHIFT) & METATILE_COMPOSITE_BRIDGE_ANCHOR_MASK)
+// Bridge mode: where the overlay composites (see the field doc above).
+#define METATILE_COMPOSITE_BRIDGE_MODE(flags) (((flags) >> METATILE_COMPOSITE_BRIDGE_MODE_SHIFT) & METATILE_COMPOSITE_BRIDGE_MODE_MASK)
+
+enum MetatileBridgeMode
+{
+    METATILE_BRIDGE_MODE_FG_BACK,  // backmost of the foreground plane (default)
+    METATILE_BRIDGE_MODE_ANCHOR,   // rides its anchor metatile layer, inheriting its plane
+    METATILE_BRIDGE_MODE_FG_FRONT, // foremost of the foreground plane
+};
 
 enum {
     METATILE_LAYER_TYPE_NORMAL,  // Metatile uses middle and top bg layers
@@ -282,6 +326,14 @@ struct MapHeaderLocationData
     /* 0x07 */ u8 mapType;
     /* 0x08 */ u8 battleType;
     /* 0x09 */ bool8 showMapName;
+    // Added to every tile level of this location (0-255): a tile's effective elevation is
+    // baseElevation + its 4-bit attribute level, saturated to ELEVATION_EFFECTIVE_MAX.
+    /* 0x0A */ u8 baseElevation;
+    // 32 bridge graphics for this location, each TWO layers of 2x2 subtiles (32 * 8 = 256 u16). The
+    // per-tile bridge attribute (1-31) selects one; 0 = no bridge. NULL when the location has none.
+    // Each bridge layer's draw position (and thus its plane) is set by the metatile it is painted over,
+    // via that metatile's compositing bridge anchor (METATILE_COMPOSITE_BRIDGE_ANCHOR).
+    /* 0x0C */ const u16 *bridgeTiles;
 };
 
 struct MapHeader
@@ -313,15 +365,18 @@ struct MapHeader
                // the remaining 6 bits are unused
 };
 
-// State of a sprite relative to a cliff face it has climbed behind. Drives cliff collision and which
-// tiles promote their middle layer into the foreground to occlude the sprite (UpdateCliffFacePromotion);
-// the sprite itself always draws at the one flat object priority. FRONT is 0, so any non-FRONT state
-// means behind the cliff.
+// State of a sprite relative to higher terrain it has climbed behind (a cliff face, or the deck of a
+// bridge it is passing under). Any non-FRONT state shares the same collision/traversal treatment: the
+// object roams the higher region at a frozen-low baseElevation, walled off by the cliff-collision bit.
+// They differ only in RENDER: a cliff hides the sprite (BEHIND band / obscured), a bridge does not —
+// the sprite draws normally and only the promoted bridge deck is drawn over it (see IsBridgePromotedCell).
+// FRONT is 0. Use ObjectEventIsRenderedBehind() for the "drawn behind terrain" render/effect tests.
 enum CliffLayer
 {
-    CLIFF_LAYER_FRONT,    // in front of the cliff: rendered normally, no terrain promotion
-    CLIFF_LAYER_BEHIND,   // behind the cliff face: covered tiles promote their middle layer over it
-    CLIFF_LAYER_OBSCURED, // fully buried: every tile the sprite spans is higher, so it is hidden/silhouetted
+    CLIFF_LAYER_FRONT,        // in front of the cliff: rendered normally, no terrain promotion
+    CLIFF_LAYER_BEHIND,       // behind the cliff face: covered tiles promote their layers over it
+    CLIFF_LAYER_OBSCURED,     // fully buried: every tile the sprite spans is higher, so it is hidden/silhouetted
+    CLIFF_LAYER_UNDER_BRIDGE, // under a bridge deck: on the cliff plane for collision, but rendered normally
 };
 
 struct ObjectEvent
@@ -364,9 +419,9 @@ struct ObjectEvent
     /*0x08*/ u8 localId;
     /*0x09*/ u8 mapNum;
     /*0x0A*/ u8 mapGroup;
-    // The elevation level the object belongs to: normally the elevation of the tile it stands
-    // on, but frozen at the level it climbed up from while behind a cliff (see
-    // UpdateObjectEventBehindCliff). Full 8 bits to match the map grid's 0-255 elevations.
+    // The EFFECTIVE elevation level the object belongs to (location base + tile level):
+    // normally the elevation of the tile it stands on, but frozen at the level it climbed
+    // up from while behind a cliff (see UpdateObjectEventBehindCliff).
     /*0x0B*/ u8 baseElevation;
     /*0x0C*/ struct Coords16 initialCoords;
     /*0x10*/ struct Coords16 currentCoords;

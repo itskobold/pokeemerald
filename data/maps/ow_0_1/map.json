@@ -18,7 +18,8 @@
       "region_map_section": "MAPSEC_ABANDONED_SHIP",
       "map_type": "MAP_TYPE_ROUTE",
       "battle_scene": "MAP_BATTLE_SCENE_NORMAL",
-      "show_map_name": false
+      "show_map_name": false,
+      "bridge_tiles_filepath": "data/maps/ow_0_1/bridge_tiles_0.bin"
     },
     {
       "secondary_tileset": "gTileset_BattleFrontier",
