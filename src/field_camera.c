@@ -387,12 +387,13 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     // The cell's promotion kind (see the promoted set above). PROMOTE_CLIFF: an object is rendered
     // behind the tile — composite with the metatile's "behind" layer flags, anchored bridge graphics
     // carried forward with their anchor layers. PROMOTE_BRIDGE (deck-only): an object merely passes
-    // under the tile's bridge — the metatile keeps its "in front" routing and only the bridge overlay
-    // layers are forced to the foreground, so the object draws behind the deck but over the terrain.
+    // under the tile's bridge — the bridge overlay layers and the BEHIND-named upper layers are
+    // lifted to the foreground, so the object draws behind the deck but over the terrain.
     u32 promotedKind = GetPromotedKind(x, y);
     bool32 promote = (promotedKind & PROMOTE_CLIFF) != 0;
     // 3-bit mask (one bit per layer 0/1/2) selecting which layers go to the foreground plane for
-    // this cell's current promotion state; the rest go to the background plane. See METATILE_COMPOSITE_*.
+    // this cell's current promotion state; the rest go to the background plane. 0 for an unpromoted
+    // cell — every layer renders to the background. See METATILE_COMPOSITE_*.
     u32 fgMask;
     u16 attributes;
     // 3-bit mask (one bit per layer 0/1/2) of layers routed to the BG3 reflective plane. They render
@@ -403,18 +404,19 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
     bool32 punchHole;
     // Bridge overlay for this tile (the active location's bridge graphic): two 2x2 layers, always
     // drawn bottom then top. NULL = no bridge here. WHERE they composite is the metatile's bridge
-    // MODE: backmost of the foreground plane (default), riding the ANCHOR metatile layer and
-    // inheriting its plane routing, or foremost of the foreground plane. Deck-only promotion (an
-    // object passing under the deck) forces an anchored overlay to the foreground; the two fg modes
-    // are already there.
+    // MODE: over the tile's own layers (default), or riding the ANCHOR metatile layer and
+    // inheriting its plane routing. Like the metatile's layers, the overlay renders to the
+    // background unless the cell is promoted: any occlusion promotion lifts it to the foreground
+    // so it covers the object hiding behind / passing under it.
     const u16 *bridgeBottom = NULL;
     const u16 *bridgeTop = NULL;
     u32 bridgeAnchor = 0;
     u32 bridgeMode = METATILE_BRIDGE_MODE_FG_BACK;
     bool32 bridgeForceFg = (promotedKind & PROMOTE_BRIDGE) != 0;
     // Walked deck with no occlusion promotion: the bottom layer draws to the top of the BACKGROUND
-    // (planks under the walker's feet) while the top layer keeps its mode placement. Any occlusion
-    // kind wins over it — the deck stays foreground and the walker front-splits above instead.
+    // (planks under the walker's feet) while the top layer is lifted to the foreground (rails drawn
+    // over the walker). Any occlusion kind wins over it — the deck stays foreground and the walker
+    // front-splits above instead.
     bool32 bridgeWalked = promotedKind == PROMOTE_WALKED;
     // The per-metatile compositing flags (fg/bg masks + bridge anchors), fetched once and reused below.
     u16 compositing;
@@ -439,26 +441,26 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
 
     compositing = GetMetatileCompositingById(metatileId);
 
-    // Promoted cells use the metatile's BEHIND layer mask, in-front cells its FRONT mask. Both are
-    // authored per metatile (metatile_compositing.bin); the mask is authoritative — a BEHIND layer
-    // left out of the mask stays in the background even when an object hides behind / passes under
-    // the tile. (Plain elevated ground bakes its ground layer into BEHIND so it still occludes; see
-    // tools/bake_cliff_promote.py.) Bridge cells are no different: their bridge graphics ride their
-    // anchor layers (see the composite loop below), so promotion carries deck art forward exactly
-    // when its anchor layer comes forward.
+    // Every layer renders to the background unless the cell is promoted; the foreground plane only
+    // ever holds promoted content. A CLIFF promote (an object hides behind the tile) lifts the
+    // metatile's BEHIND layer mask, authored per metatile (metatile_compositing.bin). The mask is
+    // authoritative — a layer left out of it stays in the background even when an object hides
+    // behind / passes under the tile. (Plain elevated ground bakes its ground layer into BEHIND so
+    // it still occludes; see tools/bake_cliff_promote.py.) Bridge cells are no different: their
+    // bridge graphics ride their anchor layers (see the composite loop below), so promotion carries
+    // deck art forward exactly when its anchor layer comes forward.
     // Deck-only promotion (an object passes under/behind this tile's bridge without a full CLIFF
-    // promote) additionally lifts the metatile's BEHIND-named UPPER layers (1/2): a bridged tile
-    // whose metatile carries cliff art in them is a cliff face with a deck riding it, and that art
-    // must occlude the object like the deck does. Layer 0 (and the bgMaterial standing in for it)
-    // never lifts — ground stays behind the object. A true walk-under deck's spanned terrain names
-    // no upper layers in BEHIND, so it is unaffected and the object keeps drawing over it.
+    // promote) lifts only the metatile's BEHIND-named UPPER layers (1/2): a bridged tile whose
+    // metatile carries cliff art in them is a cliff face with a deck riding it, and that art must
+    // occlude the object like the deck does. Layer 0 (and the bgMaterial standing in for it) never
+    // lifts — ground stays behind the object. A true walk-under deck's spanned terrain names no
+    // upper layers in BEHIND, so it is unaffected and the object keeps drawing over it.
     if (promote)
         fgMask = METATILE_COMPOSITE_BEHIND(compositing);
     else if (bridgeForceFg)
-        fgMask = METATILE_COMPOSITE_FRONT(compositing)
-               | (METATILE_COMPOSITE_BEHIND(compositing) & ~(1 << 0));
+        fgMask = METATILE_COMPOSITE_BEHIND(compositing) & ~(1 << 0);
     else
-        fgMask = METATILE_COMPOSITE_FRONT(compositing);
+        fgMask = 0;
 
     // Reflection layers: the explicit per-layer flag mask wins; each background layer it names goes
     // to BG3 (multiple layers may be flagged). As a fallback, a metatile with a reflection type but
@@ -499,108 +501,101 @@ static void DrawMetatileAtWithId(const struct MapLayout *mapLayout, u16 offset, 
 
     // For each of the metatile's four sub-tiles, compose its layers bottom-to-top into the foreground,
     // background, and reflection plane arrays. Within a plane the append order IS the draw order
-    // (first appended is drawn lowest). The layer walk runs in TWO PHASES so bridge graphics stay in
-    // sync with cliff promotion: phase 0 emits the layers whose foreground-ness comes only from
-    // promotion (they were background before the cell promoted), then a FG_BACK overlay composites,
-    // then phase 1 emits everything else (background/reflection layers, layers foreground in their
-    // own right, an ANCHOR-mode overlay with its anchor). Promotion therefore slides terrain into the
-    // foreground BENEATH a FG_BACK overlay — the cell's bridge-over-terrain order is never inverted —
-    // while always-foreground layers keep drawing over it. At each metatile layer l: the layer itself
-    // (plus the bgMaterial ground beneath an empty layer 0), routed by the fg/reflection masks, then
-    // in ANCHOR mode the overlay anchored on l (bottom then top), appended immediately after so it
-    // draws directly on top of its anchor in the SAME plane (a bridge over a reflective anchor goes
-    // to the bg plane, above the reflective surface, never to BG3). A FG_FRONT overlay is appended
-    // last, over everything. Empty (id 0) subtiles are skipped; the compositor drops them anyway.
-    // A plane holds at most the metatile's 3 own layers plus the 2 bridge layers, i.e.
-    // COMPOSITE_MAX_LAYERS.
+    // (first appended is drawn lowest), and the walk emits in metatile layer order, so a promotion
+    // lifts layers to the foreground without ever inverting the cell's own stacking. At each metatile
+    // layer l: the layer itself (plus the bgMaterial ground beneath an empty layer 0), routed by the
+    // fg/reflection masks, then in ANCHOR mode the overlay anchored on l (bottom then top), appended
+    // immediately after so it draws directly on top of its anchor in the SAME plane (a bridge over a
+    // reflective anchor goes to the bg plane, above the reflective surface, never to BG3). A
+    // non-anchored overlay is appended after the layer walk, over everything in the cell: to the
+    // foreground while the cell is occlusion-promoted (the deck must cover the object hiding behind /
+    // passing under it), to the top of the background otherwise. Empty (id 0) subtiles are skipped;
+    // the compositor drops them anyway. A plane holds at most the metatile's 3 own layers plus the
+    // 2 bridge layers, i.e. COMPOSITE_MAX_LAYERS.
     for (p = 0; p < 4; p++)
     {
         u32 bgCount = 0, fgCount = 0, reflCount = 0;
-        u32 l, phase;
+        u32 l;
 
         sLayers[0] = tiles[p];
         sLayers[1] = tiles[4 + p];
         sLayers[2] = tiles[8 + p];
 
-        for (phase = 0; phase < 2; phase++)
+        for (l = 0; l < 3; l++)
         {
-            for (l = 0; l < 3; l++)
+            bool32 layerFg = (fgMask >> l) & 1;
+
+            // bgMaterial: the material metatile's ground layer composites beneath the tile's own layer 0
+            // (an extra bottom layer). Gated per-subtile: only an EMPTY layer-0 cell (id 0) gets it — a
+            // non-empty ground subtile fully occupies the cell. Foreground routing tracks layer 0 (so
+            // behind a cliff the material promotes with the ground it stands in for); reflection uses the
+            // MATERIAL's own flags, so a non-reflective material stays on the bg plane.
+            if (l == 0 && materialTiles && (sLayers[0] & 0x3FF) == 0 && (materialTiles[p] & 0x3FF))
             {
-                bool32 layerFg = (fgMask >> l) & 1;
-                // Foreground only because the cell is promoted (not in the metatile's FRONT mask).
-                bool32 promotedOnly = layerFg && !((METATILE_COMPOSITE_FRONT(compositing) >> l) & 1);
-
-                if ((phase == 0) != promotedOnly)
-                    continue;
-
-                // bgMaterial: the material metatile's ground layer composites beneath the tile's own layer 0
-                // (an extra bottom layer). Gated per-subtile: only an EMPTY layer-0 cell (id 0) gets it — a
-                // non-empty ground subtile fully occupies the cell. Foreground routing tracks layer 0 (so
-                // behind a cliff the material promotes with the ground it stands in for); reflection uses the
-                // MATERIAL's own flags, so a non-reflective material stays on the bg plane.
-                if (l == 0 && materialTiles && (sLayers[0] & 0x3FF) == 0 && (materialTiles[p] & 0x3FF))
-                {
-                    if (layerFg)
-                        sFg[fgCount++] = materialTiles[p];
-                    else if (materialReflects)
-                        sRefl[reflCount++] = materialTiles[p];
-                    else
-                        sBg[bgCount++] = materialTiles[p];
-                }
-
-                // The metatile's own layer l, routed by its fg/reflection masks.
-                if (sLayers[l] & 0x3FF)
-                {
-                    if (layerFg)
-                        sFg[fgCount++] = sLayers[l];
-                    else if (reflMask & (1 << l))
-                        sRefl[reflCount++] = sLayers[l];
-                    else
-                        sBg[bgCount++] = sLayers[l];
-                }
-
-                // ANCHOR mode: the overlay rides metatile layer l (bottom then top) in whichever
-                // phase l lands in, inheriting its fg/bg routing (or forced to the foreground by
-                // deck-only promotion — an object passing under the deck). A walked deck's bottom
-                // layer is emitted at the top of the background instead (after the walk, below).
-                if (bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_ANCHOR && bridgeAnchor == l)
-                {
-                    if (!bridgeWalked && (bridgeBottom[p] & 0x3FF))
-                    {
-                        if (layerFg || bridgeForceFg)
-                            sFg[fgCount++] = bridgeBottom[p];
-                        else
-                            sBg[bgCount++] = bridgeBottom[p];
-                    }
-                    if (bridgeTop[p] & 0x3FF)
-                    {
-                        if (layerFg || bridgeForceFg)
-                            sFg[fgCount++] = bridgeTop[p];
-                        else
-                            sBg[bgCount++] = bridgeTop[p];
-                    }
-                }
+                if (layerFg)
+                    sFg[fgCount++] = materialTiles[p];
+                else if (materialReflects)
+                    sRefl[reflCount++] = materialTiles[p];
+                else
+                    sBg[bgCount++] = materialTiles[p];
             }
 
-            // FG_BACK mode: the overlay composites between the phases — above any promotion-added
-            // terrain, beneath every layer that is foreground in its own right (sprites stay under).
-            if (phase == 0 && bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_FG_BACK)
+            // The metatile's own layer l, routed by its fg/reflection masks.
+            if (sLayers[l] & 0x3FF)
+            {
+                if (layerFg)
+                    sFg[fgCount++] = sLayers[l];
+                else if (reflMask & (1 << l))
+                    sRefl[reflCount++] = sLayers[l];
+                else
+                    sBg[bgCount++] = sLayers[l];
+            }
+
+            // ANCHOR mode: the overlay rides metatile layer l (bottom then top), inheriting its
+            // fg/bg routing (or forced to the foreground by deck-only promotion — an object passing
+            // under the deck). A walked deck's bottom layer is emitted at the top of the background
+            // instead (after the walk, below).
+            if (bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_ANCHOR && bridgeAnchor == l)
             {
                 if (!bridgeWalked && (bridgeBottom[p] & 0x3FF))
-                    sFg[fgCount++] = bridgeBottom[p];
+                {
+                    if (layerFg || bridgeForceFg)
+                        sFg[fgCount++] = bridgeBottom[p];
+                    else
+                        sBg[bgCount++] = bridgeBottom[p];
+                }
                 if (bridgeTop[p] & 0x3FF)
-                    sFg[fgCount++] = bridgeTop[p];
+                {
+                    if (layerFg || bridgeForceFg)
+                        sFg[fgCount++] = bridgeTop[p];
+                    else
+                        sBg[bgCount++] = bridgeTop[p];
+                }
             }
         }
 
-        // FG_FRONT mode: the overlay is the foremost of the foreground plane — appended after the
-        // layer walk, over everything in the cell.
-        if (bridgeBottom && bridgeMode == METATILE_BRIDGE_MODE_FG_FRONT)
+        // Non-anchored overlay: over the tile's own layers. Foreground while the cell is
+        // occlusion-promoted; a walked-only deck lifts just its top layer (rails drawn over the
+        // walker) while the bottom goes to the top of the background (below); otherwise the whole
+        // overlay sits on top of the background.
+        if (bridgeBottom && bridgeMode != METATILE_BRIDGE_MODE_ANCHOR)
         {
+            bool32 overlayFg = promote || bridgeForceFg;
+
             if (!bridgeWalked && (bridgeBottom[p] & 0x3FF))
-                sFg[fgCount++] = bridgeBottom[p];
+            {
+                if (overlayFg)
+                    sFg[fgCount++] = bridgeBottom[p];
+                else
+                    sBg[bgCount++] = bridgeBottom[p];
+            }
             if (bridgeTop[p] & 0x3FF)
-                sFg[fgCount++] = bridgeTop[p];
+            {
+                if (overlayFg || bridgeWalked)
+                    sFg[fgCount++] = bridgeTop[p];
+                else
+                    sBg[bgCount++] = bridgeTop[p];
+            }
         }
 
         // Walked deck: the bottom layer lands on top of the background, whatever the mode — over all
@@ -738,14 +733,15 @@ void RebandPhasedMapView(void)
 //   PROMOTE_BRIDGE - an object merely passes under this tile's bridge deck: the bridge overlay
 //                    layers are forced to the foreground, plus any UPPER metatile layers (1/2)
 //                    named in the BEHIND mask (cliff art carried by a bridged tile). Layer 0 /
-//                    bgMaterial keep their FRONT routing, so the object draws behind the deck
+//                    bgMaterial stay in the background, so the object draws behind the deck
 //                    (and any wall art) but in front of the ground.
 //   PROMOTE_WALKED - an object stands ON this tile's bridge deck (its base equals the tile's
 //                    elevation): when this is the tile's ONLY kind, the deck's BOTTOM layer routes
 //                    to the top of the background so the walker draws over the planks, while the
-//                    top layer keeps its foreground placement (rails in front). Either occlusion
-//                    kind above overrides it — the deck stays foreground and the walker is lifted
-//                    over it by the front split instead.
+//                    top layer is lifted to the foreground (rails in front; an ANCHOR-mode overlay
+//                    follows its anchor layer instead). Either occlusion kind above overrides it —
+//                    the deck stays foreground and the walker is lifted over it by the front split
+//                    instead.
 // A tile can carry several kinds (e.g. one object on the deck while another passes under). Rebuilt
 // each frame from object positions. Sized for each object's full sprite footprint (width x height in
 // tiles) at both its current and destination tile while stepping; a handful of tiles each.

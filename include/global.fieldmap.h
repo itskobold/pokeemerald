@@ -125,30 +125,31 @@ enum MetatileReflectionType
     METATILE_REFLECTION_WAVY,  // Wavy reflection (formerly MB_PUDDLE / water)
 };
 
-// Per-metatile foreground/background compositing flags. One u16 per metatile, stored in each
-// data/tilesets/*/*/metatile_compositing.bin (loaded parallel to metatile_attributes). Three 3-bit
-// layer-bitmask fields, one bit per metatile layer (0=ground, 1=middle, 2=top), plus a 2-bit
-// bridge anchor:
-//   bits 0-2   in front of cliff: layer 0/1/2 -> foreground (else background)
-//   bits 3-5   behind cliff:      layer 0/1/2 -> foreground (else background)
-//   bits 6-8   reflection:        layer 0/1/2 is a reflection layer (bitmask; multiple may be set)
+// Per-metatile compositing flags. One u16 per metatile, stored in each
+// data/tilesets/*/*/metatile_compositing.bin (loaded parallel to metatile_attributes).
+// Every metatile layer renders to the BG2 background plane by default; the BG1 foreground plane
+// exists only to occlude objects, and is populated per cell at runtime by the promotion system
+// (an object hides behind / passes under the tile — see UpdateCliffFacePromotion):
+//   bits 0-2   unused (formerly the always-foreground "in front of cliff" mask)
+//   bits 3-5   behind mask: layer 0/1/2 -> foreground while the cell is promoted (else background)
+//   bits 6-8   reflection:  layer 0/1/2 is a reflection layer (bitmask; multiple may be set)
 //   bits 9-10  bridge anchor (0-2): the metatile layer the bridge overlay draws immediately above —
 //              the overlay's bottom layer right after that metatile layer, its top layer right after
 //              the bottom. Only used in BRIDGE_MODE_ANCHOR, where the overlay INHERITS the anchor
-//              layer's routing — its plane per the fg masks above (promotion included), so a
+//              layer's routing — its plane per the behind mask above (promotion included), so a
 //              promoted anchor carries its bridge graphics to the foreground with it.
 //   bits 11-12 bridge mode (see METATILE_BRIDGE_MODE_*): where the overlay composites.
-//              0 = backmost of the FOREGROUND plane (default): the overlay always draws in front of
-//                  sprites, beneath any foreground-routed metatile layers;
-//              1 = anchored: the overlay rides its anchor layer (above);
-//              2 = foremost of the FOREGROUND plane: over everything in the cell.
+//              0 = over the tile's own layers (default): top of the background normally, in the
+//                  foreground while the cell is promoted (so the deck covers the object under it);
+//              1 = anchored: the overlay rides its anchor layer (above).
+//              2 = legacy: identical to 0 (was "foremost of the foreground" when metatile layers
+//                  could be foreground in their own right).
 //   bits 13-15 unused
 // A reflection layer renders to the BG3 reflective plane and (with the attribute punch flag) punches
 // a transparent hole through the BG2 background composite wherever it is opaque; an anchored bridge
 // whose anchor is a reflection layer draws to the background plane (above the reflective surface),
 // never to BG3. The bridge fields only matter on a metatile that a bridge tile is painted over (see
 // DrawMetatileAtWithId).
-#define METATILE_COMPOSITE_FRONT_SHIFT  0
 #define METATILE_COMPOSITE_BEHIND_SHIFT 3
 #define METATILE_COMPOSITE_REFLECTION_SHIFT 6
 #define METATILE_COMPOSITE_LAYER_MASK   0x7
@@ -156,7 +157,6 @@ enum MetatileReflectionType
 #define METATILE_COMPOSITE_BRIDGE_ANCHOR_MASK  0x3 // anchor metatile layer 0-2
 #define METATILE_COMPOSITE_BRIDGE_MODE_SHIFT 11
 #define METATILE_COMPOSITE_BRIDGE_MODE_MASK  0x3
-#define METATILE_COMPOSITE_FRONT(flags)  (((flags) >> METATILE_COMPOSITE_FRONT_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
 #define METATILE_COMPOSITE_BEHIND(flags) (((flags) >> METATILE_COMPOSITE_BEHIND_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
 // Reflection layer bitmask (bit per layer, 0 = no reflection layer).
 #define METATILE_COMPOSITE_REFLECTION(flags) (((flags) >> METATILE_COMPOSITE_REFLECTION_SHIFT) & METATILE_COMPOSITE_LAYER_MASK)
@@ -167,9 +167,9 @@ enum MetatileReflectionType
 
 enum MetatileBridgeMode
 {
-    METATILE_BRIDGE_MODE_FG_BACK,  // backmost of the foreground plane (default)
+    METATILE_BRIDGE_MODE_FG_BACK,  // over the tile's own layers; foreground only while promoted (default)
     METATILE_BRIDGE_MODE_ANCHOR,   // rides its anchor metatile layer, inheriting its plane
-    METATILE_BRIDGE_MODE_FG_FRONT, // foremost of the foreground plane
+    METATILE_BRIDGE_MODE_FG_FRONT, // legacy: same as FG_BACK
 };
 
 enum {
